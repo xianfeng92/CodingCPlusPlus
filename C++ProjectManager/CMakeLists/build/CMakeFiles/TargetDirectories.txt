@@ -1,0 +1,4 @@
+/home/parallels/Stan/xforg/CodingCPlusPlus/C++ProjectManager/CMakeLists/build/CMakeFiles/edit_cache.dir
+/home/parallels/Stan/xforg/CodingCPlusPlus/C++ProjectManager/CMakeLists/build/CMakeFiles/rebuild_cache.dir
+/home/parallels/Stan/xforg/CodingCPlusPlus/C++ProjectManager/CMakeLists/build/CMakeFiles/mylib.dir
+/home/parallels/Stan/xforg/CodingCPlusPlus/C++ProjectManager/CMakeLists/build/CMakeFiles/hello.dir
