@@ -10,6 +10,5 @@ using namespace std;
 int main(int argc, char **argv)
 {
     cout << "Hello CMakeLists World" << endl;
-    // !! 常见 CMakeLists.txt 中指令剖析
-    
+    // !! 常见 CMakeLists.txt 中指令剖析sss
 }
