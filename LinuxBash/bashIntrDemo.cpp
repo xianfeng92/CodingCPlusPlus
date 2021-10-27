@@ -134,7 +134,6 @@ zsh: command not found: \n\n\n\n\n
 被双引号用括住的内容，将被视为单一字串。它防止通配符扩展，但允许变量扩展。这点与单引号的处理方式不同
 
 
-
 // !! 条件测试
 
 命令test或 [] 可以测试一个条件是否成立，如果测试结果为真，则该命令的Exit Status为0，如果测试结果为假，则命令的Exit Status为 1
@@ -187,37 +186,171 @@ if :; then echo "always true"; fi
 此外，也可以执行 /bin/true 或 /bin/false 得到真或假的 Exit Status, 再看一个例子：
 
 
+echo "Is it morning? Please answer yes or no."
+
+read YES_OR_NO
+
+read 命令的作用是等待用户输入一行字符串，将该字符串存到一个 Shell 变量中
+
+
+此外，Shell 还提供了 && 和 || 语法，和 C 语言类似，具有 Short-circuit 特性，很多 Shell 脚本喜欢写成这样
+
+test "$(whoami)"!="root"&&(echo you are using a non-privileged account; exit 1)
+
+&& 相当于 “if…then…”，而 || 相当于“if not…then…”
+
+test "$VAR" -gt 1 && test "$VAR" -lt 3
+
+
+// !! case/esac
+
+case命令可类比C语言的 switch/case 语句，esac 表示 case 语句块的结束。Shell 脚本的 case 可以匹配字符串和 Wildcard，每个
+匹配分支可以有若干条命令，末尾必须以;;结束。执行时找到第一个匹配的分支并执行相应的命令，然后直接跳到 esac 之后，不需要像 C 语言一样用 break 跳出
+
+
+echo "Is it morning? Please answer yes or no."
+
+read YES_OR_NO
+
+case "$YES_OR_NO" in
+
+yes|y|Yes|YES)
+
+        echo "Good Morning!";;
+
+[nN]*)
+
+        echo "Good Afternoon!";;
+
+*)
+         echo "Sorry, $YES_OR_NO not recognized. Enter yes or no."
+         exit 1;;
+esac
+
+
+// !! 循环 for/do/done
+
+Shell 脚本的 for 循环结构和 C 语言很不一样，它类似于某些编程语言的 foreach 循环
+
+for FRUIT in apple banana pear
+
+do
+
+      echo "I like $FRUIT"
+
+done
+
+FRUIT 是一个循环变量，第一次循环 $FRUIT 的取值是 apple，第二次取值是 banana，第三次取值是 pear。
+
+要将当前目录下的 chap0、chap1、chap2 等文件名改为 chap0~、chap1~、chap2~ 等（按惯例，末尾有~字符的文件名表示临时文件），
+这个命令可以这样写:
+
+for FILENAME in `ls chap?`; do mv $FILENAME $FILENAME~; done
+
+
+// !!while/do/done
+
+while 的用法和 C 语言类似。比如一个验证密码的脚本:
+
+echo "Enter password:"
+
+read TRY
+
+while [ "$TRY" != "secret" ]; do
+
+       echo "Sorry, try again"
+
+       read TRY
+
+done
+
+
+// !! break 和 continue
+
+break[n] 可以指定跳出几层循环；continue 跳过本次循环，但不会跳出循环。
+
+即 break 跳出，continue 跳过。
+
+
+// !! 位置参数和特殊变量
+
+有很多特殊变量是被 Shell 自动赋值的，我们已经遇到了 $? 和 $1。其他常用的位置参数和特殊变量在这里总结一下：
+
+1. $0 相当于C语言main函数的 argv[0]
+
+2. $1、$2 ... 这些称为位置参数（Positional Parameter），相当于 C 语言 main 函数的 argv[1]、argv[2]...
+
+3. $@ 表示参数列表 "$1" "$2" ...， 例如可以用在 for 循环中的 in 后面
+
+4. $* 表示参数列表"$1" "$2" ...，同上
+
+5. $? 上一条命令的 Exit Status
+
+6. $$ 当前进程号
+
+
+// !! 输入输出 echo
+
+echo ----> 显示文本行或变量，或者把字符串输入到文件。
+
+-e 解析转义字符
+-n 不回车换行。默认情况echo回显的内容后面跟一个回车换行
+
+
+// !! 管道
+
+可以通过 | 把一个命令的输出传递给另一个命令做输入
+
+
+tee
+
+tee 命令把结果输出到标准输出，另一个副本输出到相应文件
+
+tee -a a.txt表示追加操作
+
+
+// !! 文件重定向
+
+cmd > file 把标准输出重定向到新文件中
+
+cmd >> file 追加
+
+cmd < &- 关闭标准输入
+
+cmd > &fd 把文件描述符fd作为标准输出
+
+cmd < &fd 把文件描述符fd作为标准输入
+
+
+// !! 函数
+
+和 C 语言类似，Shell 中也有函数的概念，但是函数定义中没有返回值也没有参数列表
+
+foo(){ echo "Function foo is called";}
+
+echo "-=start=-"
+
+foo
+
+echo "-=end=-"
+
+
+注意函数体的左花括号 { 和后面的命令之间必须有空格或换行，如果将最后一条命令和右花括号 } 写在同一行，命令末尾必须有分号; 但不建议将函数定义写至
+一行上，不利于脚本阅读。Shell 脚本中的函数必须先定义后调用，一般把函数定义语句写在脚本的前面，把函数调用和其它命令写在脚本的最后。 Shell 函数没有参数
+列表并不表示不能传参数，事实上，函数就像是迷你脚本，调用函数时可以传任意个参数，在函数内同样是用 $0、$1、$2 等变量来提取参数，函数中的位置参数相当于函数的
+局部变量，改变这些变量并不会影响函数外面的 $0、$1、$2 等变量。函数中可以用 return 命令返回，如果 return 后面跟一个数字则表示函数的 Exit Status。
 
 
 
+// !! Shell 脚本调试方法
 
+Shell 提供了一些用于调试脚本的选项，如:
 
+1. -n 读一遍脚本中的命令但不执行，用于检查脚本中的语法错误
 
+2. -v 一边执行脚本，一边将执行过的脚本命令打印到标准错误输出
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+3. -x 提供跟踪执行信息，将执行的每一条命令和结果依次打印出来
 
 
 int main(int argc, char **argv)
