@@ -35,6 +35,7 @@ class MyClass {
 
 } // namespace mynamespace
 
+
 // .cpp 文件
 namespace mynamespace {
 
@@ -44,6 +45,7 @@ void MyClass::Foo() {
 }
 
 } // namespace mynamespace
+
 
 3. 不要在命名空间 std 内声明任何东西, 包括标准库的类前置声明. 在 std 命名空间声明实体是未定义的行为, 会导致如不可移植. 声明标准库下的实体, 
    需要包含对应的头文件.
