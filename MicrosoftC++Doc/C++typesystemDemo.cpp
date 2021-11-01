@@ -149,6 +149,16 @@ int* pNumber = &number;   // Declare and initialize a local integer
                               // pNumber, the integer variable called "number". Note "number" was changed, not "pNumber".
 
 
+The corrected code example uses local stack memory to create the backing store that pNumber points to. We use a fundamental type for 
+simplicity. In practice, the backing store for pointers are most often user-defined types that are dynamically-allocated in an area 
+of memory called the heap (or free store) by using a new keyword expression (in C-style programming, the older malloc() C runtime 
+library function was used). Once allocated, these variables are usually referred to as objects, especially if they are based on a 
+class definition. Memory that is allocated with new must be deleted by a corresponding delete statement (or, if you used the malloc() 
+function to allocate it, the C runtime function free()).
+
+However, it is easy to forget to delete a dynamically-allocated object-especially in complex code, which causes a resource bug 
+called a memory leak.  For this reason, the use of raw pointers is strongly discouraged in modern C++. It is almost always better 
+to wrap a raw pointer in a smart pointer, which will automatically release the memory when its destructor is invoked.
 
 
 int main(int argc, char **argv)
