@@ -426,6 +426,245 @@ vector<string> users ;
 users .push_back(”Draco”) ;
 
 
+更好的选择是使用 emplace_back() 函数，它会直接在 vector 容器的尾部生成对象， 而不是先生成一个临时对象， 然后将其复制到容器，最后清理掉临时对象。
+
+注意: 为了获得性能提升, 使用 emplace_back 应该使用被包含对象的构造函数的参数作为参数， 而不是直接使用被包含对象的一个实例作为参数。
+
+// direct construction in place . Faster
+std::vector<std::string> users;
+users.emplace_back("Draco");
+
+// !! 建议
+
+下面这些情况，使用 emplace 替换掉 push/insert 可以获得性能表现提升:
+
+1. 我们给插入函数传递的参数的类型和容器中存放的元素的类型不同
+
+2. 容器允许插入的元素和已有元素重复，或着我们能够保证绝大多数情况下插入的元素和容器已有元素不同
+
+3. 插入操作需要构造新对象。通常，除了在 vector，deque 或 string 的中间插入对象外，都满足这一情况
+
+
+// !! 3.4 并发
+
+C++11 引入的一个重要特性就是对并发操作 (Concurrency) 的支持。 之前因为 C++ 标准并没有直接支持并发操作，人们使用 boost 或者 POSIX 这类第三方库完
+成并发操作。现在我们可以使用 C++ 自带的并发 库来完成相关操作。
+
+
+
+// !! 3.4.1 线程
+
+C++11 为我们提供了非常简单的方法来创建线程 (thread)，只需要定义一个 std::thread 变量即可。在程序运行时，构造完这个变量线程就自动开始并发执行。线程执行后, 
+我们可以使用 join() 来等待它结束执行， 也可以使用 detach() 来将其和创建它的线程分离。另外，我们还可以使用 chrono 库来对线程进行调度, 在特定的时间唤醒线程。
+但需要注意的是标准库并没有提供访问操作系统原始线程信息的 API, 比如线程的优先级等等。
+
+下面的代码演示了如何使用 C++11 来创建一个线程，线程在变量构造后会立刻执行。
+
+std::thread workThread(computeStuff);
+workThread.join();// pauses until workThread completes
+
+C++11 还提供了 thread_local 关键字允许我们将变量标记为线程局部变量。顾名思义，线程局部变量私有于单个线程，不同线程访问同一个线程局部变量，实际上访问的是不同
+的变量。相同线程访问同一个线程局部变量，访问结果是该线程上次对这一变量的操作结果。可以认为，每个线程都有独立的一份线程局部变量。
+
+
+// !! 3.4.1 原子变量
+
+多线程并发访问共享数据需要保证线程安全。而实现线程安全的最简单方法就是使用 atomic 库。C++ 自带的整数类型和指针类型都可以通过 atomic 库实现原子操作，其它类型只要
+满足 trivially copyable 定义，可以通过 atomic 模板实现来定义它的原子版本。
+
+使用 atomic 模板定义了一个原子变量，对这一变量进行的后缀自增操作保证在多个线程间是原子的
+
+std::atomic<int> latestUserId;
+
+int User::getGlobalUserId()
+{
+    return latestUserId++;
+}
+
+
+// !! 3.4.2 互斥锁
+
+除了原子变量，对于较长的代码还可以使用 mutex(互斥锁) 来保证并发执行的正确性。当一个线程开始进入临界区，可以使用 mutex 加锁，等线程离开临界区进行解锁，保证临界区
+的代码不会同时被多个线程执行。
+
+
+为了更加可靠还可以结合使用 unique_lock 和 mutex， unique_lock 通过 unique_ptr 来保证在析构时解锁 mutex， 从而避免只使用 mutex 的情况下，临界区代码
+抛出异常，mutex 没有解锁而导致的死锁问题。
+
+需要注意的是 mutex 的操作代价较大，应该尽可能使用原子变量，只有在操作比较复杂时使用 mutex
+
+int latestUserId;
+std::mutex latestUserIdMutex;
+
+int User::getGlobalUserId()
+{
+    std::unique_lock<std::mutex> mutexLock(latestUserIdMutex);
+    return latestUserId++;
+}// mutex is released automatically here
+
+
+// !! 3.4.3 条件变量
+
+通过条件变量，我们可以将一个线程阻塞， 直到另外一个线程将条件满足。 因为条件变量需要被多个线程访问, 我们需要结合 mutex 或其它并发访问保护措施来使用它
+
+
+// !! 3.4.4 async
+
+C++11 为我们引入了 async() 使用它我们可以异步调用一个任务，并在未来需要的时候等待结果返回； 相比于使用 thread 进行并发操作，它更方便、能够更好地利用 CPU 资源
+
+在默认调度策略下，调度器可以延迟任务执行，直到我们主动获取任务结果时才执行任务。我们可以将调度策略设置为 launch::async 来避免这一问题。
+
+// !! 3.4.5 future/promise
+
+调用 async() 会返回一个 future 对象, 可以通过这一对象获取异步执行的任务的执行结果。因为任务是异步执行的，在获取结果时任务未必已经执行完毕，所以我们调用
+future.get() 后，调用线程就可能会阻塞等待任务执行完毕。
+
+
+std::future<int> idFuture = std::async(getGlobalUserId);
+int userid = idFuture.get();// waits for getGlobalUserId to return
+
+
+// !! 建议
+
+并发编程是一个强大的工具，但用起来却非常容易出错。
+
+1. 在考虑使用 thread 前，尝试使用 async() 和 future 对象
+
+2. 为了线程安全，我们可以使用原子变量(场景非常简单的情况下) 和 mutex(处理复杂操作)
+
+3. 使用 future 对象和 promise 对象可以很好地控制线程的执行, 进行线程间的数据同步
+
+
+// !! 3.4.6 计时工具
+
+C++ 标准通过 chrono 库为我们提供了计时工具。但 C++11 标准的 chrono 库，还不支持时区、UTC 时间、TAI 时间以及日历功能。所以对于需要依赖日历的物理模拟应用，
+应该使用其它计时工具。
+
+
+
+// !! 建议
+
+1. 使用 C++ 的 chrono 库来代替原来的 C 计时库进行计时
+2. 对于依赖日历的物理模拟应用，应该使用其它计时工具
+
+
+// !! 3.4.7 随机分布生成器
+
+在游戏、自动化测试和模拟程序中我们经常需要用到伪随机数。以往，我们可能会使用 C 的 rand() 函数来生成一个随机数，然后对其进行模运算，从而获得 0 到某个整数范围的
+随机数。比如，使用下面的代码可以获得一个 0 到 100 范围内的伪随机数
+
+int randInt = rand() % 101; // C-style
+
+通过这种方法生成的伪随机数并不是在 0 到 100 之间均匀分布的。 对于需要自然随机分布的应用， 比如进行蒙特卡洛模拟，使用这样的伪随机数会得到错误的结果。
+
+C++ 标准现在提供了一个更通用的随机分布生成器，只是使用它相较于使用 rand() 来说较为繁琐，如果随机数的分布不是很重要，读者可以继续使用 rand() 来生成随机数。
+下面是使用 C++ 标准自带的随机分布生成器生成 0 到 100 的随机数
+
+std::default_random_engine generator;
+std::uniform_int_distribution distribution(0,100);
+int randInt = distribution(generator);
+
+
+// !! 建议
+
+1. 对于随机数的质量要求不高的应用，可以继续使用 C 库的 rand() 来生成伪随机数
+
+2. 对于需要高质量合理分布的随机数的应用，应该使用 C++ 标准带来的 random 库
+
+3. 对于需要高质量随机数的应用，应该使用 PCG 来替换 C++ 标准自带的 std::default_random_engine
+
+
+// !! 3.5 更好的编码体验
+
+C++11 提供了一些非功能性的语法糖来帮助我们编码。
+
+// !! 3.5.1 auto 关键字
+
+C++11 提供了 auto 关键字来方便我们通过赋给变量的初始值的类型来确定变量的类型。
+
+auto hero = new User("hero");
+User hero = new User("hero");
+
+类型自动推导对于类型名称特别长的情况特别适用:
+
+unordered_map<string , User >:: const_iterator userIt = userLookupMap.find("hero");
+
+auto userId = userLookupMap.find("hero");
+
+另一种比较常见的用法是在 for 循环中使用类型自动推导
+
+for (const auto& user：users) { ... }
+
+
+使用 auto 关键字定义变量有许多好处： 减少需要键入的代码、强迫人们必须对变量进行初始化、方便以后重构代码、减少类型转换 bug 等等。
+另外，在编写部分模板代码、Lambda 表达式代码时，如果没有 auto 关键字，写起来也要麻烦许多
+
+需要注意的是使用 auto 关键字会降低代码可读性。考虑变量类型大量被 auto 关键字代替，人们想要得知类型信息可能需要跳转多个源文件
+此外，auto 关键字也会降低 IDE(集成开发环境) 对变量类型的识别，从而造成 IDE 的智能提示失效。
+
+
+// !! 建议
+
+在下面这些情况可以使用 auto 关键字让编译器自动推导变量类型
+
+1. 变量类型非常复杂，本身可读性就低
+
+2. 没有合适的类型别名来描述复杂的变量类型
+
+3. 变量的类型对于读代码的人来说非常明显的情况
+
+
+
+// !! 3.5.2 枚举类 (Enum Class)
+
+C++11 为我们提供了枚举类 (Enum Class), 它的成员不会被隐式转换为整数类型，可以保证类型安全。当我们需要成员的整数值时，也可以使用 static_cast() 来进行类型转换。
+
+此外，我们需要通过类似 FruitType::APPLE 的形式来访问它的成员，要比枚举类型可以直接以类似 FRUIT_TYPE_APPLE 的形式访问要更好，更不容易出现命名冲突。
+
+我们还可以在枚举类的名称后指定成员的类型。 默认情况下，枚举类的成员的值为 int 类型。
+
+enum class FruitType:int{
+    APPLE, ORANGE, PEAR
+    };
+
+int numUsers = static_cast<int>(FruitType::APPLE)
+
+// !! 建议
+
+1. 我们可以使用枚举类 (Enum Class) 来保证类型安全，减少命名冲突
+
+2. 我们应该在定义枚举类时给出它的成员的类型，这样做既避免了可能的误用，又减少了内存使用
+
+
+// !! 3.5.3 基于范围的 for 循环
+
+C++11 为我们提供了一个新的 for 循环语法用于遍历容器。相比于之前遍历容器的方法，使用它更为高效。但需要注意的是，如果我们需要对遍历的容器进行修改，或是需要正在遍历
+的元素的索引，可能基于范围的 for 循环就不太适用了。
+
+使用基于范围的 for 循环，我们需要注意下面这些细节:
+
+1. 对于不需要修改的类对象，使用 const & 来接收元素
+
+2. 对于需要修改的容器元素，使用 & 来接收元素
+
+3. 对于元素类型是基本变量类型的，且不需要修改的情况，使用值传递来接收元素
+
+
+// !! 3.5.4 类型别名
+
+// template ” typedef ” allowed in C++11
+
+template <class T>
+using StringMap = std::map<std::string, T>; // Only in C++11
+
+// valid C++98 − confusing
+typedef bool (*compare)(int , int);
+
+// valid C++11 − less confusing
+using compare = bool (*)(int, int);
+
+// !! 建议使用 using 替代 typedef 来定义类型别名
+
 
 
 int main(int argc, char **argv)
