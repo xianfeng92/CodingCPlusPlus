@@ -1,9 +1,6 @@
 #include<iostream>
 
-
-
-
-// !! C++ 11 重大改进
+// !! 一、C++ 11 重大改进
 
 C++11 标准对 C++ 有不少影响深远的改进，其中最重要的便是: 移动语义 (Move Semantics)、智能指针 (Smart Pointers)、哈希表和集合(Hash Maps and Sets)。
 
@@ -129,6 +126,304 @@ delete[] buffer;
 
 上面的代码也给出了 unique_ptr 智能指针的一个用法:强制传递对象所有权。
 
+shared_ptr 智能指针引用的对象的所有权可以被共享。只要还有一个 shared_ptr 智能指针引用了该对象，这一对象就不会被清除。 shared_ptr 智能指针通过引用计数来维护对象。
+对 shared_ptr 智能指针进行复制操作， 其内部的引用计数会加 1， 当 shared_ptr 智能指针被销毁时，其内部的引用计数会减 1。 当引用计数变为 0 时，智能指针引用的对象会
+被清除。虽然 shared_ptr 智能指针使用起来非常方便，但一般情况下， 维护引用计数 (共享的引用计数需要额外分配独立的内存空间) 会带来额外的性能损失，我们不应该优先使用它。
+下面的代码，给出了一个使用 shared_ptr 智能指针的常见场景:缓存系统。因为缓存系统内部使用的是 shared_ptr 智能指针， 并且用户获取数据获得的也是 shared_ptr，缓存系
+统可以安全地在任何时间移除 shared_ptr 智能指针，不需要担心用户无法访问到数据。和使用 unique_ptr 智能指针相同，我们推荐使用 make_shared() 来生成 shared_ptr 
+指针对象。
+
+// Simple LRU Cache put() fragment using make_shared()
+
+template<class KEY, class VAL> class
+
+LRUCache::put(const KEY& key, const VAL& value)
+{
+    //...
+    if(!contains(key))
+    {
+        storage[key] = std::make_shared(value);
+    }
+    //...
+}
+
+std::shared_ptr<LargeObject> localSharedUser = lruCache.get(somekey);
+
+weak_ptr 智能指针也被用来引用共享的对象, 但其对对象的引用计数没有影响。被 weak_ptr 智能指针引用的对象仍然可能被清除; 正因为如此，访问 weak_ptr 智能指针引用的
+对象需要先验证对象是否被清除，然后使用 lock() 函数将其转换为一个 shared_ptr 智能指针后再进行使用。通常，我们使用 weak_ptr 智能指针来避免循环引用导致的内存
+无法释放。
+
+
+unique_ptr 智能指针只有一个降落伞，很安全。shared_ptr 智能指针有两个降落伞，虽然也很安全，但代价比 unique_ptr 智能指针高；最后是原生指针，一点都不安全。
+
+
+// !! 建议
+
+1. 总是使用智能指针，不要直接使用原生指针
+
+2. 对于单一所有权的对象使用 unique_ptr 智能指针; 对于需要共享所有权的对象使用 shared_ptr 智能指针; 对于可能出现的循环引用，使用 weak_ptr 智能指针
+
+3. 总是使用 make_unique()(C++ 14 引入)/make_shared() 来生成智能指针对象 (也就是在对象创建后，立即生成智能指针引用它)
+
+4. 不要继续使用已经废弃的 auto_ptr 智能指针，使用 unique_ptr 智能指针替换它
+
+5. 如果要使用 this 指针生成 shared_ptr 智能指针，应该考虑使用 shared_from_this()。 此外，不应该使用 this 指针生成 unique_ptr 智能指针
+
+
+
+// !! 哈希表和集合
+
+无序容器，比如哈希表可以提供 O(1) 时间复杂度的插入，查询和删除操作。我们可以将一个对象的属性进行组合，将其转换为一个整数类型的关键字，然后使用这一关键字作
+为键值访问哈希表。C++98 为我们提供了 map 和 set 这两种哈希表的变种， 它们可以提供 O(lgN) 时间复杂度的插入，查询和删除操作 (标准库使用平衡二叉树来实现它们，
+所以时间复杂度 不是哈希表的 O(1))。map 和 set 的优点是，它们中所存放的元素的排列是有序的，元素在容器中的位置由元素间进行小于比较运算得到。如果元素在容器中的顺序
+对我们不重要，使用无序容器显然是更好的选择。
+
+C++11 为我们提供了 unordered_map 和 unordered_set(还有 un- ordered_multimap 和 unordered_multiset) 等无序容器。我们只需要为容器中存放的对象实现
+良好的哈希函数，就可以得到不错的插入，查询和删除操作的性能提升。
+
+
+下面的代码使用 unordered_map 实现了字符串到整数的映射:
+
+std::unordered_map<std::string, int> usertoindex;
+
+
+// !! 建议
+
+1. 总是优先使用 std::unordered_map 和 std::unordered_set 作为无序容器，除非其它无序容器可以提供我们所需的额外功能，或是可以带来明显的性能提升
+
+2. 优先使用 std::unordered_map 和 std::unordered_set 作为查询表，除非容器中元素的顺序对我们有用
+
+3. 在某些情况下，比如表中元素较少时，哈希表的操作效率可能不如二叉树，甚至是顺序数组
+
+
+
+// !! 二、C++ 11 重大改进
+
+本章介绍的特性对于我们来说非常重要。这些特性可以使我们的工作变得更加轻松，它们有的有利于我们捕获程序 bug，有的让我们的代码变得更简洁，更容易阅读。
+
+// !! 1.代码安全性/错误捕获
+
+C++11 为我们提供了一些新的语言特性使得我们在编译时就可以捕获一些代码逻辑上的错误。
+
+
+// !! 1.1 nullptr 关键字
+
+NULL 本质上是一个预定义的值为 0 的常量，并非 C/C++ 语言的关键字， 这就造成了一定问题。
+
+1. 不要设置指针变量的值为 0 或 NULL
+2. 使用新的 nullptr 关键字代替 NULL
+
+
+// !! 1.2 override 关键字
+
+子类如果要覆盖父类的函数， 我们需要将父类的函数定义为虚函数 (virtual function)， 子类覆盖对应的虚函数，需要保证它和父类的虚函数完全匹配。很多时候，我们可能会因为
+疏忽而没有让两者完全匹配，造成难以察觉到 bug， 比如下面的代码:
+
+class User 
+{
+    virtual void print();
+    virtual string getName() const;
+    void performAction(const Action &a); // note: not virtual !
+};
+
+class PowerUser : public User
+{
+    void print();// overrides User::print
+
+    string getName(); // doesn’t override User::getName −missing const
+
+    void performAction(const Action& a); // doesn’t override − base func not virtual
+}
+
+
+C++11 为我们提供了一个新的关键字 override 可以避免这一问题, 使用这一关键字的函数如果没有与之完全匹配的父类虚函数，编译器就会报告错误，我们就可以及时做出修改。
+
+
+此外，C++11 还为我们提供了 final 关键字， 用于声明函数或类不可被覆盖或继承, 使用这一关键字有助于编译器做出更好的优化。
+
+
+// !! 建议
+
+1. 覆盖父类虚函数时，总是使用 override 关键字
+
+2. 使用 final 关键字有助于编译器优化 (虽然优化效果不明显)
+
+
+
+// !! 1.3 控制类的默认行为
+
+编译器为了方便，会自动生成一些我们没有定义的函数, 比如类的默认构造函数、复制构造函数、赋值运算函数、析构函数等等。
+
+对于复制构造函数来说， 编译器生成的复制构造函数会遍历类的每个成员， 然后执行对应的复制构造函数。
+
+一般来说，使用编译器自动生成的函数是个不错的选择，但有时候我们的一些行为可能导致编译器不会为我们自动生成想要的函数。比如，如果我们自己定义了一个复制构造函数，
+编译器就不会再为我们自动生成移动构造函数， 也就享受不到 C++11 带来的潜在的自动的性能提升。
+
+显然，记忆编译器何时会自动生成这些函数，何时不会太过麻烦。
+
+我们可以遵循这样的原则:如果有一个编译器可以自动生成的函数被我们自己定义的， 那么所有其它可以自动生成的函数都应该进行显式标记。C++11 允许我们使用 default 和 delete 
+关键字 (default 关键字标记的函数编译器会自动生成，delete 关键字标记的自动生成函数会被编译器移除) 来对编译器可以自动生成的函数进行标记。
+
+
+class User
+{
+    User() = default;
+
+    User(const User& other) = default;// accept default copy construction
+
+    User& operator=(const User &) = delete; //disallow copy assignment
+
+    User(User&& other) = default;// accept default move
+
+    User& operator=(const User&& other) = default;// accept default move assignment
+
+    ~User() = default // accept default destructor
+}
+
+要么全部，要么一个都不，这一原则也适用于父类包含虚析构函数的情况。通常这种情况下，我们还应该使用 delete 关键字来移除复制构造函数，避免使用子类对象构造父类对象引发的
+数据损失。
+
+
+// !! 建议
+
+我们可以使用下面的原则来避免错误发生:
+
+1. 如果我们只需要编译器自动生成的函数 (大多数情况下)，要么不要对任一函数使用 default 标记，要么对所有函数使用 default 标记
+
+2. 如果我们自己定义了任意一个编译器可以自动生成的函数 (包括虚析构函数)，对于其它自动生成函数，要么我们自己定义它，要么使用 default/delete 对其进行标记
+
+3. 使用 delete 标记子类不需要的父类函数，以及不需要的编译器自动生成的函数 (之前 C++98 通过 private 关键字进行这一工作)
+
+
+// !! 1.4 array 数组
+
+C++11 为我们带来了 array 数组， 使用它不仅可以像普通的 C 风格数组一样利用栈空间, 还可以利用标准库提供的一些模板算法: 比如 find()， count() 等等。
+
+此外，因为 array 数组是一个类型, 不会有像 C 风格数组一样有被编译器作为一个普通指针传给函数造成的潜在风险。
+
+printMe(User * user) { ... } // prints user pointer
+User allUsers [50]; // native C−style array
+printMe(allUsers); // OOPS, only the first user is printed
+
+使用 array 数组， 我们可以在编译时就提前发现问题:
+
+array<User, 50> allUsers;
+printMe(allUsers); // ERROR − no matching function
+
+
+// !! 建议
+
+1. 尽量使用 std::array 替代语言自带的固定大小的数组
+
+2. 除非使用 std::array 会带来明显的性能下降
+
+3. 通常在开启常规的编译器优化后， std::array 带来的性能下降非常小，甚至完全没有影响
+
+
+// !! 1.5 {} 初始化
+
+在之前我们可以使用 = 运算符加上 () 构造函数，或 {} 来对变量进行初始化，但具体在何种情况使用何种方法初始化其实并不简单。C++11 对 {} 初始化进行了扩展，
+让它可以用于任意情况的变量初始化。下面是使用 {} 进行变量初始化的三种形式:
+
+std::string name = {"kobe"};
+std::string name1{"Kobe"};
+std::string name2 = string("Kobe");
+
+目前，C++ 自带的容器都可以接收 std::initializer_list 作为构造函数的参数，我们可以使用 {} 来对容器进行初始化，例子如下:
+
+vector<int> actionIndexes = {1, 2, 3, 4};
+
+map<string , int> nameToIndexMap = { {”Vader” , 1} , {”Skywalker” ,1} };
+
+需要注意的是，初始化列表构造函数会被优先匹配，读者可以考虑下面的代码，第一行代码调用的是普通的构造函数，生成了一个大小为 5 的 vector 对象，第二行代码调用的是
+初始化列表构造函数，生成了一个大小为 1，第一个元素为 5 的 vector 对象。
+
+vector<int> v(5) ; // vector of size 5
+vector<int> v{5}; // vector with 1 value which is 5
+
+
+
+// !! 三、更强大的功能
+
+一般来说，如果某个功能能够为绝大多数开发者带来好处，我们就会在未来将其加入 C++ 标准。
+
+// !! 3.1 constexpr 关键字
+
+现代 C++ 倾向于在编译期就尽可能多地完成代码计算, 直接将计算结果写入最终的二进制代码。这样做之后， 程序运行时所需要实时计算的代码就会少很多，程序在性能表现
+上会提高不少。
+
+C++11 引入了 constexpr 关键字，我们可以使用这一关键字来标记能够在编译期预计算的表达式。如果一个表达式被使用 constexpr 进行标记，它的计算不应该依赖于程序 
+运行时才能确定的其它变量。
+
+constexpr long long factorial(int n)
+{
+    return n <= 1 ? 1 : (n * factorial(n - 1));
+}
+
+factorial(4); // 24 − computed at compile time!
+factorial (someNumber) ; // slower , computed at run time !
+
+// !! 建议
+
+1. 对于静态的 (static)，并且不需要修改的类成员变量使用 constexpr 进行标记，而不是 const; 尽管对于整数类型的变量，两者的意义一样， 但对于其它类型，
+   使用 constexpr 更为准确
+
+2. 尽量使用 static constexpr 标记的成员变量来替代 #define 定义的宏， 这样做既可以得到内联代码的好处，又保证了类型安全
+
+3. 如果一个功能的结果可以在编译期预计算， 考虑使用 constexpr 来优化性能表现
+
+
+// !! 3.2 Lambda 表达式
+
+很多时候，我们可能需要将自定义的函数传递给其它函数。为了简化这一过程，C++11 为我们提供了 Lambda 表达式，可以在原地生成一个函数对象，它的基本形式如下:
+
+[ capture list ] (parameter list ) { function body }
+
+Lambda 表达式的计算结果是一个 std::function 对象。
+
+Lambda 表达式的计算结果是一个 std::function 对象。下面的代码，演示了以往传递自定义函数的方法和使用 Lambda 表达式的方法。可以看出以往方法是传递一个函数指针，
+自定义函数的代码和函数调用的地方距离较远，且自定义函数会暴露给其它无关部分。而现在的方法可以在调用函数的地方直接定义函数代码，不需要将自定义的函数暴露给其它无关部分。
+
+// Using named function
+
+bool isLannister(const string& username) 
+{
+    return username.find(”Lannister”) != string ::npos;
+}
+
+int numLannisters = std::count_if(usernames.begin(), usernames.end(), isLannister);
+
+// Using lambda
+int numLannisters = std::count_if(usernames.begin(), usernames.end(), [](const string& username){
+    return username.find(”Lannister”) != string ::npos;
+});
+
+
+一般来说如果同一个函数被多次作为函数参数使用或者它的代码行数较多, 就不应该使用 Lambda 表达式来定义它。
+
+
+// !! 建议
+
+1. 在大多数情况下，使用 Lambda 表达式可能会造成代码可读性下降
+2. 在下面这些情况考虑使用 Lambda 表达式：
+   自定义函数需要访问局部变量，使用 Lambda 表达式要比使用 functor 对象或 std::bind() 更具可读性
+   自定义函数的函数体非常简单 
+   自定义函数不会被多次使用
+3. 使用 Lambda 表达式时:
+   不要使用捕捉所有模式 (capture-all modes)，而是在捕捉列表指定需要的变量
+
+为了可读性，建议不要在同一行定义 Lambda 表达式，而是将 Lambda 表达式定义在一个缩进后的新行，并对表达式的函数体缩进一级。
+
+
+// !! 3.3 原地构造插入
+
+对于很多标准库中的容器, 比如 vector 使用 push_back() 插入一个新元素可能会调用不止一次构造函数。比如下面的代码，字符串字面量首先被作为参数构造了一个局部的 string 
+对象，然后 vector 使用复制构造 (copy-construct) 函数生成了一个新的 string 对象，并将其放入了容器尾部。
+
+
+vector<string> users ;
+// first makes string out of ”Draco”, then copy constructs into vector .Slower
+users .push_back(”Draco”) ;
 
 
 
