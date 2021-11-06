@@ -1,7 +1,6 @@
 
 // !! ELF 符号表结构
 
-
 // !! 使用 nm 查看 ELF 文件的符号表
 
 ~/Stan/xforg/CodingCPlusPlus/GCCDeping(main*) » nm SimpleSection.o 
@@ -14,7 +13,6 @@
 0000000000000004 d static_var.1919
 0000000000000000 b static_var2.1920
 --------------------------------------------------------------------------------
-
 
 
 // !! 使用 readelf 查看 ELF 文件的符合信息
