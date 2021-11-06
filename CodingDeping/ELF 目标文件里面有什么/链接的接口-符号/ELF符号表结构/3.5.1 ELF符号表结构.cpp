@@ -15,7 +15,7 @@
 --------------------------------------------------------------------------------
 
 
-// !! 使用 readelf 查看 ELF 文件的符合信息
+// !! 使用 readelf 查看 ELF 文件的符号表信息
 
 /Stan/xforg/CodingCPlusPlus/GCCDeping/ELF(main*) » readelf -s SimpleSection.o 
 
