@@ -1,22 +1,16 @@
-
-
 // !! 强符号与弱符号
 
-我们经常在编程中碰到一种情况叫'符号重复定义'，多个目标文件含有相同名字的全局符号定义, 那么这些目标文件链接的时候将会出现符号重复
-定义的错误。
+'多个目标文件含有相同名字的全局符号定义', 那么这些目标文件链接(Linking)的时候将会出现符号重复定义的错误。 我们在 main.c 和 other.c 都定义了一个全
+局整形变量 global，并将它们都初始化，那么链接器将 main.c 的目标文件 和 other.c 的目标文件进行链接时会报错。
 
-我们在 main.c 和 other.c 都定义了一个全局整形变量 global，并将它们都初始化，那么链接器将 main.c 的目标文件 和 other.c 的目标文件
-进行链接时会报错。
-
-» gcc main.c other.c                                        1 ↵ parallels@xforg
+» gcc main.c other.c                                        
 /usr/bin/ld: /tmp/cc0yf8GE.o:(.data+0x0): multiple definition of `a'; 
 /tmp/cc04nLHC.o:(.data+0x0): first defined here
 collect2: error: ld returned 1 exit status
 
-对于 C/C++ 语言来说， 编译器默认函数和初始化了的全局变量称为强符号（Strong Symbol），未初始化的全局变量为弱符号（Weak Symbol）
+对于 C/C++ 语言来说，编译器默认函数和'初始化了的全局变量称为强符号（Strong Symbol）'，'未初始化的全局变量为弱符号（Weak Symbol）'
 
 __attribute__((weak)) 是 gcc 提供的将强符号转为弱符号的关键字
-
 
 // main1.c
 extern int ext;  
@@ -116,14 +110,11 @@ int main()
     }
 }
 
-~/Stan/xforg/CodingCPlusPlus/GCCDeping/ELF 目标文件是什么/强符号与弱符号(main*) » gcc pthread.c  -o pt                                      
---------------------------------------------------------------------------------
-~/Stan/xforg/CodingCPlusPlus/GCCDeping/ELF 目标文件是什么/强符号与弱符号(main*) » ./pt                                                       
+ » gcc pthread.c  -o pt                                      
+» ./pt                                                       
 This is multi-thread version!
---------------------------------------------------------------------------------
-~/Stan/xforg/CodingCPlusPlus/GCCDeping/ELF 目标文件是什么/强符号与弱符号(main*) » gcc pthread.c  -lpthread -o pt                                                                           parallels@xforg
---------------------------------------------------------------------------------
-~/Stan/xforg/CodingCPlusPlus/GCCDeping/ELF 目标文件是什么/强符号与弱符号(main*) » ./pt                                                    
+» gcc pthread.c  -lpthread -o pt                                                                          
+ » ./pt                                                    
 This is multi-thread version!
 
 // !! 最新版本 GCC 无需指定，自动帮忙链接 lpthread ？？？？？？？
