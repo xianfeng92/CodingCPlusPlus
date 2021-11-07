@@ -15,9 +15,8 @@ int main(int argc, char **argv)
     return 0;
 }
 
-// ~/Stan/xforg/CodingCPlusPlus/GCCDeping/ELF(main*) » gcc SpecSymbol.c -o SpecSymbol
-
-// /Stan/xforg/CodingCPlusPlus/GCCDeping/ELF(main*) » ./SpecSymbol
+// » gcc SpecSymbol.c -o SpecSymbol
+// » ./SpecSymbol
 // Executable Start A704C000
 // Text End A704D255
 // Data End A7050010

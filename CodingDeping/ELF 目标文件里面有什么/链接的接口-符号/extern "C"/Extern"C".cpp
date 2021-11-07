@@ -9,9 +9,9 @@ extern "C"
     int var;
 }
 
-c++ 编译器会将在 extern "C" 的大括号里面的代码当做 C 语言代码来处理。
+// !! c++ 编译器会将 extern "C" 的大括号里面的代码当做 C 语言代码来处理
 
-如果单独声明某个变量或者函数是 C 语言的符号，可以使用如下格式：
+如果单独声明某个变量或者函数是 C 语言的符号，可以使用如下格式:
 
 extern "C" int func11(int);
 extern "C" int value;

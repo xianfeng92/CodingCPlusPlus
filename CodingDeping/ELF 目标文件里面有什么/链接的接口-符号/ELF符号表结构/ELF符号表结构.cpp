@@ -3,7 +3,7 @@
 
 // !! 使用 nm 查看 ELF 文件的符号表
 
-~/Stan/xforg/CodingCPlusPlus/GCCDeping(main*) » nm SimpleSection.o 
+ » nm SimpleSection.o 
 0000000000000000 T func1
 0000000000000000 D global_init_var
                  U _GLOBAL_OFFSET_TABLE_
@@ -17,7 +17,7 @@
 
 // !! 使用 readelf 查看 ELF 文件的符号表信息
 
-/Stan/xforg/CodingCPlusPlus/GCCDeping/ELF(main*) » readelf -s SimpleSection.o 
+ » readelf -s SimpleSection.o 
 
 Symbol table '.symtab' contains 18 entries:
    Num:    Value          Size Type    Bind   Vis      Ndx Name
@@ -38,10 +38,7 @@ Symbol table '.symtab' contains 18 entries:
     14: 0000000000000000    40 FUNC    GLOBAL DEFAULT    1 func1
     15: 0000000000000000     0 NOTYPE  GLOBAL DEFAULT  UND _GLOBAL_OFFSET_TABLE_
     16: 0000000000000000     0 NOTYPE  GLOBAL DEFAULT  UND printf
-    17: 0000000000000028    55 FUNC    GLOBAL DEFAULT    1 main
---------------------------------------------------------------------------------
-~/Stan/xforg/CodingCPlusPlus/GCCDeping/ELF(main*) »             
-
+    17: 0000000000000028    55 FUNC    GLOBAL DEFAULT    1 main           
 
 1. ELF 文件中符号表通常是文件中的一个段（'.symtab'）
 
@@ -56,21 +53,20 @@ Symbol table '.symtab' contains 18 entries:
 
 4. NOTYPE 未知类型符合
 
-5. SECTION 该符号表示一个段
+5. SECTION 该符号表示一个段, ndx 为该符号所在的段
 
-6. ndx 为该符号所在的段
    如果符号定义在本目标文件中，那么这个成员表示符号所在的段在段表中的下标； 
-   如果符号不是定义在本目标文件中： UND 表示未定义 COM 表示该符号是一个 COMMON 块 类型的符号
+   如果符号不是定义在本目标文件中： UND 表示未定义 ; COM 表示该符号是一个 COMMON 块 类型的符号
 
-7. Value 表示符号的值
+6. Value 表示符号的值
    
    // !! 每一个符号都以一个对应的值，如果这个符号是一个变量或者函数，那么符号的值就是该变量或函数的地址。
 
    特别地，在可执行文件中，符号的值表示符号的虚拟地址，这个虚拟地址对于动态链接器来说十分有用
 
-8. Size 为符号大小
+7. Size 为符号大小
    
    特别地，对于 main 和 func1 是定义在 SimpleSection.c 中的函数，属于指令，位于 .text 段中。其 Size 表示函数指令所占的字节数，Value 是函数相对于代
    码段起始位置的偏移量。
 
-9. static_var2.1920 和 static_var2.1920 两个静态变量，只对编译单元内部可见
+8. static_var2.1920 和 static_var2.1920 两个静态变量，只对编译单元内部可见
