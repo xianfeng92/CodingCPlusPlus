@@ -304,12 +304,43 @@ ELF 具体使用的是 PLT（Procedure Linkage Table） 方法，在 ELF 文件�
 
 动态链接的简要流程:
 
-1. OS 加载可执行文件头，读取 Segment 的属性, 将它们映射到进程的虚拟地址空间中
+1. OS 加载可执行文件头，检查其合法性，再从头部中的 “Program Header” 中读取每个 Segment 的虚拟地址、文件地址和属性, 并将它们映射到进程的
+   虚拟地址空间的相应位置。这些步骤跟前面静态链接的情况下的装载基本无异。在静态链接下，OS 接着就可以把 CPU 控制权转交给可执行文件的入口地址，
+   然后程序开始执行，一切看起来非常直观。
 
-2. OS 将 CPU 的控制权交给动态链接器（Dynamic Linker）, 由其完成程序的动态链接过程
+2. 在映射完可执行文件之后， OS 将 CPU 的控制权交给动态链接器（Dynamic Linker）（ld.so）的入口地址, 由其完成程序的动态链接过程
 
-3. 完成动态链接工作之后, 将控制权交给可执行文件的入口地址
+3. 在完成动态链接工作之后, 将动态链接器会将 CPU 控制权交给可执行文件的入口地址，程序开始正式执行
 
+
+// !! “.interp” 段
+
+这个段的内容是一个字符串,保存的是可执行文件用到的动态链接器的路径。
+
+用 objdump -s xxx 即可查看 xxx 的不同段的内容，如果 xxx 是动态链接的可执行程序，那么就能找到 .interp 段的内容
+
+
+>>  objdump -s Program1
+
+Program1：     文件格式 elf64-x86-64
+
+Contents of section .interp:
+ 0318 2f6c6962 36342f6c 642d6c69 6e75782d  /lib64/ld-linux-
+ 0328 7838362d 36342e73 6f2e3200           x86-64.so.2.    
+Contents of section .note.gnu.property:
+
+在 Linux 下可执行文件所需要的动态链接器的路径几乎都是 /lib64/ld-linux- x86-64.so.2 。在 Liux 系统中，/lib64/ld-linux- x86-64.so.2 
+为一个软连接。
+
+/lib64 » ls -li                                                                                                             
+总用量 0
+2623708 lrwxrwxrwx 1 root root 32 Dec 16  2020 ld-linux-x86-64.so.2 -> /lib/x86_64-linux-gnu/ld-2.31.so
+
+/lib/x86_64-linux-gnu/ld-2.31.so 才是真正的动态链接器。在 Linux 中，操作系统 OS 对可执行文件的加载的时候，它回去寻找该可执行文件所需要的
+相应的动态链接器，即 “.interp” 指定的路径的共享对象。
+
+
+// !! “.dynamic” 段
 
 
 
