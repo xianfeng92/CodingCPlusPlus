@@ -218,6 +218,7 @@ There are 11 program headers, starting at offset 64
    分离出来放在数据部分，因为每个进程都有单独的一个数据部分的副本，从而可以满足我们的需求。
 
 
+// !! 使用 GCC 产生地址无关代码很简单，我们只需要使用 ”-fPIC” 参数接口
 
 // !! 模块中各种类型的地址引用方式：
 
@@ -251,8 +252,6 @@ There are 11 program headers, starting at offset 64
 模块外部         （3）间接跳转和调用（GOT）    （4）直接访问（GOT）
 
 
-
-
 // !! -fPIC
 
 使用 GCC 产生地址无关代码很简单， 我们还需要使用 “-fPIC” 参数即可。
@@ -280,9 +279,8 @@ There are 11 program headers, starting at offset 64
 
 // !! 延迟绑定（Lazing Binding）
 
-动态链接的确有许多优点，比静态链接要灵活的多，但它是以牺牲一部分性能为代价的。据统计 ELF 程序在静态链接下要比动态链接快点，大约 1% ~ 5%，
-这当然取决于程序本身的特性以及运行环境等。同时因为要在真正运行程序前将程序引用到的所有函数都进行动态链接，这个过程很耗时，导致用户在点击运
-行程序后需要等待的时间变长，影响用户体验。
+'动态链接的确有许多优点，比静态链接要灵活的多，但它是以牺牲一部分性能为代价的'。据统计 ELF 程序在静态链接下要比动态链接快点，大约 1% ~ 5%，这当然取决于程序本身的
+特性以及运行环境等。'因为要在真正运行程序前将程序引用到的所有函数都进行动态链接'，这个过程很耗时，导致用户在点击运行程序后需要等待的时间变长，影响用户体验。
 
 同时，在我们使用程序的时候，并不是所有在程序中被引用的函数都真正被调用了（比如 if 判断就会导致有些函数不会被调用）。于是考虑能不能在函数第一次被调用
 的时候才对函数进行链接，这样也能将原本的时间（一次性链接所有函数）平摊到每次调用函数的时候——一个函数第一次链接所需要的时间很少，使得用户体验得到明显提升。
@@ -290,7 +288,7 @@ There are 11 program headers, starting at offset 64
 // !! 这种方案称作延迟绑定（Lazy Binding），基本思想就是在函数第一次被用到的时候才进行绑定（符号查找、重定位等），这样可以大幅提高程序的启动速度
 
 ELF 具体使用的是 PLT（Procedure Linkage Table） 方法，在 ELF 文件中表现为段名中包含 plt 的段，其本质就是在指令和 GOT 之间又增加了一层跳转的过程，
-在第一次调用的时候，调用一个“绑定函数”来完成函数的绑定过程（填充GOT表中的项），在之后的调用时，直接调用 GOT 表中的项。每一个函数都在 plt 中有一个对应的项。
+'在第一次调用的时候，调用一个“绑定函数”来完成函数的绑定过程（填充GOT表中的项），在之后的调用时，直接调用 GOT 表中的项'。每一个函数都在 plt 中有一个对应的项。
 
 
 动态链接器绑定过程具体调用的方法是 _dl_runtime_resolve(), 它需要的两个参数:
@@ -315,7 +313,7 @@ ELF 具体使用的是 PLT（Procedure Linkage Table） 方法，在 ELF 文件�
 
 // !! “.interp” 段
 
-这个段的内容是一个字符串,保存的是可执行文件用到的动态链接器的路径。
+这个段的内容是一个字符串, 保存的是可执行文件用到的动态链接器的路径。
 
 用 objdump -s xxx 即可查看 xxx 的不同段的内容，如果 xxx 是动态链接的可执行程序，那么就能找到 .interp 段的内容
 
@@ -325,8 +323,8 @@ ELF 具体使用的是 PLT（Procedure Linkage Table） 方法，在 ELF 文件�
 Program1：     文件格式 elf64-x86-64
 
 Contents of section .interp:
- 0318 2f6c6962 36342f6c 642d6c69 6e75782d  /lib64/ld-linux-
- 0328 7838362d 36342e73 6f2e3200           x86-64.so.2.    
+ 0318 2f6c6962 36342f6c 642d6c69 6e75782d  /lib64/ld-linux-x86-64.so.2
+ 0328 7838362d 36342e73 6f2e3200            
 Contents of section .note.gnu.property:
 
 在 Linux 下可执行文件所需要的动态链接器的路径几乎都是 /lib64/ld-linux- x86-64.so.2 。在 Liux 系统中，/lib64/ld-linux- x86-64.so.2 
@@ -342,8 +340,87 @@ Contents of section .note.gnu.property:
 
 // !! “.dynamic” 段
 
+动态链接 ELF 中最重要的结构应该是 ”.dynamic” 段， 这个段里面保存了动态链接器所需要的基本信息，比如'依赖于哪些共享对象、动态链接符号表的位置、动态链接重定位表的位置、
+共享对象初始化代码的地址'等。
+
+”.dynamic” 段的结构 Elf64_Dyn 或 Elf32_Dyn 定义在 /usr/include/elf.h 文件中，如下:
+
+~ » cd /usr/include                                             
+--------------------------------------------------------------------------------
+/usr/include » subl elf.h 
+
+// !! ps: /usr/include linux 下开发和编译应用程序所需要的头文件  
+
+/* Dynamic section entry.  */
+
+typedef struct
+{
+  Elf32_Sword	d_tag;			/* Dynamic entry type */
+  union
+    {
+      Elf32_Word d_val;			/* Integer value */
+      Elf32_Addr d_ptr;			/* Address value */
+    } d_un;
+} Elf32_Dyn;
+
+typedef struct
+{
+  Elf64_Sxword	d_tag;			/* Dynamic entry type */
+  union
+    {
+      Elf64_Xword d_val;		/* Integer value */
+      Elf64_Addr d_ptr;			/* Address value */
+    } d_un;
+} Elf64_Dyn;
+
+
+Elf64_Dyn 或 Elf32_Dyn 结构由一个类型值加上一个附加的数值或指针，对于不同的类型，后面附加的数值或者指针有着不同的含义。这里列举几个比较常见的类型值
+(这些值都是定义在”elf.h”里面的宏)，如下所示:
+
+/usr/include » subl elf.h 
+
+#define DT_NULL		0		/* Marks end of dynamic section */
+#define DT_NEEDED	1		/* Name of needed library */
+#define DT_PLTRELSZ	2		/* Size in bytes of PLT relocs */
+#define DT_PLTGOT	3		/* Processor defined value */
+#define DT_HASH		4		/* Address of symbol hash table */
+#define DT_STRTAB	5		/* Address of string table */
+#define DT_SYMTAB	6		/* Address of symbol table */
+#define DT_RELA		7		/* Address of Rela relocs */
+#define DT_RELASZ	8		/* Total size of Rela relocs */
+#define DT_RELAENT	9		/* Size of one Rela reloc */
+#define DT_STRSZ	10		/* Size of string table */
+#define DT_SYMENT	11		/* Size of one symbol table entry */
+#define DT_INIT		12		/* Address of init function */
+#define DT_FINI		13		/* Address of termination function */
+#define DT_SONAME	14		/* Name of shared object */
+#define DT_RPATH	15		/* Library search path (deprecated) */
+#define DT_SYMBOLIC	16		/* Start symbol search here */
+#define DT_REL		17		/* Address of Rel relocs */
+#define DT_RELSZ	18		/* Total size of Rel relocs */
+#define DT_RELENT	19		/* Size of one Rel reloc */
+#define DT_PLTREL	20		/* Type of reloc in PLT */
+#define DT_DEBUG	21		/* For debugging; unspecified */
+
+
+Linux 还提供了一个 ldd 命令用来查看程序主模块或一个共享库依赖于哪些共享库
+
+// !! 动态符号表
+
+在静态链接中，有一个专门的段叫做符号表”.symtab”(Symbol Table) '里面保存了所有关于该目标文件的符号的定义和引用'。动态链接的符号表示实际上它跟静态链接十分相似。比如
+前面例子中的 Program1 程序依赖于 Lib.so，引用到了里面的 foobar() 函数。那么对于 Program1 来说，我们往往称 Program1 导入(Import)了 foobar() 函数，foobar 
+是 Program1 的导入函数(Import Function)； 而站在 Lib.so 的角度来看，它实际上定义了 foobar() 函数，并且提供给其它模块使用，我们往往称 Lib.so 导出(Export)了
+foobar() 函数，foobar() 是 Lib.so 的导出函数(Export Function)。
+
+这种导入导出关系放到静态链接的情形下，我们可以把它们看作普通的函数定义和引用。
+
+为了表示动态链接这些模块之间的符号导入导出关系，ELF 专门有一个叫做动态符号表(Dynamic Symbol Table)的段来保存这些信息，这个段的段名通常叫做 
+”.dynsym”(Dynamic Symbol)。
+
+”.dynsym”只保存了与动态链接相关的符号，对于那些模块内部的符号，比如模块私有变量则不保存。很多时候动态链接的模块同时拥有”.dynsym”和”.symtab”两个表，”.symtab”中往
+往保存了所有符号，包括”.dynsym”中的符号。
 
 
 
-
+// https://blog.csdn.net/fengbingchun/article/details/101120761
 
