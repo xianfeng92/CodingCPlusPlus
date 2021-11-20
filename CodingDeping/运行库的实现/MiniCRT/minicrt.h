@@ -5,7 +5,7 @@
 extern "C" {
 #endif
 
-//malloc 
+// malloc 
 #ifndef NULL
 #define NULL (0)
 #endif
@@ -15,13 +15,13 @@ void* malloc(unsigned long size);
 static long brk(void *end_data_segment);
 long mini_crt_init_heap();
 
-//�ַ�
+// 字符串
 char* itoa(long n,char* str,long radix);
 long strcmp(const char* src, const char* dst);
 char* strcpy(char* dest, const char* src);
 unsigned long strlen(const char* str);
 
-//�ļ���IO
+//文件与IO
 typedef long FILE;
 
 #define EOF	(-1)
@@ -36,7 +36,7 @@ typedef long FILE;
 #define stderr	((FILE*)2)
 #endif
 
-//int 0x80中断不能显示64位的地址，所以不能用栈
+//int 0x80 中断不能显示64位的地址，所以不能用栈
 long write(long fd,const void *buffer,unsigned long size);
 
 long mini_crt_init_io();

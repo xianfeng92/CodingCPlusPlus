@@ -156,10 +156,10 @@ FILE *fopen(const char *filename, const char *mode)
 {
     long fd = -1;
     long flags = 0;
-    long access = 00700; //´´½¨ÎÄ¼þµÄÈ¨ÏÞ
+    long access = 00700; // 创建文件的权限
 
-    //À´×ÔÓÚ/usr/include/bits/fcntl.h
-    //×¢Òâ£ºÒÔ0¿ªÊ¼µÄÊý×ÖµÄ°Ë½øÖÆµÄ
+    //来自于 /usr/include/bits/fcntl.h
+    //注意： 以 0 开始的数字为八进制的
 #define O_RDONLY 00
 #define O_WRONLY 01
 #define O_RDWR 02
