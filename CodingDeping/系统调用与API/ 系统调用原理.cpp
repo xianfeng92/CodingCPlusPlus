@@ -138,11 +138,7 @@ cat  /proc/self/maps
 ffffffffff600000-ffffffffff601000 --xp 00000000 00:00 0                  [vsyscall]
 
 
-我们可以看见地址 7ffe913d1000 到  7ffe913d3000 的地方被映射了vdso，也就是 linux-vdso.so.1
-
-
-
-
+我们可以看见地址 7ffe913d1000 到  7ffe913d3000 的地方被映射了 vdso，也就是 linux-vdso.so.1
 
 
 
