@@ -139,7 +139,49 @@ int atexit(atexit_func_t func);
 
 // !! stream 与 string
 
-'流和字符串是 C++ STL 的最基本的两个部分', 在有了流和字符串之后，Mini CRT 将最终宣告完成，可以考虑将它重命名为 Mini CRT++。
+C++ helloWorld 程序里面一般都会用到 cout 和 string ，以展示 C++ 的特性，'流和字符串是 C++ STL 的最基本的两个部分', 在有了流和字符串之后，Mini CRT 将最终
+宣告完成，可以考虑将它重命名为 Mini CRT++。
+
+
+string 和 stream 的实现将遵循下列原则:
+
+1. 不支持模板定制，即这两个类仅支持char字符串类型，不支持自定义分配器等，没有 basic_string 模板类
+
+2. 流对象仅实现 ofstream，且没有继承体系，即没有 ios_base、stream、ostream、fstream 等类似的相关类
+
+3. 流对象没有内置的缓冲功能，即没有 stream_buffer 类支持
+
+4. cout 作为 ofstream 的一个实例，它的输出文件是标准输出
+
+
+// !! 如何使用 Mini CRT++
+
+为了能够在 linux 下正常运行，还需要建立一个新的源代码文件叫 sysdep.cpp，用于定义 linux 平台相关的一个函数：
+
+extern "C"
+{
+    void *__dso_handle = 0;
+}
+
+这个函数用于处理共享库的全局对象的构造与析构。由于共享库可能在进程退出之前被卸载，为保证共享库的全局对象被正确的析构，GCC 的 __cxa_atexit() 第三个参数用于标示这
+个析构函数属于哪个共享对象，它就是 __dso_handle  这个符号。Mini CRT 不考虑对共享库的支持，为防止链接时出现符号未定义错误，定义这个符号为 0。
+
+
+Mini CRT++ 在 Linux 平台下编译的方法如下:
+
+gcc -c -fno-builtin -nostdlib  -fno-stack-protector entry.c malloc.c stdio.c string.c printf.c atexit.c
+
+g++ -c -nostdinc++ -fno-rtti -fno-exceptions -fpermissive -fno-builtin -nostdlib -fno-stack-protector crtbegin.cpp crtend.cpp ctors.cpp new_delete.cpp sysdep.cpp iostream.cpp sysdep.cpp
+
+ar -rs minicrt.a malloc.o printf.o stdio.o string.o ctors.o atexit.o iostream.o new_delete.o sysdep.o
+
+
+在 Linux 下使用 Mini CRT++ 的方法如下:
+
+g++ -c -nostdinc++ -fno-rtti -fno-exceptions -fno-builtin -nostdlib -fno-stack-protector test.cpp
+
+ld -static -e mini_crt_entry entry.o crtbegin.o test.o minicrt.a crtend.o -o test
+
 
 
 

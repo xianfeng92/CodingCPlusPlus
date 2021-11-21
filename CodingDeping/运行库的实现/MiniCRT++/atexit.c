@@ -9,7 +9,7 @@ typedef struct _func_node
     struct _func_node *next;
 } func_node;
 
-static func_node* atexit_list = 0;
+static func_node *atexit_list = 0;
 
 int register_atexit(atexit_func_t func, void *arg, int is_cxa)
 {
@@ -35,7 +35,7 @@ int register_atexit(atexit_func_t func, void *arg, int is_cxa)
 }
 
 #ifndef WIN32
-typedef void (*cxa_func_t )( void* );
+typedef void (*cxa_func_t)(void *);
 int __cxa_atexit(cxa_func_t func, void *arg, void *unused)
 {
     return register_atexit((atexit_func_t)func, arg, 1);
@@ -56,9 +56,13 @@ void mini_crt_call_exit_routine()
         p->func();
 #else
         if (p->is_cxa)
+        {
             ((cxa_func_t)p->func)(p->arg);
+        }
         else
+        {
             p->func();
+        }
 #endif
         free(p);
     }
