@@ -1,5 +1,5 @@
 #include "minicrt.h"
-
+// Mini CRT 中并不支持特殊的格式操做，仅支持 %d 和 %s 两种简单的转换
 static char __fputc_tmp_val__ = 0;
 long fputc(char c, FILE *stream)
 {

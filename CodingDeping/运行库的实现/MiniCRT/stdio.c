@@ -1,6 +1,13 @@
 //stdio.c
 #include "minicrt.h"
 
+/*
+1.为了简单起见，这里 miniCRT 不实现此前介绍的附带的 buffer 机制，不对 Windows 下的换行机制进行转换，即\r\n与\n不进行转换。
+2.在 Windows 下，文件基本操做使用了Windows API（CreateFile,ReadFile,WriteFile,CloseHandle,SetFilePointer)
+3.在 Linux 下，则使用系统调用 open\read\write\close\seek
+4.fopen 时仅区分 "r""w""+" 这几种模式及它们的组合，不对文本模式和二进制模式进行区分，不支持追加模式（"a")。
+*/
+
 long mini_crt_init_io()
 {
 	return	1;

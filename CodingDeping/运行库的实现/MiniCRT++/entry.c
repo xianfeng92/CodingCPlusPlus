@@ -73,13 +73,15 @@ void mini_crt_entry(void)
 		crt_fatal_error("IO initalize failed");
 	}
 
+	do_global_ctors();
+	
 	ret	= main(argc,argv);
 	exit(ret);
 }
 
 void exit(long exitCode)
 {
-	// mini_crt_call_exit_routine();
+	mini_crt_call_exit_routine();
 #ifdef WIN32
 	ExitProcess(exitCode);
 #else
