@@ -1,4 +1,5 @@
-// iostream.cpp
+
+
 #include "minicrt.h"
 #include "iostream"
 
@@ -82,7 +83,7 @@ namespace std
         }
     }
 
-    ofstream &ofstream::write(const char *buf, unsigned size)
+    ofstream& ofstream::write(const char *buf, unsigned size)
     {
         fwrite(buf, 1, size, fp);
         return *this;

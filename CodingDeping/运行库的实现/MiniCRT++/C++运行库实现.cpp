@@ -169,21 +169,15 @@ extern "C"
 
 Mini CRT++ 在 Linux 平台下编译的方法如下:
 
-gcc -c -fno-builtin -nostdlib  -fno-stack-protector entry.c malloc.c stdio.c string.c printf.c atexit.c
+gcc -c -fno-builtin -nostdlib  -fno-stack-protector entry.c malloc.c string.c stdio.c printf.c atexit.c -m32
 
-g++ -c -nostdinc++ -fno-rtti -fno-exceptions -fpermissive -fno-builtin -nostdlib -fno-stack-protector crtbegin.cpp crtend.cpp ctors.cpp new_delete.cpp sysdep.cpp iostream.cpp sysdep.cpp
+g++ -c -nostdinc++ -fno-rtti -fno-exceptions  -fno-builtin -nostdlib -fno-stack-protector crtbegin.cpp crtend.cpp ctors.cpp new_delete.cpp sysdep.cpp iostream.cpp sysdep.cpp
 
 ar -rs minicrt.a malloc.o printf.o stdio.o string.o ctors.o atexit.o iostream.o new_delete.o sysdep.o
 
 
-在 Linux 下使用 Mini CRT++ 的方法如下:
+在 Linux 下使用 Mini CRT++ 的方法如下
 
 g++ -c -nostdinc++ -fno-rtti -fno-exceptions -fno-builtin -nostdlib -fno-stack-protector test.cpp
 
 ld -static -e mini_crt_entry entry.o crtbegin.o test.o minicrt.a crtend.o -o test
-
-
-
-
-
-

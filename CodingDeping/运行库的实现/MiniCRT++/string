@@ -1,6 +1,5 @@
 // string.c
-
-namespace std {
+namespace std{
 
     class string
     {
@@ -69,7 +68,7 @@ namespace std {
         return pbuf[idx];
     }
 
-    const char *string::c_str() const
+    const char* string::c_str() const
     {
         return pbuf;
     }

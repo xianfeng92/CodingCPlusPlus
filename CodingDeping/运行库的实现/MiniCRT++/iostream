@@ -1,6 +1,5 @@
 // iostream
 #include "minicrt.h"
-
 namespace std
 {
 
