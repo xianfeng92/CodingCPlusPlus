@@ -396,6 +396,250 @@ inseam =: 52(42 in octal)
 
 // !! C++ 如何确定常量的类型
 
+'程序的声明将特定的整型变量的类型告诉了 C++ 编译器'，但编译器是如何知道常量的类型呢？假设在程序中使用常量表示一个数字：
+
+cout << "Year: " << 2121 << endl;
+
+程序将把 2021 存储为 int、long 还是其他整型呢？答案是: '除非有理由存储为其他类型（如使用了特殊的后缀来表示特定的类型，或者值太大，不能存储为 int），否则 
+C++ 将整型常量存储为 int 类型'。
+
+
+首先来看看后缀。后缀是放在数字常量后面的字母，用于表示类型。
+
+1. 整数后面的 l 或 L 后缀表示该整数为 long 常量
+2. u 或 U 后缀表示 unsigned int 常量
+3. ul （可以采用任何一种顺序，大写小写均可）表示 unsigned long 常量
+
+例如，在 int 为16位、long 为32位的系统上，数字 22022 被存储为 int，占 16 位，数字 22022L 被存储为 long，占32位。同样，22022LU 和 22022UL 都被存储为
+unsigned long。'C++11 提供了用于表示类型 long long 的后缀 LL，还提供了用于表示类型 unsigned long long 的后缀 ull、Ull、uLL 和 ULL'。
+
+'由于小写 l 看上去像1，因此应使用大写 L 作后缀'
+
+
+// !! 在 C++ 中，对十进制整数采用的规则，与十六进制和八进制稍微有些不同。
+
+1. 对于不带后缀的十进制整数，将使用下面几种类型中能够存储该数的最小类型来表示：int、long 或 long long。在 int 为16位、long 为32位的计算机系统上，
+   20000 被表示为 int 类型，40000 被表示为 long 类型，3000000000 被表示为 long long 类型
+
+2. 对于不带后缀的十六进制或八进制整数，将使用下面几种类型中能够存储该数的最小类型来表示：int、unsigned int long、unsigned long、long long 或 
+   unsigned long long。在将 40000 表示为 long 的计算机系统中，十六进制数 0x9C40（40000）将被表示为 unsigned int。'这是因为十六进制常用来表示内存地址
+   ，而内存地址是没有符号的，因此，unsigned int 比 long 适合用来表示 16 位的地址'
+
+
+// !! char类型: 字符和小整数
+
+'顾名思义，char 类型是专为存储字符（如字母和数字）而设计的'。现在，存储数字对于计算机来说算不了什么，但存储字母则是另一回事。'编程语言通过使用字母的数值编码
+解决了这个问题'。
+
+因此，char 类型是另一种整型。
+
+1. 它足够长，'能够表示目标计算机系统中的所有基本符号'—所有的字母、数字、标点符号等
+
+2. 实际上，'很多系统支持的字符都不超过 128 个，因此用一个字节就可以表示所有的符号'。虽然 char 最常被用来处理字符，但也可以将它用做比 short 更小的整型
+
+在美国，最常用的符号集是 ASCII 字符集。字符集中的字符用数值编码（ASCII 码）表示。例如，字符 A 的编码为 65，字母 M 的编码为 77。
+
+// chartype.cpp
+
+#include <iostream>
+
+int main()
+{
+    using namespace std;
+    char ch;// declare a char variable
+
+    cout << "Enter a character" << endl;
+    cin >> ch;
+    cout << "Hola! ";
+    cout << "Thanks for the  " << ch <<" character " << endl;
+    return 0;
+}
+
+ » g++ --std=c++11 chartype.cpp
+--------------------------------------------------------------------------------
+ » ./a.out
+Enter a character
+M
+Hola! Thanks for the  M character 
+
+有趣的是，程序中输入的是 M，而不是对应的字符编码77。另外，程序将打印 M，而不是77。通过查看内存可以知道，77 是存储在变量 ch 中的值。这种神奇的力量不是来自 
+char 类型，而是来自 cin 和 cout，这些工具为您完成了转换工作。输入时，cin 将键盘输入的 M 转换为 77；输出时，cout 将值 77 转换为所显示的字符 M；'cin 和 
+cout 的行为都是由变量类型引导的'。如果将 77 存储在 int 变量中，则 cout 将把它显示为 77（也就是说，cout显示两个字符7）
+
+// morechar.cpp
+
+#include <iostream>
+
+int main()
+{
+    using namespace std;
+    char ch = 'M';
+    int i = ch;
+
+    cout << "The ASCII code for " << ch << " is " << i << endl;
+    cout << "Add one to the character code :" << endl;
+    ch = ch + 1;
+    i = ch;
+    cout << "The ASCII code for " << ch << " is " << i << endl;
+
+    cout << "Displaying char ch using cout.put(ch):";
+    cout.put(ch);
+
+    cout << "Using cout.put() to display a char character";
+    cout.put('!');
+    cout << "Done!" << endl;
+    return 0;
+}
+
+ » g++ --std=c++11 morechar.cpp
+--------------------------------------------------------------------------------
+ » ./a.out
+The ASCII code for M is 77
+Add one to the character code :
+The ASCII code for N is 78
+Displaying char ch using cout.put(ch):NUsing cout.put() to display a char character!Done!
+
+1. ‘M’ 表示字符 M 的数值编码，因此将 char 变量 ch 初始化为‘M’，将把 ch 设置为 77。然后，程序将同样的值赋给 int 变量 i，这样 ch 和 i 的值都是 77。
+cout 把 ch 显示为 M，而把 i 显示为 77。如前所述，'值的类型将引导 cout 选择如何显示值'
+
+由于 ch 实际上是一个整数，因此可以对它使用整数操作，如加 1，这将把 ch 的值变为 78。然后，程序将 i 重新设置为新的值（也可以将i加1）。cout 再次将这个值的
+char 版本显示为字符，将 int 版本显示为数字。
+
+2. 成员函数 cout.put()
+
+   cout.put() 到底是什么东西？ 其名称中为何有一个句点？ 函数 cout.put() 是一个重要的 C++ OOP 概念—成员函数—的第一个例子。'类定义了如何表示和控制数据。
+   成员函数归类所有，描述了操纵类数据的方法'。例如类 ostream 有一个 put() 成员函数，用来输出字符。只能通过类的特定对象（例如这里的 cout 对象）来使用成员
+   函数。要通过对象（如 cout）使用成员函数， 必须用句点将对象名和函数名称（put()）连接起来。'句点被称为成员运算符'。
+
+3. char 字面值
+
+   在 C++ 中，书写字符常量的方式有多种。对于常规字符（如字母、标点符号和数字），'最简单的方法是将字符用单引号括起。这种表示法代表的是字符的数值编码'。
+   例如, ASCII 系统中的对应情况如下: 'A'为65，即字符 A 的 ASCII 码; 'a' 为 97，即字符 a 的 ASCII 码; '5' 为 53，即数字 5 的 ASCII 码；
+   ' '为 32，即空格字符的 ASCII 码； '!' 为 33，即惊叹号的 ASCII 码。
+
+'有些字符不能直接通过键盘输入到程序中'。例如，按回车键并不能使字符串包含一个换行符；相反，程序编辑器将把这种键击解释为在源代码中开始新的一行。其他一些字符也无法
+从键盘输入，因为 C++ 语言赋予了它们特殊的含义。例如， 双引号字符用来分隔字符串字面值，因此不能把双引号放在字符串字面值中。
+
+'对于这些字符，C++ 提供了一种特殊的表示方法—转义序列'。例如，\a 表示振铃字符，它可以使终端扬声器振铃。转义序列 \n 表示换行符，\” 将双引号作为常规字符，而不是
+字符串分隔符。可以在字符串或字符常量中使用这些表示法，如下例所示:
+
+char alarm = '\a';
+cout << alarm << "Dont do that again.\n";
+
+注意，应该像处理常规字符（如Q）那样处理转义序列（如 \n）。也就是说，'将它们作为字符常量时，应用单引号括起；将它们放在字符串中时，不要使用单引号'。
+
+转义序列的概念可追溯到使用电传打字机与计算机通信的时代，'现代系统并非都支持所有的转义序列'。例如， 输入振铃字符时，有些系统保持沉默。
+
+换行符可替代 endl，用于在输出中重起一行。可以以字符常量表示法（‘\n’）或字符串方式（“\n”）使用换行符。下面三行代码都将光标移到下一行开头:
+
+cout << endl;
+cout << '\n';
+cout << "\n";
+
+可以将换行符嵌入到较长的字符串中，这通常比使用 endl 方便。例如，下面两条 cout 语句的输出相同:
+
+cout << endl << endl << "What next ? " << endl << "Enter the number: " << endl;
+cout << "\n\nWhat next ? \n Enter the number: \n";
+
+
+最后，可以基于字符的八进制和十六进制编码来使用转义序列。
+
+例如，Ctr+Z 的 ASCII 码为26，对应的八进制编码为 032，十六进制编码为 0x1a。可以用下面的转义序列来表示该字符：\032 或 \x1a。将这些编码用单引号括起，
+可以得到相应的字符常量，如'\032'，也可以将它们放在字符串中，如"hi\x1a there"。
+
+程序 bondini.cpp 演示了一些转义序列。它使用振铃字符来提请注意，使用换行符使光标前进，使用退格字符使光标向左退一格。
+
+// bondini.cpp
+
+#include<iostream>
+
+int main()
+{
+    using namespace std;
+    cout << "\aOperation \"HyperHype\" is now activated!\n";
+    cout << "Enter your agent code:_____\b\b\b\b\b\b";
+    long code;
+    cin >> code;
+    cout << "\a your entered " << code << "...\n";
+    cout << "\a Code verify! Procesed with plan Z3 \n";
+    return 0;
+}
+
+
+ » g++ --std=c++11 bondini.cpp
+--------------------------------------------------------------------------------
+» ./a.out
+Operation "HyperHype" is now activated!
+Enter your agent code:__12334_
+ your entered 12334...
+ Code verify! Procesed with plan Z3 
+
+
+
+ // !! 通用字符名
+
+ C++ 实现支持一个基本的源字符集，即可用来编写源代码的字符集。它由标准美国键盘上的字符（大写和小写）和数字、C 语言中使用的符号（如{和=}以及其他一些字符
+ （如换行符和空格）组成。
+
+
+// !!signed char 和 unsigned char
+
+与 int 不同的是，char 在默认情况下既不是没有符号，也不是有符号。'是否有符号由 C++ 实现决定，这样编译器开发人员可以最大限度地将这种类型与硬件属性匹配起来'。
+如果 char 有某种特定的行为对您来说非常重要，则可以显式地将类型设置为 signed char 或 unsigned char:
+
+char fodo;
+unsigned char bar;
+signed char snark;
+
+'如果将 char 用作数值类型，则 unsigned char 和 signed char 之间的差异将非常重要'。unsigned char 类型的表示范围通常为 0～255，而 signed char 的表示
+范围为 −128~127。例如，假设要使用一个 char 变量来存储像 200 这样大的值，则在某些系统上可以，而在另一些系统上可能不可以。但使用 unsigned char 可以在任何系
+统上达到这种目的。另一方面，如果使用 char 变量来存储标准 ASCII 字符，则 char 有没有符号都没关系，在这种情况下，可以使用 char。
+
+
+// !! wchar_t
+
+程序需要处理的字符集可能无法用一个 8 位的字节表示，如日文汉字系统。对于这种情况，C++ 的处理方式有两种。首先，如果大型字符集是实现的基本字符集，则编译器厂商可以
+将 char 定义为一个 16 位的字节或更长的字节。其次，一种实现可以同时支持一个小型基本字符集和一个较大的扩展字符集。8 位 char 可以表示基本字符集，另一种类型
+ wchar_t（宽字符类型）可以表示扩展字符集。wchar_t 类型是一种整数类型，它有足够的空间，可以表示系统使用的最大扩展字符集。这种类型与另一种整型
+ （底层（underlying）类型）的长度和符号属性相同。'对底层类型的选择取决于实现，因此在一个系统中，它可能是 unsigned short，而在另一个系统中，则可能是 int'。
+
+'cin 和 cout 将输入和输出看作是 char 流，因此不适于用来处理 wchar_t 类型。iostream 头文件的最新版本提供了作用相似的工具— wcin 和 wcout，可用于处理 
+wchar_t 流'。
+
+另外，可以通过加上前缀 L 来指示宽字符常量和宽字符串。下面的代码将字母 P 的 wchar_t 版本存储到变量 bob 中，并显示单词 tall 的 wchar_t 版本：
+
+wchar_t bob = L'P';// a wide-character constant
+wcout << L"tall" << endl; // outputing a wide-character string 
+
+在支持两字节 wchar_t 的系统中，上述代码将把每个字符存储在一个两个字节的内存单元中。
+
+
+// !! C++11 新增的类型：char16_t 和 char32_t
+
+随着编程人员日益熟悉 Unicode，类型 wchar_t 显然不再能够满足需求。事实上，在计算机系统上进行字符和字符串编码时，仅使用 Unicode 码点并不够。具体地说，进行字
+符串编码时，如果有特定长度和符号特征的类型，将很有帮助，而类型 wchar_t 的长度和符号特征随实现而已。
+
+'因此，C++11 新增了类型 char16_t 和 char32_t，其中前者是无符号的，长 16 位，而后者也是无符号的，但长 32 位。' C++11 使用前缀 u 表示 char16_t 字符常量
+和字符串常量，如 u‘C’和 u“be good”; 并使用前缀 U 表示 char32_t 常量，如 U‘R’ 和 U“dirty rat”。
+
+与 wchar_t 一样，char16_t 和 char32_t 也都有底层类型—一种内置的整型，但底层类型可能随系统而已。
+
+// !! bool 类型
+
+ANSI/ISO C++ 标准添加了一种名叫 bool 的新类型（对 C++ 来说是新的）。它的名称来源于英国数学家 George Boole，是他开发了逻辑律的数学表示法。在计算中，布尔
+变量的值可以是 true 或 false。过去，C++ 和 C 一样，也没有布尔类型。然而，现在可以使用 bool 类型来表示真和假了，它们分别用预定义的字面值 true 和 false 
+表示。也就是说，可以这样编写语句:
+
+bool is_ready = true;
+
+字面值 true 和 false 都可以通过提升转换为 int 类型，true 被转换为 1，而 false 被转换为 0：
+
+int ans = true;
+int promise = false;
+
+另外，任何数字值或指针值都可以被隐式转换（即不用显式强制转换）为 bool 值。任何非零值都被转换为 true，而零被转换为 false。
+
+
 
 
 
