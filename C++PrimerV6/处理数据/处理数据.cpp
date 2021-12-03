@@ -990,6 +990,126 @@ so_long = thirty;
 2. 将浮点值赋给整型将导致两个问题。首先，将浮点值转换为整型会将数字截短（除掉小数部分）。其次，float 值对于 int 变量来说可能太大了。在这种情况下，C++ 并没有定义结果应
    该是什么；这意味着不同的实现的反应可能不同。
 
+传统初始化的行为与赋值相同，程序 init.cpp 演示了一些初始化进行的转换。
+
+// init.cpp --- type change on initialization
+
+#include<iostream>
+
+int main()
+{
+    using namespace std;
+    cout.setf(ios_base::fixed,ios_base::floatfield);
+
+    float tree = 3;// int convert to float
+    int guess(3.1234);// double convert to int
+    int debt = 7.2e12;// result not defined in C++
+    cout << "Tree: " << tree << endl;
+    cout << "Guess: " << guess << endl;
+    cout << "Debt: " << debt << endl;
+    return 0;
+}
+
+
+// !! 以 {} 方式初始化时进行的转换（C++11）
+
+'C++11 将使用大括号的初始化称为列表初始化（list-initialization），因为这种初始化常用于给复杂的数据类型提供值列表'。与程序 init.cpp 所示的初始化方式相比，它对类型
+转换的要求更严格。具体地说，'列表初始化不允许缩窄（narrowing），即变量的类型可能无法表示赋给它的值'。
+
+例如，不允许将浮点型转换为整型。在不同的整型之间转换或将整型转换为浮点型可能被允许，条件是编译器知道目标变量能够正确地存储赋给它的值。例如，可将 long 变量初始化为 int
+值，因为 long 总是至少与 int 一样长；相反方向的转换也可能被允许，只要 int 变量能够存储赋给它的 long 常量。
+
+
+// !! 表达式中的转换
+
+当同一个表达式中包含两种不同的算术类型时，将出现什么情况呢？ 在这种情况下，C++ 将执行两种自动转换：首先，一些类型在出现时便会自动转换；其次，有些类型在与其他类型同时出现
+在表达式中时将被转换。
+
+1. 先来看看自动转换。在计算表达式时，C++ 将 bool、char、unsigned char、signed char 和 short 值转换为 int
+   具体地说，true 被转换为 1，false 被转换为 0。这些转换被称为整型提升（integral promotion）, 例如，请看下面的语句：
+
+   short chickens = 20;
+   short ducks = 35;
+   short fowl = chickens + ducks;
+
+   为执行第 3 行语句，C++ 程序取得 chickens 和 ducks 的值，并将它们转换为 int。然后程序将结果转换为 short 类型， 因为结果将被赋给一个 short 变量。这种说法可能有
+   点拗口，但是情况确实如此。'通常将 int 类型选择为计算机最自然的类型，这意味着计算机使用这种类型时，运算速度可能最快。'
+
+2. 还有其他一些整型提升: 如果 short 比 int 短，则 unsigned short 类型将被转换为 int；如果两种类型的长度相同，则 unsigned short 类型将被转换为 unsigned int
+
+3. 同样 wchar_t 被提升成为下列类型中第一个宽度足够存储 wchar_t 取值范围的类型：int、unsigned int、long 或 unsigned long
+
+4. 将不同类型进行算术运算时, 也会进行一些转换, 例如将 int 和 float 相加时。
+
+   当运算涉及两种类型时，较小的类型将被转换为较大的类型。
+
+
+// !! 传递参数时的转换
+
+传递参数时的类型转换通常由 C++ 函数原型控制。然而，也可以取消原型对参数传递的控制，尽管这样做并不明智。在这种情况下，C++ 将对 char 和 short 类型（signed 和 
+unsigned）应用整型提升。另外，为保持与传统 C 语言中大量代码的兼容性，在将参数传递给取消原型对参数传递控制的函数时，C++ 将 float 参数提升为 double。
+
+
+// !! 强制类型转换
+
+'C++ 还允许通过强制类型转换机制显式地进行类型转换'。（C++ 认识到，必须有类型规则，而有时又需要推翻这些规则）。强制类型转换的格式有两种。例如，为将存储在变量 thorn 
+中的 int 值转换为 long 类型，可以使用下述表达式中的一种:
+
+(long)thorn;
+long(thorn);
+
+第一种格式来自 C 语言，第二种格式是纯粹 C++。新格式的想法是，要让强制类型转换就像是函数调用。这样对内置类型的强制类型转换就像是为用户定义的类设计的类型转换。
+
+C++ 还引入了 4 个强制类型转换运算符，对它们的使用要求更为严格:
+
+static_cast<> 可用于将值从一种数值类型转换为另一种数值类型。例如，可以像下面这样将 thorn 转换为 long 类型：
+
+static_cast<long>(thorn);
+
+
+// !! C++11 中的 auto 声明
+
+C++11 新增了一个工具，'让编译器能够根据初始值的类型推断变量的类型'。在初始化声明中，如果使用关键字 auto，而不指定变量的类型，编译器将把变量的类型设置成与初始值相同。
+
+
+auto n = 10; // n is int
+auto x = 1.6; // x is double
+auto y = 1.6f; // y is float
+
+然而，自动推断类型并非为这种简单情况而设计的；事实上，如果将其用于这种简单情形，甚至可能让您误入歧途。
+
+'处理复杂类型，如标准模块库（STL）中的类型时，自动类型推断的优势才能显现出来。'
+
+例如，对于下述 C++98 代码：
+
+std::vector<double> scores;
+std::vector<double>::iterator pv = scores.begin();
+
+C++11 允许您将其重写为下面这样:
+
+std::vector<double> scores;
+auto pc = scores.begin();
+
+
+// !! 总结
+
+C++ 的基本类型分为两组：一组由存储为整数(char、bool、short、int、long、long long)的值组成; 另一组由存储为浮点（float、double、long double）格式的值
+组成。'整型之间通过存储值时使用的内存量及有无符号来区分'。整型从最小到最大依次是：bool、char、signed char、unsigned char、short、unsigned short、int、
+unsigned int、long、unsigned long 以及 C++11 新增的 long long 和 unsigned long long。还有一种 wchar_t 类型，它在这个序列中的位置取决于实现。
+C++11 新增了类型 char16_t 和 char32_t，它们的宽度足以分别存储 16 和 32 位的字符编码。'C++ 确保了 char 足够大，能够存储系统基本字符集中的任何成员，而 wchar_t
+则可以存储系统扩展字符集中的任意成员'。short 至少为 16 位，而 int 至少与 short 一样长，long 至少为 32 位。确切的长度取决于实现。'字符通过其数值编码来表示。I/O 
+系统决定了编码是被解释为字符还是数字'。
+
+浮点类型可以表示小数值以及比整型能够表示的值大得多的值。3 种浮点类型分别是 float、double 和 long double。C++ 确保 float 不比 double 长，而 double 不比 
+long double 长。通常，float 使用 32 位内存，double 使用 64 位，long double 使用 80 到 128 位。
+
+'通过提供各种长度不同、有符号或无符号的类型，C++ 使程序员能够根据特定的数据要求选择合适的类型。'
+
+C++ 使用运算符来提供对数字类型的算术运算：加、减、乘、除和求模。当两个运算符对同一个操作数进行操作时，C++ 的优先级和结合性规则可以确定先执行哪种操作。
+
+对变量赋值、在运算中使用不同类型、使用强制类型转换时，C++ 将把值从一种类型转换为另一种类型。很多类型转换都是“安全的”，即可以在不损失和改变数据的情况下完成转换。
+例如，可以把 int 值转换为 long 值，而不会出现任何问题。对于其他一些转换，如将浮点类型转换为整型，则需要更加小心。开始，读者可能觉得大量的 C++ 基本类型有些多余，尤其是
+考虑到各种转换规则时。但是很可能最终将发现，某些时候，只有一种类型是需要的，此时您将感谢 C++ 提供了这种类型。
 
 
 
