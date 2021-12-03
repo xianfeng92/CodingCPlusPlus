@@ -11,12 +11,12 @@ int main()
 
     const float million = 1.0e6;
 
-    cout << "tub : " <<tub << endl;
+    cout << "tub : " <<tub;
     cout << " a million tubs = " << million * tub;
-    cout <<  ",\n and ten million tubs = ";
+    cout <<  ",\nand ten million tubs = ";
     cout << 10 * million * tub << endl;
 
-    cout << "mint = " << mint << "and a million mints =";
+    cout << "mint = " << mint << " and a million mints = ";
     cout << million * mint << endl;
     return 0;
 }
