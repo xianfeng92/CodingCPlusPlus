@@ -590,23 +590,474 @@ s3: buzzardpenguin
 s1 += s2 yields s1 =  penguinbuzzard
 s2 += "for a day" yields s2 = buzzardfor a day
 
+// !! string 类的其他操作
+
+在 C++ 新增 string 类之前，程序员也需要完成诸如给字符串赋值等工作。对于 C-Style string，程序员使用 C 语言库中的函数来完成这些任务。头文件 cstring
+提供了这些函数。
+
+例如，可以使用函数 strcpy() 将字符串复制到字符数组中，使用函数 strcat() 将字符串附加到字符数组末尾：
+
+strcpy(charr1,charr2);// copy charr2 to charr1
+strcat(charr1,charr2);// append contents of charr2 to charr1
+
+程序 strtype3.cpp 对用于 string 对象的技术和用于字符数组的技术进行了比较。
+
+// strtype3.cpp
+
+#include <iostream>
+#include<string>
+#include<cstring>
+
+int main()
+{
+    using namespace std;
+    char charr1[20];
+    char charr2[20] = "jaguar";
+    string str1;
+    string str2 = "panther";
+
+    // assignment for string object and character arrays
+    str1 = str2;
+    strcpy(charr1, charr2);
+
+    // appending for string object and character arrays
+    str1 += " paste";
+    strcpy(charr1, "juice");
+
+    // finding the length of the string object and a C-Style string
+    int len1 = str1.size();
+    int len2 = strlen(charr1);
+
+    cout << "The string " << str1 << " has length " << len1 << " characters.\n";
+    cout << "The string " << charr1 << " has length " << len2 << " characters.\n";
+    return 0;
+}
+
+处理 string 对象的语法通常比使用 C 字符串函数简单，尤其是执行较为复杂的操作时。例如，对于下述操作:
+
+str3 = str1 + str2;
+
+使用 C-Style string 时，需要使用的函数如下:
+
+strcpy(charr3, charr1);
+strcat(charr3, charr2);
+
+另外，使用字符数组时，总是存在目标数组过小，无法存储指定信息的危险，如下面的示例所示:
+
+函数 strcat() 试图将全部 12 个字符复制到数组 charr3 中，这将覆盖相邻的内存。这可能导致程序终止，或者程序继续运行，但数据被损坏。'string 类具有自动调整
+大小的功能，从而能够避免这种问题发生'。C 函数库确实提供了与 strcat()和 strcpy() 类似的函数 -- strncat() 和 strncpy()，它们接受指出目标数组最大允许长
+度的第三个参数，因此更为安全，但使用它们进一步增加了编写程序的复杂度。
+
+下面是两种确定字符串中字符数的方法: 
+
+int len1 = str1.size();
+int len2 = strlen(charr1);
+
+函数 strlen() 是一个常规函数，它接受一个 C-Style string 作为参数，并返回该字符串包含的字符数。函数 size()的功能基本上与此相同，但句法不同: str1 不
+是被用作函数参数，而是位于函数名之前，它们之间用句点连接。这种句法表明，str1 是一个对象，而 size() 是一个类方法。在这里，str1 是一个 string 对象，而 
+size() 是 string 类的一个方法。总之，C 函数使用参数来指出要使用哪个字符串，而 C++ string 类对象使用对象名和句点运算符来指出要使用哪个字符串。
+
+// !! string 类 I/O
+
+可以使用 cin 和运算符 >> 来将输入存储到 string 对象中，使用 cout 和运算符 << 来显示 string 对象，其句法与处理 C-Style string 相同。但每次读取一行
+而不是一个单词时，使用的句法不同，程序 strtype4.cpp 说明了这一点。
+
+// strtype4.cpp
+
+#include<iostream> 
+#include<string> // make string class available
+#include<cstring>// C-style string library
+
+int main()
+{
+    using namespace std;
+    char charr[20];
+    string str;
+
+    cout << "The length of the string in charr before input : " << strlen(charr) << endl;
+    cout << "The length of the string str before input : " << str.size() << endl;
+
+    cout << "Enter a line of text: \n";
+    cin.getline(charr,20);// indicate maximum length
+    cout << "You Entered : " << charr << endl;
+
+    cout << "Enter another line of text: \n";
+    getline(cin,str);// cin now an argument; no length specifier
+    cout << "You entered : " << str << endl;
+
+    cout << "The length of string in charr after input : " << strlen(charr) << endl;
+    cout << "The length of string in str after input : " << str.size() << endl;
+    return 0;
+}
+
+ » g++ --std=c++11 strtype4.cpp
+--------------------------------------------------------------------------------
+ » ./a.out
+
+The length of the string in charr before input :6
+The length of the string str before input :0
+Enter a line of text: 
+hellokitty
+You Entered : hellokitty
+Enter another line of text: 
+lbj 
+You entered : lbj
+The length of string in charr after input : 10
+The length of string in str after input : 3
 
 
+在用户输入之前，该程序指出数组 charr 中的字符串长度为 6，这比该数组的长度要小。
+
+这里要两点需要说明：
+
+1. 首先，未初始化的数组的内容是未定义的
+
+2. 其次，函数 strlen() 从数组的第一个元素开始计算字节数，直到遇到空字符（\0）
+
+3. 对于未被初始化的数据，第一个空字符(\0)的出现位置是随机的，因此您在运行该程序时，得到的数组长度很可能与此不同
+
+4. 用户输入之前，str 中的字符串长度为 0, 这是因为未被初始化的 string 对象的长度被自动设置为 0
+
+下面是将一行输入读取到数组中的代码:
+
+cin.getline(charr,20);
+
+这种句点表示法表明，函数 getline() 是 istream 类的一个类方法。第一个参数是目标数组；第二个参数数组长度，getline() 使用它来避免超越数组的边界。
+
+下面是将一行输入读取到 string 对象中的代码:
+
+getline(cin,str);
+
+这里没有使用句点表示法，这表明这个 getline() 不是类方法。它将 cin 作为参数，指出到哪里去查找输入。另外，也没有指出字符串长度的参数，因为 string 对象将根
+据字符串的长度自动调整自己的大小。
+
+像下面这样的代码使用istream类的一个成员函数: 
+cin >> x;
 
 
+像下面处理string 对象的代码使用 string 类的一个友元函数:
 
-
-
-
-
-
-
-
+cin >> str;
 
 
 // !! 结构简介
 
+假设要存储有关篮球运动员的信息，则可能需要存储他（她）的姓名、工资、身高、体重、平均得分、命中率、助攻次数等。希望有一种数据格式可以将所有这些信息存储在一个单
+元中。数组不能完成这项任务，因为虽然数组可以存储多个元素，但所有元素的类型必须相同。也就是说，一个数组可以存储 20 个 int，另一个数组可以存储 10 个 float，
+但同一个数组不能在一些元素中存储 int，在另一些元素中存储 float。
+
+C++ 中的结构的可以满足要求（存储篮球运动员的信息）。'结构是一种比数组更灵活的数据格式，因为同一个结构可以存储多种类型的数据'，这使得能够将有关篮球运动员的
+信息放在一个结构中，从而将数据的表示合并到一起。
+
+如果要跟踪整个球队，则可以使用结构数组。结构也是 C++ OOP 堡垒（类）的基石。学习有关结构的知识将使我们离 C++ 的核心 OOP 更近。
+
+结构是用户定义的类型，而结构声明定义了这种类型的数据属性。定义了类型后，便可以创建这种类型的变量。
+
+因此创建结构包括两步:
+
+1. 首先，定义结构描述—它描述并标记了能够存储在结构中的各种数据类型
+
+2. 然后按描述创建结构变量（结构数据对象）
+
+例如，假设 Bloataire 公司要创建一种类型来描述其生产线上充气产品的成员。具体地说，这种类型应存储产品名称、容量（单位为立方英尺）和售价。
+
+下面的结构描述能够满足这些要求:
+
+struct inflatable // structure declaration
+{
+    char name[20];
+    float volume;
+    double price;
+};
+
+1. '关键字 struct 表明，这些代码定义的是一个结构的布局'。
+2. 标识符 inflatable 是这种数据格式的名称，因此新类型的名称为 inflatable
+
+这样，便可以像创建 char 或 int 类型的变量那样创建 inflatable 类型的变量了。
+
+接下来的大括号中包含的是结构存储的数据类型的列表，其中每个列表项都是一条声明语句。列表中的每一项都被称为结构成员，因此 infatable 结构有 3 个成员
+
+总之，结构定义指出了新类型（这里是 inflatable ）的特征。
+
+定义结构后，便可以创建这种类型的变量了:
+
+inflatable hat;
+
+如果您熟悉 C 语言中的结构，则可能已经注意到了，C++ 允许在声明结构变量时省略关键字 struct:
+
+struct inflatable goose;
+
+'在 C++ 中，结构标记的用法与基本类型名相同。这种变化强调的是，结构声明定义了一种新类型'。
+
+在 C++ 中，省略 struct 不会出错。由于 hat 的类型为 inflatable，因此可以使用成员运算符 （.） 来访问各个成员。
+
+例如，hat.volume 指的是结构的 volume 成员，hat.price 指的是 price 成员。同样，vincent.price 是 vincent 变量的 price 成员。
+
+'总之，通过成员名能够访问结构的成员，就像通过索引能够访问数组的元素一样'。
+
+由于 price 成员被声明为 double 类型，因此 hat.price 和 vincent.price 相当于是 double 类型的变量，可以像使用常规 double 变量那样来使用它们。
+总之，hat 是一个结构，而 hat.price 是一个 double 变量。
+
+顺便说一句，访问类成员函数（如 cin.getline()）的方式是从访问结构成员变量（如 vincent.price）的方式衍生而来的。
+
+
+// !! 在程序中使用结构
+
+// structur.cpp
+
+#include<iostream>
+
+struct inflatable// struct declaration
+{
+    char name[20];
+    float volume;
+    double price;
+};
+
+
+int main()
+{
+    using namespace std;
+    inflatable guess = 
+    {
+        "Gloris",
+        1.88,
+        2.99
+    };
+
+    inflatable pal = 
+    {
+        "Kooo",
+        23.11,
+        212.32
+    };
+
+    cout << "Expand you guest list with  " << guess.name;
+    cout << " and " << pal.name << "!\n";
+    cout << "You can have both of $ ";
+    cout << guest.price + pal.price << "!\n";
+    return 0;
+}
+
+ » g++ --std=c++11 structur.cpp
+--------------------------------------------------------------------------------
+ » ./a.out
+Expand you guest list with  Gloris and Kooo!
+You can have both of $ 215.31!
+
+
+结构声明的位置很重要。对于 structur.cpp 而言，有两种选择。可以将声明放在 main() 函数中，紧跟在开始括号的后面。另一种选择是将声明放到 main() 的前面，这
+里采用的便是这种方式，'位于函数外面的声明被称为外部声明'。对于这个程序来说，两种选择之间没有实际区别。但是对于那些包含两个或更多函数的程序来说，差别很大。'外
+部声明可以被其后面的任何函数使用，而内部声明只能被该声明所属的函数使用'。通常应使用外部声明，这样所有函数都可以使用这种类型的结构
+
+变量也可以在函数内部和外部定义，外部变量由所有的函数共享（这将在第9章做更详细的介绍）。C++ 不提倡使用外部变量，但提倡使用外部结构声明。另外，在外部声明符号
+常量通常更合理。
+
+
+// !! C++11 结构初始化
+
+与数组一样，C++11 也支持将列表初始化用于结构，且等号（=）是可选的:
+
+inflatable duck{"hello",1.222,4.332};
+
+其次，如果大括号内未包含任何东西，各个成员都将被设置为零。最后，不允许缩窄转换。
+
+
+// !! 结构可以将 string 类作为成员吗
+
+可以将成员 name 指定为 string 对象而不是字符数组吗？即可以像下面这样声明结构吗？
+
+#include<string>
+struct inflatable
+{
+    std::string name;
+    float volume;
+    float price;
+};
+
+答案是肯定的，只要您使用的编译器支持对以 string 对象作为成员的结构进行初始化。'一定要让结构定义能够访问名称空间 std'。为此，可以将编译指令 using 移到结
+构定义之前；也可以像前面那样，将 name 的类型声明为 std::string。
+
+// !! 其他结构属性
+
+'C++ 使用户定义的类型与内置类型尽可能相似'。
+
+例如，可以将结构作为参数传递给函数，也可以让函数返回一个结构。另外，还可以使用赋值运算符（=）将结构赋给另一个同类型的结构，这样结构中每个成员都将被设置为
+另一个结构中相应成员的值，即使成员是数组。这种赋值被称为成员赋值（memberwise assignment）
+
+//  assgn_st.cpp
+
+#include<iostream>
+
+struct inflatable
+{
+    char name[20];
+    float volume;
+    float price;
+};
+
+int main()
+{
+    using namespace std;
+    inflatable bouquet = 
+    {
+        "sunflowers",
+        0.20,
+        12.49
+    };
+    inflatable choice;
+
+    cout << "bouquet " << bouquet.name << "for $" <<bouquet.price << endl;
+
+    choice = bouquet; // assign one struct to another
+
+    cout << "choice: " << choice.name << "for $" << choice.price << endl;
+    return 0;
+}
+
+
+» g++ --std=c++11 assgn_st.cpp 
+--------------------------------------------------------------------------------
+ » ./a.out
+bouquet sunflowersfor $12.49
+choice: sunflowersfor $12.49
+
+
+从中可以看出，成员赋值是有效的，因为 choice 结构的成员值与 bouquet 结构中存储的值相同。
+
+
+'可以同时完成定义结构和创建结构变量的工作'。为此，只需将变量名放在结束括号的后面即可:
+
+
+struct peaks
+{
+    int key_number;
+    char car[12];
+} mr_smith;
+
+甚至可以初始化以这种方式创建的变量：
+
+
+struct perks
+{
+    int key_number;
+    char car[12];
+} mr_smith = 
+{
+    7, 
+    "Packe"
+};
+
+然而，将结构定义和变量声明分开, 可以使程序更易于阅读和理解。
+
+// !! 结构数组
+
+inflatable 结构包含一个数组（name）。也可以创建元素为结构的数组，方法和创建基本类型数组完全相同。例如，要创建一个包含 100 个 inflatable 结构的数组，
+可以这样做:
+
+inflatable gifts[100]；
+
+这样，gifts 将是一个 inflatable 数组，其中的每个元素（如 gifts[0] 或 gifts[99]）都是 inflatable 对象，可以与成员运算符一起使用：
+
+cin >> gifts[0].volume;
+cout << gifts[99].price << endl;
+
+记住，gifts 本身是一个数组，而不是结构，因此像 gifts.price 这样的表述是无效的。
+
+要初始化结构数组，可以结合使用初始化数组的规则（用逗号分隔每个元素的值，并将这些值用花括号括起）和初始化结构的规则（用逗号分隔每个成员的值，并将这些值用花括号
+括起）。由于数组中的每个元素都是结构，因此可以使用结构初始化的方式来提供它的值。因此，最终结果为一个被括在花括号中、用逗号分隔的值列表，其中每个值本身又是一个
+被括在花括号中、用逗号分隔的值列表:
+
+inflatable guests[2] = 
+{
+    {"bambi",0.5,21.22},
+    {"joooo",4.3,32.45}
+};
+
+可以按自己喜欢的方式来格式化它们。例如，两个初始化位于同一行，而每个结构成员的初始化各占一行。
+
+
+// !! 结构中的位字段
+
+与 C 语言一样，'C++ 也允许指定占用特定位数的结构成员'，这使得创建与某个硬件设备上的寄存器对应的数据结构非常方便。
+
+字段的类型应为整型或枚举，接下来是冒号，冒号后面是一个数字，它指定了使用的位数。'可以使用没有名称的字段来提供间距'。'每个成员都被称为位字段（bit field）'。
+下面是一个例子:
+
+struct torgle_register
+{
+    unsigned int SN:4;// 4 bits for SN value
+    unsigned int :4; // 4 bits unused
+    bool goodIn:1;// valid input (1 bit )
+    bool goodTorgle;// successfully torgle
+};
+
+可以像通常那样初始化这些字段，还可以使用标准的结构表示法来访问位字段：
+
+torgle_register tr = {14,true,false};
+...
+if(tr.goodTorgle)
+...
+
+位字段通常用在低级编程中。
+
 // !! 共同体
+
+共用体（union）是一种数据格式，它能够存储不同的数据类型，但只能同时存储其中的一种类型。
+
+也就是说，结构可以同时存储 int、long 和 double，共用体只能存储 int、long 或 double。共用体的句法与结构相似，但含义不同。例如，请看下面的声明:
+
+union one4all
+{
+    int int_val;
+    float float_val;
+    double double_val;
+};
+
+可以使用 one4all 变量来存储 int、long 或 double，条件是在不同的时间进行:
+
+one4all pail;
+pail.int_val = 15;// store an int
+cout << pal.int_val << endl;
+pail.double_val = 3.234;// store a double, int value is lost
+cout << pal.double_val << endl;
+
+因此，pail 有时可以是 int 变量，而有时又可以是 double 变量。'由于共用体每次只能存储一个值，因此它必须有足够的空间来存储最大的成员，所以，共用体的
+长度为其最大成员的长度'。
+
+'共用体的用途之一是，当数据项使用两种或更多种格式（但不会同时使用）时，可节省空间'。
+
+例如，假设管理一个小商品目录，其中有一些商品的 ID 为整数，而另一些的 ID 为字符串。在这种情况下，可以这样做:
+
+struct widget 
+{
+    char brand[20];
+    int type;
+    union id
+    {
+        long id_num;
+        char id_char[20];
+    } id_val;
+};
+
+...
+
+Widget price;
+...
+
+if(price.type == 1)
+{
+    cin >> price.id_val.id_num;
+}
+else
+{
+    cin >> price.id_val.id_char;
+}
+
+'共用体常用于（但并非只能用于）节省内存。当前，系统的内存多达数 GB 甚至数 TB，好像没有必要节省内存，但并非所有的 C++ 程序都是为这样的系统编写的'。
+C++ 还用于嵌入式系统编程，如控制烤箱、MP3播放器或火星漫步者的处理器。对这些应用程序来说，内存可能非常宝贵。'另外，共用体常用于操作系统数据结构或硬件数据结构'。
+
+
 
 
 
