@@ -305,15 +305,427 @@ int main()
 
 // !!  简单文件输入/输出
 
-有时候，通过键盘输入并非最好的选择。例如，假设您编写了一个股票分析程序，并下载了一个文件，其中包含 1000 种股票的价格。在这种情况下，
-让程序直接读取文件，而不是手工输入文件中所有的值，将方便得多。同样，让程序将输出写入到文件将更为方便，这样可得到有关结果的永久性记录。
+有时候，通过键盘输入并非最好的选择。例如，假设您编写了一个股票分析程序，并下载了一个文件，其中包含 1000 种股票的价格。在这
+种情况下，让程序直接读取文件，而不是手工输入文件中所有的值，将方便得多。同样，让程序将输出写入到文件将更为方便，这样可得到有
+关结果的永久性记录。
 
 幸运的是，C++ 使得将读取键盘输入和在屏幕上显示输出（统称为控制台输入/输出）的技巧用于文件输入/输出（文件 I/O）非常简单。
 
+// !! 文本 I/O 和文本文件
+
+使用 cin 进行输入时，程序将输入视为一系列的字节，其中每个字节都被解释为字符编码。'不管目标数据类型是什么，输入一开始都是字符
+数据——文本数据'。然后，cin 对象负责将文本转换为其他类型。为说明这是如何完成的，来看一些处理同一个输入行的代码。
+
+假设有如下示例输入行：
+
+38.5 19.2
+
+来看一下使用不同数据类型的变量来存储时，cin 是如何处理该输入行的。首先，来看使用 char 数据类型的情况:
+
+char ch;
+cin >> ch;
+
+输入行中的第一个字符被赋给 ch。在这里，第一个字符是数字 3，其字符编码（二进制）被存储在变量 ch 中。输入和目标变量都是字符，因
+此不需要进行转换。注意，这里存储的数值 3，而是字符 3 的编码。执行上述输入语句后，输入队列中的下一个字符为字符 8，下一个输入操
+作将对其进行处理。
+
+接下来看看 int 类型:
+
+int n;
+cin >> n;
+
+'在这种情况下，cin 将不断读取，直到遇到非数字字符'。也就是说，它将读取 3 和 8，这样句点将成为输入队列中的下一个字符。cin 通过
+计算发现，这两个字符对应数值 38，因此将 38 的二进制编码复制到变量 n 中。
+
+接下来看看 double 类型:
+
+double x;
+cin >> x;
+
+'在这种情况下，cin 将不断读取，直到遇到第一个不属于浮点数的字符'。也就是说，cin 读取 3、8、句点和 5，使得空格成为输入队列
+中的下一个字符。cin 通过计算发现，这四个字符对应于数值 38.5，因此将 38.5 的二进制编码（浮点格式）复制到变量 x 中。
+
+
+接下来看看 char 数组的情况:
+
+char word[50];
+cin >> word;
+
+'在这种情况下，cin 将不断读取，直到遇到空白字符'。也就是说，它读取 3、8、句点 和 5，使得空格成为输入队列中的下一个字符。
+然后，cin将这 4 个字符的字符编码存储到数组 word 中，并在末尾加上一个空字符。
+
+最后，来看一下另一种使用 char 数组来存储输入的情况：
+
+char word[50];
+cin.getline(world,50);
+
+'在这种情况下，cin 将不断读取，直到遇到换行符'（示例输入行少于 50 个字符）。所有字符都将被存储到数组 word 中，并在末尾加上一
+个空字符。换行符被丢弃，输入队列中的下一个字符是下一行中的第一个字符。
+
+
+'对于输入，将执行相反的转换。即整数被转换为数字字符序列，浮点数被转换为数字字符和其他字符组成的字符序列（如284.53或−1.58E+06）'。
+字符数据不需要做任何转换。
+
+这里的要点是，输入一开始为文本。因此，控制台输入的文件版本是文本文件，即每个字节都存储了一个字符编码的文件。并非所有的文件都是
+文本文件，例如，数据库和电子表格以数值格式（即二进制整数或浮点格式）来存储数值数据。另外，字处理文件中可能包含文本信息，但也可能
+包含用于描述格式、字体、打印机等的非文本数据。
+
+// !! 写入到文本文件中
+
+对于文件输出，C++ 使用类似于 cout 的东西。下面来复习一些有关将 cout 用于控制台输出的基本事实，为文件输出做准备。
+
+1. 必须包含头文件iostream
+2. 头文件 iostream 定义了一个用处理输出的 ostream 类
+3. 头文件 iostream 声明了一个名为 cout 的 ostream 变量（对象）
+4. 必须指明名称空间 std；例如，为引用元素 cout 和 endl，必须使用编译指令 using 或前缀 std::
+5. 可以结合使用 cout 和运算符 << 来显示各种类型的数据
+
+文件输出与此极其相似。
+
+1. 必须包含头文件fstream
+2. 头文件 fstream 定义了一个用于处理输出的 ofstream 类
+3. 需要声明一个或多个 ofstream 变量（对象），并以自己喜欢的方式对其进行命名，条件是遵守常用的命名规则
+4. 必须指明名称空间 std；例如，为引用元素 ofstream，必须使用编译指令 using 或前缀 std::
+5. 需要将 ofstream 对象与文件关联起来。为此，方法之一是使用 open() 方法
+6. 使用完文件后，应使用方法 close() 将其关闭。
+7. 可结合使用 ofstream 对象和运算符 << 来输出各种类型的数据
+
+
+注意，虽然头文件 iostream 提供了一个预先定义好的名为 cout 的 ostream 对象，但您必须声明自己的 ofstream 对象，为其命名，
+并将其同文件关联起来。下面演示了如何声明这种对象：
+
+ofstream outFile；
+ofstream fout；
+
+下面演示了如何将这种对象与特定的文件关联起来：
+
+outFile.open("hello.txt");
+char filename[50];
+cin >> filename;
+fout.open(filename);
+
+
+方法 open() 接受一个 C-Style string 作为参数，这可以是一个字面字符串，也可以是存储在数组中的字符串。
+
+下面演示了如何使用这种对象：
+
+double wt = 12.321;
+fout << wt;
+char line[81] = "Object are closer than appear.";
+fout << line << endl;
+
+
+'重要的是，声明一个 ofstream 对象并将其同文件关联起来后，便可以像使用 cout 那样使用它'。所有可用于 cout 的操作和方法
+（如 <<、endl 和 setf()）都可用于 ofstream 对象。
+
+
+总之，使用文件输出的主要步骤如下:
+
+1． 包含头文件fstream
+
+2． 创建一个 ofstream 对象
+
+3． 将该ofstream对象同一个文件关联起来
+
+4． 就像使用 cout 那样使用该 ofstream 对象
+
+
+程序 outfile.cpp 中的程序演示了这种方法。它要求用户输入信息，然后将信息显示到屏幕上，再将这些信息写入到文件中。
+
+
+// outfile.cpp
+#include<iostream>
+#include<fstream>// for file I/O
+
+int main()
+{
+    using namespace std;
+    char automobile[50];
+    int year;
+    double a_price;
+    double d_price;
+
+    ofstream outfile;
+    outfile.open("hello.txt");
+    cout << "Enter to make and model of automobile: ";
+    cin.getline(automobile,50);
+    cout << "Enter the model of year: ";
+    cin >> year;
+    cout << "Enter the origin asking price: ";
+    cin >> a_price;
+    d_price = a_price * 0.913;
+
+    // display information on screen with cout
+    cout << fixed;
+    cout.precision(2);
+    cout.setf(ios_base::showpoint);
+    cout << "Make and model " << automobile << endl;
+    cout << "year " << year << endl;
+    cout << " was asking " << a_price << endl;
+    cout << "Now asking " << d_price << endl;
+
+    // now do exact same thing using outFile instead of cout
+    outFile.fixed;
+    outFile.precision(2);
+    outFile.self(ios_base::showpoint);
+    outFile << "Make and model " << automobile << endl;
+    outFile << "year " << year << endl;
+    outFile << "was asking " << a_price << endl;
+    outFile << "Now asking " << d_price << endl;
+    return 0;
+}
 
 
 
+该程序的最后一部分与 cout 部分相同，只是将 cout 替换为 outFile 而已。
 
+1. ，声明一个 ofstream 对象后，便可以使用方法 open() 将该对象特定文件关联起来：
+
+ofstream outFile;
+outFile.open("hello.txt");
+
+程序使用完该文件后，应该将其关闭：
+
+outFile.close();
+
+注意，方法 close() 不需要使用文件名作为参数，这是因为 outFile 已经同特定的文件关联起来。如果您忘记关闭文件，程序正常终止时将自
+动关闭它。
+
+
+回到 open() 方法：
+
+outFile.open("hello.txt");
+
+1. 在这里，该程序运行之前，文件 hello.txt 并不存在。在这种情况下，方法 open() 将新建一个名为 hello.txt 的文件。
+
+2. 如果在此运行该程序，文件 hello.txt 存在，此时情况将如何呢？ 默认情况下，open() 将首先截断该文件，即将其长度截短到零——丢其原有
+的内容，然后将新的输出加入到该文件中
+
+'打开文件用于接受输入时可能失败'。例如，指定的文件可能已经存在，但禁止对其进行访问。因此细心的程序员将检查打开文件的操作是否成功
+
+
+// !! 读取文本文件
+
+文本文件输入，它是基于控制台输入的。控制台输入涉及多个方面，下面首先总结这些方面:
+
+1. 必须包含头文件 iostream
+
+2. 头文件 iostream 定义了一个用处理输入的 istream 类
+
+3. 头文件 iostream 声明了一个名为 cin 的 istream 变量（对象）
+
+4. 必须指明名称空间std；例如，为引用元素 cin，必须使用编译指令 using或前缀 std::
+
+5. 可以结合使用 cin 和运算符 >> 来读取各种类型的数据
+
+6. 可以使用 cin 和 get() 方法来读取一个字符，使用 cin 和 getline() 来读取一行字符
+
+7. 可以结合使用 cin 和 eof()、fail() 方法来判断输入是否成功
+
+8. 对象 cin 本身被用作测试条件时，如果最后一个读取操作成功，它将被转换为布尔值 true，否则被转换为 false
+
+
+文件输出与此极其相似:
+
+1. 必须包含头文件 fstream
+
+2. 头文件 fstream 定义了一个用于处理输入的 ifstream 类
+
+3. 需要声明一个或多个 ifstream 变量（对象），并以自己喜欢的方式对其进行命名，条件是遵守常用的命名规则
+
+4. 必须指明名称空间 std；例如，为引用元素 ifstream，必须使用编译指令 using 或前缀 std::
+
+5. 需要将 ifstream 对象与文件关联起来。为此，方法之一是使用 open() 方法
+
+6. 使用完文件后，应使用 close() 方法将其关闭
+
+7. 可结合使用 ifstream 对象和运算符 >> 来读取各种类型的数据
+
+8. 可以使用 ifstream 对象和 get() 方法来读取一个字符，使用 ifstream 对象和 getline() 来读取一行字符
+
+9. 以结合使用 ifstream 和 eof()、fail() 等方法来判断输入是否成功
+
+10. ifstream 对象本身被用作测试条件时，如果最后一个读取操作成功，它将被转换为布尔值 true，否则被转换为 false
+
+
+注意，虽然头文件 iostream 提供了一个预先定义好的名为 cin 的 istream 对象，'但您必须声明自己的 ifstream 对象，为其
+命名，并将其同文件关联起来'。下面演示了如何声明这种对象:
+
+ifstream inFile;
+ifstream fin;
+
+下面演示了如何将这种对象与特定的文件关联起来:
+
+inFile.open("hello.txt");
+char filename[50];
+cin >> filename;
+inFile.open(filename);
+
+'方法 open() 接受一个 C-Style string 作为参数，这可以是一个字面字符串，也可以是存储在数组中的字符串'。
+
+下面演示了如何使用这种对象:
+
+double wt;
+inFile >> wt;
+
+char line[100];
+inFile.getline(line, 100);
+
+重要的是，声明一个 ifstream 对象并将其同文件关联起来后，便可以像使用 cin 那样使用它。所有可用于 cin 的操作和方法都
+可用于 ifstream 对象。
+
+如果试图打开一个不存在的文件用于输入，情况将如何呢？ 这种错误将导致后面使用 ifstream 对象进行输入时失败。
+检查文件是否被成功打开的首先方法是使用方法 is_open() ，为此，可以使用类似于下面的代码：
+
+inFile.open("hello.txt")
+if(！inFile.is_open())
+{
+    exit(EXIT_FAILURE);
+}
+
+
+如果文件被成功地打开，方法 is_open() 将返回 true；因此如果文件没有被打开，表达式 !inFile.isopen() 将为 true。'函数 exit() 
+的原型是在头文件 cstdlib 中定义的，在该头文件中，还定义了一个用于同操作系统通信的参数值 EXIT_FAILURE' 。函数 exit() 终止程序。
+
+
+程序 sumafile.cpp 中的程序打开用户指定的文件，读取其中的数字，然后指出文件中包含多少个值以及它们的和与平均值。
+
+// sumafile.cpp
+#include<iostream>
+#include<fstream>
+#include<cstdlib>
+
+const int SIZE = 60;
+
+int main()
+{
+    using namespace std;
+    char filename[SIZE];
+    ifstream inFile;
+    cout << "Enter name of data file: ";
+    cin.getLine(filename,SIZE);
+    inFile.open(filename);
+    if(!inFile.is_open())
+    {
+        cout << "Can not open file " << filename << endl;
+        cout << "program terminated" << endl;
+        exit(EXIT_FAILURE);
+    }
+    double value;
+    double sum = 0;
+    int count = 0;
+    
+    inFile >> value;
+    
+    while(inFile.good())
+    {
+        ++count;
+        sum += value;
+        inFile >> value;
+    }
+    if(inFile.eof())
+    {
+        cout  << "End of file Reached" << endl;
+    }
+    else if(inFile.fail())
+    {
+        cout << "Input terminated by data mismatch.\n";
+    }
+    else
+    {
+        cout << "Input terminated by unknow reason.\n";
+    }
+    if(count == 0)
+    {
+        cout << "No data Processed.\n";
+    }
+    else
+    {
+        cout << "Item read : " << count << endl;
+        cout << "sum : " << sum << endl;
+        cout << "average : " << average << endl;
+    }
+    inFile.close();
+    return 0;
+}
+
+该程序没有使用硬编码文件名，而是将用户提供的文件名存储到字符数组 filename 中，然后将该数组用作 open() 的参数：
+
+inFile.open(filename);
+
+'检查文件是否被成功打开至关重要'。下面是一些可能出问题的地方：指定的文件可能不存在；文件可能位于另一个目录（文件夹）中；访问可能被拒绝； 
+用户可能输错了文件名或省略了文件扩展名。检查文件是否被成功打开可避免将这种将精力放在错误地方的情况发生。
+
+读者需要特别注意的是文件读取循环的正确设计。读取文件时，有几点需要检查:
+
+1. 首先，程序读取文件时不应超过 EOF。如果最后一次读取数据时遇到 EOF，方法 eof() 将返回 true
+
+2. 其次，程序可能遇到类型不匹配的情况
+
+例如，程序 sumafile.cpp 期望文件中只包含数字。如果最后一次读取操作中发生了类型不匹配的情况，方法 fail() 将返回 true（如果遇到了 EOF，该方法也将
+返回 true）。
+
+3. 最后，可能出现意外的问题，如文件受损或硬件故障。如果最后一次读取文件时发生了这样的问题，方法 bad()将返回 true。
+
+'不要分别检查这些情况，一种更简单的方法是使用 good() 方法，该方法在没有发生任何错误时返回 true'
+
+while (inFile.good()) 
+{
+
+}
+
+然后，如果愿意，可以使用其他方法来确定循环终止的真正原因：
+
+if(inFile.eof())
+{
+
+}
+if(inFile.fail())
+{
+
+}
+
+这些代码紧跟在循环的后面，用于判断循环为何终止。
+
+由于 eof() 只能判断是否到达 EOF，而 fail() 可用于检查 EOF 和类型不匹配，因此上述代码首先判断是否到达 EOF。
+
+方法 good() 指出最后一次读取输入的操作是否成功，这一点至关重要。这意味着应该在执行读取输入的操作后，立刻应用这种测试。为此，一种标准方法是，
+在循环之前（首次执行循环测试前）放置一条输入语句，并在循环的末尾（下次执行循环测试之前）放置另一条输入语句:
+
+
+inFile >> value;
+while (inFile.good())
+{
+    inFile >> value;
+}
+
+
+鉴于以下事实，可以对上述代码进行精简：表达式 inFile >> value 的结果为 inFile，而在需要一个 bool 值的情况下，inFile 的结果为
+inFile.good( )，即 true 或 false。因此，可以将两条输入语句用一条用作循环测试的输入语句代替。也就是说，可以将上述循环结构替换为
+如下循环结构：
+
+while (inFile >> value)
+{
+    inFile >> value;
+}
+
+这种设计仍然遵循了在测试之前进行读取的规则，因为要计算表达式 inFile >> value 的值，程序必须首先试图将一个数字读取到 value 中。
+
+
+
+// !! 总结
+
+使用引导程序选择不同操作的语句后，程序和编程将更有趣。C++ 提供了 if 语句、if else 语句和 switch 语句来管理选项。if 语句使程序有条件地执行
+语句或语句块，也就是说，如果满足特定的条件，程序将执行特定的语句或语句块。if else 语句程序选择执行两个语句或语句块之一。可以在这条语句后再加上
+if else，以提供一系列的选项。switch 语句引导程序执行一系列选项之一。
+
+C++ 还提供了帮助决策的运算符。if 和 if else 语句通常使用关系表达式作为测试条件。通过使用逻辑运算符（&&、||和!），可以组合或修改关系表达式，
+创建更细致的测试。条件运算符（?:）提供了一种选择两个值之一的简洁方式。cctype 字符函数库提供了一组方便的、功能强大的工具，可用于分析字符输入。
+
+对于文件 I/O 来说，循环和选择语句是很有用的工具；文件 I/O 与控制台 I/O 极其相似。声明 ifstream 和 ofstream 对象，并将它们同文件关联起来后，
+便可以像使用 cin 和 cout 那样使用这些对象。
+
+使用循环和决策语句，便可以编写有趣的、智能的、功能强大的程序。
 
 
 
