@@ -760,8 +760,6 @@ void file_it(ostream &os,double f0,const double fe[], int n)
 
 4. 如果数据对象是类对象，则使用 const 引用。类设计的语义常常要求使用引用，这是 C++ 新增这项特性的主要原因。
 
-
-
 对于修改调用函数中数据的函数:
 
 1. 如果数据对象是内置数据类型，则使用指针
@@ -776,5 +774,4 @@ void file_it(ostream &os,double f0,const double fe[], int n)
 当然，这只是一些指导原则，很可能有充分的理由做出其他的选择。例如，对于基本类型，cin 使用引用，因此可以使用 cin>>n，而不是 cin >> &n。
 
 // !! 默认参数
-
 
