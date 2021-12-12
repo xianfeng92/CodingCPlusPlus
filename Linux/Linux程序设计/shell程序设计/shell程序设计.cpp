@@ -300,11 +300,116 @@ shell程序设计.cpp
 
 // !! shell 的语法
 
+1. 变量
+
+在 shell 里，使用变量之前通常并不需要事先为它们做出声明。你只是通过使用它们(比如当你给它们赋初始值时)来创建它们。
+
+在默认情况下，所有变量都被看作字符串并以字符串来存储, 即使它们被赋值为数值时也是如此。shell 和一些工具程序会在需要时把数值型字符串转换为对应
+的数值以对它们进行操作。
 
 
+'在 shell 中，你可以通过在变量名前加一个 $ 符号来访问它的内容'。
+
+一种检查变量内容的简单方式就是在变量名前加一个 $ 符号，再用 echo 命令将它的内容输出到终端上。
+
+ » str="hello script"                                 
+ » echo $str                                           
+hello script
 
 
+'你可以使用 read 命令将用户的输入赋值给一个变量'。这个命令需要一个参数，即准备读入用户输入数据的变量名, 然后它会等待用户输入数据。通常情况下，在用
+户按下回车键时，read 命令结束。
 
+当从终端上读取一个变量时，你一般不需要使用引号，如下所示:
+
+» read type                                     
+helloworld
+» echo $type                                        
+helloworld
+
+'使用引号'
+
+一般情况下，脚本文件中的参数以空白字符分隔（例如，一个空格、一个制表符或者一个换行符）。如果你想在一个参数中包含一个或多个空白字符，你就必须给参数加
+上引号。
+
+字符串通常都被放在双引号中，以防止变量被空白字符分开，同时又允许 $ 扩展
+
+
+// !!实验　变量的使用
+
+#!/bin/sh
+
+myvar="Hi there"
+
+echo $myvar
+echo "$myvar"
+
+
+echo '$myvar'
+echo \$myvar
+
+
+echo "Enter some text: "
+read myvar
+echo '$myvar' now equals $myvar
+
+exit 0
+
+
+ » ./variable.sh 
+Hi there
+Hi there
+$myvar
+$myvar
+Enter some text: 
+hello 
+$myvar now equals hello
+
+
+变量 myvar 在创建时被赋值字符串 Hi there。你用 echo 命令显示该变量的内容，同时显示了在变量名前加一个 $ 符号就能得到变量的内容。使用双
+引号并不影响变量的替换，但使用单引号和反斜线就不进行变量的替换。使用 read 命令从用户那里读入一个字符串。
+
+2. 环境变量
+
+当一个 shell 脚本程序开始执行时，一些变量会根据环境设置中的值进行初始化。。这些变量通常用大写字母做名字，以便把它们和用户在脚本程序里定义的
+变量区分开来，后者按惯例都用小写字母做名字。
+
+$HOME 当前用户的家目录
+
+$PATH 以冒号分隔的用来搜索命令的目录列表
+
+$0 shell 脚本的名字
+
+$# 传递给脚本的参数个数
+
+$$ shell 脚本的进程号，脚本程序通常会用它来生成一个唯一的临时文件，如/tmp/tmpfile_$$
+
+
+3. 参数变量
+
+如果脚本程序在调用时带有参数，一些额外的变量就会被创建。即使没有传递任何参数，环境变量 $# 也依然存在，只不过它的值是 0 罢了
+
+$1, $2, ...  脚本程序的参数
+
+
+#!/bin/sh
+salutation="Hello"
+echo $salutation
+echo "The program $0 is now running"
+
+echo "The second parameter was $2"
+echo "The first parameter was $1"
+echo "The parameter list was $*"
+echo "The user's home directory is $HOME"
+
+echo "Please enter a new greeting"
+read salutation
+
+echo $salutation
+echo "The script is now complete"
+exit 0
+
+// !! 条件
 
 
 
