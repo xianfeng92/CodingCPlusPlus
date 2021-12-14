@@ -775,3 +775,274 @@ void file_it(ostream &os,double f0,const double fe[], int n)
 
 // !! 默认参数
 
+'默认参数指的是当函数调用中省略了实参时自动使用的一个值'。例如，如果将 void wow(int n) 设置成 n 有默认值为 1，则函数调用 wow() 相当于 wow(1)。
+这极大地提高了使用函数的灵活性。假设有一个名为 left() 的函数，它将字符串和 n 作为参数，并返回该字符串的前 n 个字符。更准确地说，该函数返回一个指针，该指针
+指向由原始字符串中被选中的部分组成的字符串。例如，函数调用 left(“theory”, 3) 将创建新字符串 “the”，并返回一个指向该字符串的指针。现在假设第二个参数的默认
+值被设置为 1，则函数调用left(“theory”, 3) 仍像前面讲述的那样工作，3 将覆盖默认值。。但函数调用left(“theory”)不会出错，它认为第二个参数的值为1，并返回指
+向字符串 “t” 的指针。'如果程序经常需要抽取一个字符组成的字符串，而偶尔需要抽取较长的字符串，则这种默认值将很有帮助'。
+
+如何设置默认值呢？
+
+'必须通过函数原型。由于编译器通过查看原型来了解函数所使用的参数数目， 因此函数原型也必须将可能的默认参数告知程序'。方法是将值赋给原型中的参数。例如，left( )
+的原型如下:
+
+char * left(const char *str, int n = 1);
+
+您希望该函数返回一个新的字符串，因此将其类型设置为 char *；您希望原始字符串保持不变，因此对第一个参数使用了 const 限定符；您希望 n 的默认值为1，因此将这个
+值赋给 n。默认参数值是初始化值，因此上面的原型将 n 初始化为 1。如果省略参数 n， 则它的值将为 1；否则，传递的值将覆盖 1。
+
+
+'对于带参数列表的函数，必须从右向左添加默认值。也就是说，要为某个参数设置默认值，则必须为它右边的所有参数提供默认值':
+
+int fun1(int i,int j = 8, int k = 12);// valid
+int fun2(int i, int j = 8, int k);// invalid
+int fun3(int i, int j, int k = 12);// valid
+
+left.cpp 使用了默认参数。请注意，只有原型指定了默认值。函数定义与没有默认参数时完全相同:
+
+» g++ --std=c++11 left.cpp
+» ./a.out
+
+Enter a string: 
+hello world
+hell
+
+该程序使用 new 创建一个新的字符串, 以存储被选择的字符。一种可能出现的尴尬情况是，不合作的用户要求的字符数目可能为负。在这种情况下，函数将字符计数设置为 0,
+并返回一个空字符串。另一种可能出现的尴尬情况是, 不负责任的用户要求的字符数目可能多于字符串包含的字符数，为预防这种情况，函数使用了一个组合测试:
+
+i < n && str[i];
+
+i < n 测试让循环复制了 n 个字符后终止。测试的第二部分——表达式 str[i]，是要复制的字符的编码, 遇到空值字符(其编码为 0)后，循环将结束。这样，while 循环将
+使字符串以空值字符(\0)结束，并将余下的空间（如果有的话）设置为空值字符。
+
+另一种设置新字符串长度的方法是， 将 n 设置为传递的值和字符串长度中较小的一个：
+
+int len = strlen(str);
+n = (n < len) ? n : len;
+char *p = new char[n + 1];
+
+'这将确保 new 分配的空间不会多于存储字符串所需的空间'。如果用户执行像 left("Hi!", 32767) 这样的调用，则这种方法很有用。第一种方法将把 "Hi!" 复制到由 32767 
+个字符组成的数组中，并将除前 3 个字符之外的所有字符都设置为空值字符；第二种方法将 "Hi!" 复制到由 4 个字符组成的数组中。但由于添加了另外一个函数调用(strlen())
+，因此程序将更长，运行速度将降低，同时还必须包含头文件 cstring(或 string.h)。'C 程序员倾向于选择运行速度更快、更简洁的代码，因此需要程序员在正确使用函数方面
+承担更多责任'。然而， C++ 的传统是更强调可靠性。毕竟，速度较慢但能正常运行的程序，要比运行速度虽快但无法正常运行的程序好。如果调用 strlen() 所需的时间很长，则
+可以让 left() 直接确定 n 和字符串长度哪个小。例如，当 m 的值等于 n 或到达字符串结尾时，下面的循环都将终止:
+
+int m = 0;
+while (m <=n && str[m] != '\0')
+{
+    m++;
+}
+char *p = new char[m + 1];
+
+别忘了，在 str[m] 不是空值字符时，表达式 str[m] != '\0' 的结果为 true，否则为 false。由于在 && 表达式中，非零值被转换为 true，而零被转换为 false，因此
+也可以这样编写这个 while 测试:
+
+while(m <=n && str[m]);
+
+
+// !!函数重载
+
+函数多态是 C++ 在 C 语言的基础上新增的功能。默认参数让您能够使用不同数目的参数调用同一个函数，而函数多态（函数重载）让您能够使用多个同名的函数。'术语"多态"指的
+是有多种形式，因此函数多态允许函数可以有多种形式'。类似地，术语"函数重载"指的是可以有多个同名的函数,因此对名称进行了重载。这两个术语指的是同一回事，但我们通常使
+用函数重载。可以通过函数重载来设计一系列函数——它们完成相同的工作，但使用不同的参数列表。
+
+重载函数就像是有多种含义的动词。例如，Piggy 小姐可以在棒球场为家乡球队助威 (root)，也可以在地里种植 (root) 菌类作物。根据上下文可以知道在每一种情况下，root 
+的含义是什么。同样，C++ 使用上下文来确定要使用的重载函数版本。
+
+'函数重载的关键是函数的参数列表---也称为函数特征标(function signature)'。
+
+'如果两个函数的参数数目和类型相同, 同时参数的排列顺序也相同，则它们的特征标相同，而变量名是无关紧要的'。C++ 允许定义名称相同的函数，条件是它们的特征标不同。如果
+参数数目或参数类型不同，则特征标也不同。例如，可以定义一组原型如下的 print() 函数:
+
+void print(const char *str, int width);// #1
+void print(double d, int width);// #2
+void print(long l, int width);// #3
+void print(int i, int width);// #4
+void print(const char * str);// #5
+
+
+使用 print() 函数时，编译器将根据所采取的用法使用有相应特征标的原型:
+
+print("hello",15);// using #1
+print("helloworld");// using #5
+print(1992.05,15);// using #2
+
+使用被重载的函数时, 需要在函数调用中使用正确的参数类型。例如，对于下面的语句:
+
+unsigned int year = 2021;
+print(year,6);// ambiguous call
+
+
+print() 调用与哪个原型匹配呢？它不与任何原型匹配！没有匹配的原型并不会自动停止使用其中的某个函数，因为 C++ 将尝试使用标准类型转换强制进行匹配。如果 #2 原型是 
+print() 唯一的原型，则函数调用 print(year, 6) 将把 year 转换为 double 类型。但在上面的代码中，有 3 个将数字作为第一个参数的原型，因此有 3 种转换 year 的
+方式。'在这种情况下，C++ 将拒绝这种函数调用，并将其视为错误'。
+
+一些看起来彼此不同的特征标是不能共存的。例如，请看下面的两个原型：
+
+
+double cube(double x);
+double cube(double &x);
+
+您可能认为可以在此处使用函数重载，因为它们的特征标看起来不同。然而，请从编译器的角度来考虑这个问题。假设有下面这样的代码：
+
+cout << cube(x) << endl;
+
+参数 x 与 double x 原型和 double &x 原型都匹配，因此编译器无法确定究竟应使用哪个原型。
+
+'为避免这种混乱，编译器在检查函数特征标时，将把类型引用和类型本身视为同一个特征标'。
+
+匹配函数时，并不区分 const 和非 const 变量。请看下面的原型:
+
+
+// !!重载引用参数
+
+类设计和 STL 经常使用引用参数，因此知道不同引用类型的重载很有用。请看下面三个原型：
+
+void sink(double &r1);// match modifiable value
+void sank(const double &r2);// match modifiable or const value lvalue,rvalue
+void sunk(double && r3);// match rvalue
+
+左值引用参数 r1 与可修改的左值参数(如 double 变量)匹配； const 左值引用参数 r2 与可修改的左值参数、const 左值参数和右值参数(如两个 double 值的和)匹配；
+最后，左值引用参数 r3 与右值匹配。注意到与 r1 或 r3 匹配的参数都与 r2 匹配。
+
+这就带来了一个问题：如果重载使用这三种参数的函数，结果将如何？
+
+'答案是将调用最匹配的版本'：
+
+void staff(double &rs);
+void staff(const double &rcs);
+void stove(double &r1);
+void stove(const double &r2);
+void stove(double &&r3);
+
+这让您能够根据参数是左值、const 还是右值来定制函数的行为:
+
+double x = 55.5;
+const double y = 32.0;
+stove(x);// call staff(double &rs)
+stove(y);// call staff(const double &rcs)
+stove(x+y);// call stove(double &&r3)
+
+如果没有定义函数 stove(double &&)，stove(x+y) 将调用函数 stove(const double &)。
+
+
+// !! 重载示例
+
+
+本章前面创建了一个 left() 函数，它返回一个指针，指向字符串的前 n 个字符。下面添加另一个 left() 函数，它返回整数的前 n 位。例如，可以使用该函数来查看被存储
+为整数的、美国邮政编码的前 3 位。
+
+该函数的整数版本编写起来比字符串版本更困难些，因为并不是整数的每一位被存储在相应的数组元素中。一种方法是，先计算数字包含多少位。将数字除以 10 便可以去掉一位，因此
+可以使用除法来计算数位。更准确地说，可以用下面的循环完成这种工作：
+
+unsigned digits = 1;
+while(n /= 10)
+{
+    ++digits;
+}
+
+现在假设知道数字共有 5 位，并要返回前 3 位，则将这个数除以 10 后再除以 10，便可以得到所需的值。每除以 10 次就删除数字的最后一位。要知道需要删除多少位，只需将总
+位数减去要获得的位数即可。例如，要获得 9 位数的前 4 位，需要删除后面的 5 位。可以这样编写代码:
+
+ct = digits - ct;
+while(ct--)
+{
+    num /= 10;
+}
+return num;
+
+
+leftover.cpp 将上述代码放到了一个新的 left() 函数中。该函数还包含一些用于处理特殊情况的代码，如用户要求显示 0 位或要求显示的位数多于总位数。由于新 left() 的特
+征标不同于旧的 left()， 因此可以在同一个程序中使用这两个函数。
+
+// leftover.cpp
+#include<iostream>
+
+unsigned long left(unsigned long num, int ct);
+char * left(const char * str, int n);
+
+int main()
+{
+    using namespace std;
+    const char * trip = "helloworld!!!";// test value
+    unsigned long n = 12345678;// test value
+    int i = 0;
+    char *temp;
+    for(int i = 0; i < 10; i++)
+    {
+        cout << left(n,i);
+        temp = left(trip,i);
+        cout << temp << '\n';
+        delete[] temp;
+    }
+    return 0;
+}
+
+
+unsigned long left(unsigned long num, int ct)
+{
+    unsigned digits = 1;
+    unsigned long n = num;
+    if(ct == 0 || num == 0)
+    {
+        return 0;
+    }
+    while(n /= 10)
+    {
+        ++digits;
+    }
+    if(digits > ct)
+    {
+        ct = digits -ct;
+        while(ct--)
+        {
+            num /= 10;
+        }
+        return num;
+    }
+    else
+    {
+        return num;
+    }
+}
+
+char * left(const char * str,int n)
+{
+    if(n < 0)
+    {
+        return 0;
+    }
+    char *p = new char[n+1];
+    int i;
+    for(i = 0; i <n && str[i]; i++)
+    {
+        p[i] = str[i];
+    }
+    while(i <= n)
+    {
+        p[i++] = '\0';
+    }
+    return p;
+}
+
+» g++ --std=c++11 leftover.cpp
+--------------------------------------------------------------------------------
+ » ./a.out
+0
+1h
+12he
+123hel
+1234hell
+12345hello
+123456hellow
+1234567hellowo
+12345678hellowor
+12345678helloworl
+
+
+// !! 何时使用函数重载
+
+虽然函数重载很吸引人，但也不要滥用。'仅当函数基本上执行相同的任务，但使用不同形式的数据时，才应采用函数重载'。
+
+
+
