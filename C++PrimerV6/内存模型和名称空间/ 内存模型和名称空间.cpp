@@ -115,6 +115,473 @@ C++ 函数的作用域可以是整个类或整个名称空间（包括全局的�
 
 // !! 自动存储持续性
 
+在默认情况下, 在函数中声明的函数参数和变量的存储持续性为自动，作用域为局部，没有链接性。也就是说，如果在 main() 中声明了一个名为 texas 的变量，并在函数 
+oil() 中也声明了一个名为 texas 变量，则创建了两个独立的变量——只有在定义它们的函数中才能使用它们。对 oil() 中的 texas 执行的任何操作都不会影响 main() 
+中的 texas，反之亦然。
+
+
+另外，当程序开始执行这些变量所属的代码块时，将为其分配内存; 当函数结束时，这些变量都将消失(注意，执行到代码块时，将为变量分配内存，但其作用域的起点为其声明
+位置)。
+
+如果在代码块中定义了变量，则该变量的存在时间和作用域将被限制在该代码块内。
+
+例如，假设在 main() 的开头定义了一个名为 teledeli 的变量，然后在 main() 中开始一个新的代码块，并其中定义了一个新的变量 websight，则 teledeli 在内部代
+码块和外部代码块中都是可见的，而 websight 就只在内部代码块中可见，它的作用域是从定义它的位置到该代码块的结尾:
+
+int main()
+{
+  int teledeli = 5;
+  {
+    cout << "Hello\n";
+    int websight = 10;
+    cout << "websight " << websight << ' ' << teledeli << '\n';
+  }
+  cout << teledeli << '\n';
+  return 0;
+}
+
+然而，如果将内部代码块中的变量命名为 teledeli，而不是 websight，使得有两个同名的变量(一个位于外部代码块中，另一个位于内部代码块中)，情况将如何呢？在这种情况
+下，程序执行内部代码块中的语句时，将 teledeli 解释为局部代码块变量。我们说，新的定义隐藏了(hide)以前的定义，新定义可见，旧定义暂时不可见。在程序离开该代码块时
+，原来的定义又重新可见。
+
+程序 auto.cpp 表明，自动变量只在包含它们的函数或代码块中可见。
+
+// auto.cpp
+
+#include<iostream>
+void oil(int x);
+
+int main()
+{
+    using namespace std;
+    int teaxs = 31;
+    int year = 2021;
+    cout << "In main " << "teaxs" << teaxs << '\n';
+    cout << &teaxs << '\n';
+    cout << "In main " << "year" << year << '\n';
+    cout << &year << '\n';
+    oil(teaxs);
+    cout << "In main " << "teaxs" << teaxs << '\n';
+    cout << &teaxs << '\n';
+    cout << "In main " << "year" << year << '\n';
+    cout << &year << '\n';
+    return 0;
+}
+
+void oil(int x)
+{
+    using namespace std;
+    int teaxs = 5;
+    cout << "In oil " << "teaxs" << teaxs << '\n';
+    cout << "&teaxs " << &teaxs << '\n';
+    cout << "In oil x " << x << "&x is " << &x << '\n';
+    {
+        int teaxs = 999;
+        cout << "In block " << "teaxs is " << teaxs;
+        cout << "&teasx is " << &teaxs << '\n';
+        cout << "In block x " << x << "&x is " << &x << '\n';
+    }
+    cout << "Post-block teaxs is " << teaxs;
+    cout << "&teaxs is " << &teaxs;
+}
+
+1. 自动变量的初始化
+
+可以使用任何在声明时其值为已知的表达式来初始化自动变量，下面的示例初始化变量 x、y 和 z:
+
+int w;// value of w is indeterminate
+int x = 5;// initialized with a numeric literal
+int y = x*2 -5;
+cin >> w;
+int z = 3*w;
+
+
+2. 自动变量和栈
+
+了解典型的 C++ 编译器如何实现自动变量有助于更深入地了解自动变量。
+
+由于自动变量的数目随函数的开始和结束而增减，因此程序必须在运行时对自动变量进行管理。常用的方法是留出一段内存，并将其视为栈，以管理变量的增减。之所以被称为栈，
+是由于新数据被象征性地放在原有数据的上面(也就是说，在相邻的内存单元中，而不是在同一个内存单元中)，当程序使用完后，将其从栈中删除。栈的默认长度取决于实现，但编
+译器通常提供改变栈长度的选项。程序使用两个指针来跟踪栈，一个指针指向栈底——栈的开始位置，另一个指针指向堆顶——下一个可用内存单元。当函数被调用时，其自动变量将
+被加入到栈中，栈顶指针指向变量后面的下一个可用的内存单元。函数结束时，栈顶指针被重置为函数被调用前的值，从而释放新变量使用的内存。
+
+栈是 LIFO（后进先出）的，即最后加入到栈中的变量首先被弹出。这种设计简化了参数传递。函数调用将其参数的值放在栈顶，然后重新设置栈顶指针。被调用的函数根据其形
+参描述来确定每个参数的地址。
+
+当函数执行结束时，'栈顶指针重新指向以前的位置。新值没有被删除，但不再被标记，它们所占据的空间将被下一个将值加入到栈中的函数调用所使用'。
+
+
+
+// !! 静态持续变量
+
+和 C 语言一样，'C++ 也为静态存储持续性变量提供了 3 种链接性': 外部链接性(可在其他文件中访问)、内部链接性(只能在当前文件中访问)和无链接性(只能在当前函数或代
+码块中访问)。这 3 种链接性都在整个程序执行期间存在，与自动变量相比，它们的寿命更长。由于静态变量的数目在程序运行期间是不变的，因此程序不需要使用特殊的装置
+(如栈)来管理它们。
+
+'编译器将分配固定的内存块来存储所有的静态变量，这些变量在整个程序执行期间一直存在'。另外，如果没有显式地初始化静态变量，编译器将把它设置为 0。在默认情况下，
+静态数组和结构将每个元素或成员的所有位都设置为 0。
+
+
+下面介绍如何创建这 3 种静态持续变量，然后介绍它们的特点。
+
+1. 要想创建链接性为外部的静态持续变量，必须在代码块的外面声明它
+
+2. 要创建链接性为内部的静态持续变量，必须在代码块的外面声明它，并使用 static 限定符
+
+3. 要创建没有链接性的静态持续变量，必须在代码块内声明它，并使用 static 限定符
+
+下面的代码片段说明这 3 种变量:
+
+
+int global = 2021;
+static int one_file = 990;
+
+{
+  static int count = 0;
+}
+
+由于 one_file 的链接性为内部，因此只能在包含上述代码的文件中使用它；由于 global 的链接性为外部，因此可以在程序的其他文件中使用它。
+
+
+所有的静态持续变量都有下述初始化特征:'未被初始化的静态变量的所有位都被设置为0。这种变量被称为零初始化的(zero-initialized)'。
+
+
+// !! 静态变量的初始化
+
+那么初始化形式由什么因素决定呢？
+
+首先，所有静态变量都被零初始化，而不管程序员是否显式地初始化了它。接下来，如果使用常量表达式初始化了变量，且编译器仅根据文件内容（包括被包含的头文件）就
+可计算表达式，编译器将执行常量表达式初始化。必要时，编译器将执行简单计算。如果没有足够的信息，变量将被动态初始化。
+
+请看下面的代码:
+
+#include <cmath>
+
+int x = 10;
+int y = 5;
+long z = 13 * 13;
+const double ps = 4.0 * atan(1.0);
+
+首先，x、y、z 和 pi 被零初始化。然后，编译器计算常量表达式，并将 y 和 z 分别初始化为 5 和 169。'但要初始化 pi，必须调用函数 atan()，这需要等到该函数
+被链接且程序执行时'。
+
+常量表达式并非只能是使用字面常量的算术表达式。例如，它还可使用 sizeof 运算符:
+
+int enough = sizeof(long) +1;
+
+C++11 新增了关键字 constexpr，这增加了创建常量表达式的方式。
+
+
+// !! 静态持续性、外部链接性
+
+链接性为外部的变量通常简称为外部变量，它们的存储持续性为静态，作用域为整个文件。外部变量是在函数外部定义的，因此对所有函数而言都是外部的。例如，可以在
+main() 前面或头文件中定义它们。可以在文件中位于外部变量定义后面的任何函数中使用它，因此外部变量也称全局变量(相对于局部的自动变量)。
+
+1.单定义规则
+
+'一方面，在每个使用外部变量的文件中，都必须声明它'; 另一方面，C++ 有"单定义规则"(One Definition Rule，ODR），该规则指出，变量只能有一次定义。
+
+为满足这种需求，C++ 提供了两种变量声明。一种是定义声明(defining declaration)或简称为定义(definition)，它给变量分配存储空间；'另一种是引用声明
+(referencing declaration)或简称为声明(declaration)， 它不给变量分配存储空间，因为它引用已有的变量'。
+
+引用声明使用关键字 extern，且不进行初始化; 否则，声明为定义，导致分配存储空间:
+
+double up;// definition, up is 0
+extern int year;// year defined elsewhere
+extern char gz = 'Z';// definition because initialized
+
+
+'如果要在多个文件中使用外部变量, 只需在一个文件中包含该变量的定义(单定义规则)， 但在使用该变量的其他所有文件中，都必须使用关键字 extern 声明它'
+
+如果在函数中声明了一个与外部变量同名的变量，结果将如何呢？
+
+这种声明将被视为一个自动变量的定义，当程序执行自动变量所属的函数时，该变量将位于作用域内。程序 external.cpp 和程序 support.cpp 在两个文件中使用了一个
+外部变量, 还演示了自动变量将隐藏同名的全局变量。它还演示了如何使用关键字 extern 来重新声明以前定义过的外部变量，以及如何使用 C++ 的作用域解析运算符来访问
+被隐藏的外部变量。
+
+// external.cpp
+#include <iostream>
+using namespace std;
+
+double warming = 0.3;// warming defined
+
+// function prototype
+void update(double dt);
+void local();
+
+int main()
+{
+    cout << "Global warming is " << warming << " degrees\n";
+    update(0.1);
+    cout << "Global warming is " << warming << " degrees\n";
+    local();
+    cout << "Global warming is " << warming << " degrees\n";
+    return 0;
+}
+
+// compile with external.cpp
+#include<iostream>
+extern double warming;// using warming from another
+
+// function prototype
+void update(double dt);
+void local();
+
+using std::cout;
+void update(double dt)
+{
+    extern double warming;
+    warming += dt;
+    cout << "Updating global warming to " << warming;
+    cout << "degrees.\n";
+}
+
+
+void local()
+{
+    double warming = 0.8;
+    cout << "Local warming is " << warming << " degrees.\n";
+    cout << "Bit global warming= " << ::warming;
+    cout << " degrees.\n";
+}
+
+C++ 比 C 语言更进了一步——它提供了作用域解析运算符(::)。放在变量名前面时, 该运算符表示使用变量的全局版本。
+
+// !! 全局变量和局部变量
+
+既然可以选择使用全局变量或局部变量, 那么到底应使用哪种呢 ？
+
+首先，全局变量很有吸引力, 因为所有的函数能访问全局变量，因此不用传递参数。但易于访问的代价很大---程序不可靠。
+
+'计算经验表明，程序越能避免对数据进行不必要的访问，就越能保持数据的完整性'。通常情况下，应使用局部变量，应在需要知晓时才传递数据，而不应不加区分地使用全
+局变量来使数据可用。读者将会看到，OOP 在数据隔离方面又向前迈进了一步。
+
+然而，全局变量也有它们的用处。例如，可以让多个函数可以使用同一个数据块。'外部存储尤其适于表示常量数据，因为这样可以使用关键字 const 来防止数据被修改'。
+
+
+
+// !! 静态持续性、内部链接性
+
+将 static 限定符用于作用域为整个文件的变量时, 该变量的链接性将为内部的。在多文件程序中, 内部链接性和外部链接性之间的差别很有意义。链接性为内部的变量只能
+在其所属的文件中使用; 但常规外部变量都具有外部链接性，即可以在其他文件中使用。
+
+如果要在其他文件中使用相同的名称来表示其他变量，该如何办呢 ？只需省略关键字 extern 即可吗？
+
+//files1
+int errors = 20;
+
+//file2
+int errors = 100;
+
+void froobish()
+{
+  cout << errors;
+}
+
+这种做法将失败，因为它违反了单定义规则。file2 中的定义试图创建一个外部变量，因此程序将包含 errors 的两个定义，这是错误。
+
+但如果文件定义了一个静态外部变量，其名称与另一个文件中声明的常规外部变量相同，则在该文件中，静态变量将隐藏常规外部变量:
+
+//files1
+int errors = 20;
+
+//file2
+static int errors = 100;
+
+void froobish()
+{
+  cout << errors;
+}
+
+这没有违反单定义规则，因为关键字 static 指出标识符 errors 的链接性为内部，因此并非要提供外部定义。
+
+'可使用外部变量在多文件程序的不同部分之间共享数据'； '可使用链接性为内部的静态变量在同一个文件中的多个函数之间共享数据'。另外，如果将作用域为整个文件的变量
+变为静态的，就不必担心其名称与其他文件中的作用域为整个文件的变量发生冲突。
+
+twofile1.cpp 和 twofile2.cpp 演示了 C++ 如何处理链接性为外部和内部的变量。twofile1.cpp 定义了外部变量 tom 和 dick 以及静态外部变量 harry。这
+个文件中的 main() 函数显示这 3 个变量的地址，然后调用 remote_access() 函数，该函数是在另一个文件中定义的。twofile2.cpp 列出了该文件。除定义 
+remote_access() 外，该文件还使用 extern 关键字来与第一个文件共享 tom。接下来，该文件定义一个名为 dick 的静态变量。static 限定符使该变量被限制在这个文
+件内，并覆盖相应的全局定义。然后，该文件定义了一个名为 harry 的外部变量，这不会与第一个文件中的 harry 发生冲突，因为后者的链接性为内部的。随后，
+remote-access() 函数显示这 3 个变量的地址，以便于将它们与第一个文件中相应变量的地址进行比较。
+
+// twofile1.cpp
+
+#include<iostream>
+
+int tom = 3;
+int dick = 30;
+static int harry = 300;
+
+// function prototype
+void remote_access();
+
+int main()
+{
+    using namespace std;
+    cout << "main reports the following address: ";
+    cout << &tom <<" =tom, " << &dick <<" =dick, " << &harry <<" =harry" << '\n';
+    remote_access();
+    return 0;
+}
+
+// twofile2.cpp
+#include<iostream>
+
+extern int tom;
+extern int dick;
+
+int harry = 200;
+
+void remote_access()
+{
+    using namespace std;
+    cout << "remote_access reports the following address: ";
+    cout << &tom <<" =tom, " << &dick <<" =dick, " << &harry <<" =harry" << '\n';
+}
+
+ » g++ --std=c++11 twofile1.cpp twofile2.cpp
+--------------------------------------------------------------------------------
+ » ./a.out
+
+main reports the following address: 0x561cd7a80010 =tom, 0x561cd7a80014 =dick, 0x561cd7a80018 =harry
+remote_access reports the following address: 0x561cd7a80010 =tom, 0x561cd7a8001c =dick, 0x561cd7a80020 =harry
+
+从上述地址可知，这两个文件使用了同一个 tom 变量，但使用了不同的 dick 和 harry 变量。具体的地址和格式可能随系统而异，但两个 tom 变量的地址将相同，
+而两个 dick 和 harry 变量的地址不同。
+
+
+// !! 静态存储持续性、无链接性
+
+接下来介绍静态持续家族中的第三个成员——无链接性的局部变量。这种变量是这样创建的，将 static 限定符用于在代码块中定义的变量。
+在代码块中使用 static 时，将导致局部变量的存储持续性为静态的。这意味着虽然该变量只在该代码块中可用，但它在该代码块不处于活动状态时仍然存在。因此在两次函数调用
+之间，静态局部变量的值将保持不变。
+
+// static.cpp
+
+#include<iostream>
+
+const int ArSize = 10;
+
+//function prototype
+void strcount(const char * str);
+
+int main()
+{
+    using namespace std;
+    char input[ArSize];
+    char next;
+
+    cout << "Enter a line:\n";
+    cin.getline(input,ArSize);
+    while(cin)
+    {
+        cin.get(next);
+        while(next != '\n')
+        {
+            cin.get(next);
+        }
+        strcount(next);
+        cout << "Enter next line[empty to quite]:\n";
+        cin.get(input,ArSize);
+    }
+    cout << "Bye!" << endl;
+    return 0;
+}
+
+void strcount(const char * str)
+{
+    using namespace std;
+    static int total = 0;
+    int count = 0;
+
+    cout << "\"" << str << "\" contains ";
+    while(*str++)
+    {
+        ++count;
+    }
+    total += count;
+    cout << count << "characters，\n"；
+    cout << total << " characters total\n";
+}
+
+// !! 说明符和限定符
+
+关键字 static 被用在作用域为整个文件的声明中时，表示内部链接性； 被用于局部声明中，表示局部变量的存储持续性为静态的。关键字 extern 表明是引用声明，即声明引
+用在其他地方定义的变量。关键字 thread_local 指出变量的持续性与其所属线程的持续性相同。thread_local 变量之于线程，犹如常规静态变量之于整个程序。
+
+
+// !! 再谈const
+
+在 C++ 中，const 限定符对默认存储类型稍有影响。在默认情况下全局变量的链接性为外部的，但 const 全局变量的链接性为内部的。也就是说，在 C++ 看来，全局 const 
+定义就像使用了 static 说明符一样。
+
+const int fingers = 10;
+
+C++ 修改了常量类型的规则，让程序员更轻松。
+
+例如，假设将一组常量放在头文件中，并在同一个程序的多个文件中使用该头文件。 那么，预处理器将头文件的内容包含到每个源文件中后，所有的源文件都将包含类似下面这
+样的定义：
+
+const int fingers = 10;
+
+如果全局 const 声明的链接性像常规变量那样是外部的，则根据单定义规则，这将出错。
+
+也就是说，只能有一个文件可以包含前面的声明，而其他文件必须使用 extern 关键字来提供引用声明。另外，只有未使用 extern 关键字的声明才能进行初始化：
+
+extern const int fingers;
+
+因此，需要为某个文件使用一组定义，而其他文件使用另一组声明。然而，由于外部定义的 const 数据的链接性为内部的，因此可以在所有文件中使用相同的声明。
+
+内部链接性还意味着，每个文件都有自己的一组常量，而不是所有文件共享一组常量。
+
+在函数或代码块中声明 const 时，其作用域为代码块，即仅当程序执行该代码块中的代码时，该常量才是可用的。这意味着在函数或代码块中创建常量时，不必担心其名称与其他
+地方定义的常量发生冲突。
+
+// !! 函数和链接性
+
+和变量一样，函数也有链接性，虽然可选择的范围比变量小。和 C 语言一样，C++ 不允许在一个函数中定义另外一个函数，因此所有函数的存储持续性都自动为静态的，即在整
+个程序执行期间都一直存在。
+
+'在默认情况下，函数的链接性为外部的，即可以在文件间共享'。
+
+实际上，可以在函数原型中使用关键字 extern 来指出函数是在另一个文件中定义的，不过这是可选的。'要让程序在另一个文件中查找函数，该文件必须作为程序的组成部分被编
+译，或者是由链接程序搜索的库文件'。
+
+还可以使用关键字 static 将函数的链接性设置为内部的，使之只能在一个文件中使用。必须同时在原型和函数定义中使用该关键字:
+
+
+static int privite(double x, double y);
+
+
+static int privite(double x, double y)
+{
+  ...
+}
+
+'这意味着该函数只在这个文件中可见, 还意味着可以在其他文件中定义同名的的函数'。
+
+和变量一样，在定义静态函数的文件中，静态函数将覆盖外部定义，因此即使在外部定义了同名的函数，该文件仍将使用静态函数。
+
+单定义规则也适用于非内联函数, 因此对于每个非内联函数，程序只能包含一个定义。 对于链接性为外部的函数来说，这意味着在多文件程序中，只能有一个文件(该文件可能是
+库文件，而不是您提供的) 包含该函数的定义，但'使用该函数的每个文件都应包含其函数原型'。
+
+
+'C++ 在哪里查找函数'
+
+假设在程序的某个文件中调用一个函数，C++ 将到哪里去寻找该函数的定义呢？
+
+1. 如果该文件中的函数原型指出该函数是静态的, 则编译器将只在该文件中查找函数定义
+
+2. 否则，编译器(包括链接程序)将在所有的程序文件中查找。如果找到两个定义，编译器将发出错误消息，因为每个外部函数只能有一个定义
+
+3. 如果在程序文件中没有找到，编译器将在库中搜索。这意味着如果定义了一个与库函数同名的函数, 编译器将使用程序员定义的版本，而不是库函数
+
+
+// !! 语言链接性
+
+
+
+
 
 
 
