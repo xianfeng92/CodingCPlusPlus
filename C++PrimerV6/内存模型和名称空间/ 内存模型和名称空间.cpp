@@ -579,17 +579,292 @@ static int privite(double x, double y)
 
 // !! 语言链接性
 
+另一种形式的链接性——称为语言链接性(language linking) 也对函数有影响。
+
+链接程序要求每个不同的函数都有不同的符号名。在 C 语言中，一个名称只对应一个函数，因此这很容易实现。为满足内部需要，C 语言编译器可能将 spiff 这样的函数名翻
+译为 _spiff。这种方法被称为 C 语言链接性(C language linkage)。
+
+但在 C++ 中，同一个名称可能对应多个函数，必须将这些函数翻译为不同的符号名称。因此，C++ 编译器执行名称修饰。
+
+例如，可能将 spiff（int） 转换为 _spoff_i，而将 spiff（double，double） 转换为 _spiff_d_d, 这种方法被称为 C++ 语言链接(C++ language linkage)。
+
+链接程序寻找与 C++ 函数调用匹配的函数时，使用的方法与 C 语言不同。但如果要在 C++ 程序中使用 C 库中预编译的函数，将出现什么情况呢？
+
+例如，假设有下面的代码:
+
+spiff(22);
+
+它在 C 库文件中的符号名称为 _spiff，但对于我们假设的链接程序来说，C++ 查询约定是查找符号名称 _spiff_i。
+
+为解决这种问题，可以用函数原型来指出要使用的约定:
+
+extern "C" void spiff(int i);// using c protocal for name look up
+
+extern void spiff(int);// using c++ protocal for name look up
+
+extern "C++" void spiff(int)// using c++ protocal for name look up
+
+第一个原型使用 C 语言链接性；而后面的两个使用 C++ 语言链接性。第二个原型是通过默认方式指出这一点的，而第三个显式地指出了这一点。
+
+C 和 C++ 链接性是 C++ 标准指定的说明符，但实现可提供其他语言链接性说明符。
+
+
+// !! 存储方案和动态分配
+
+通常，编译器使用三块独立的内存：一块用于静态变量(可能再细分)，一块用于自动变量，另外一块用于动态存储。虽然存储方案概念不适用于动态内存，但适用于用来跟踪动态内
+存的自动和静态指针变量。例如，假设在一个函数中包含下面的语句：
+
+
+float *p_fees = new float[20];
+
+由 new 分配的 80 个字节(假设float为4个字节)的内存将一直保留在内存中，直到使用 delete 运算符将其释放。但当包含该声明的语句块执行完毕时，p_fees 指针将消失。
+如果希望另一个函数能够使用这 80 个字节中的内容，则必须将其地址传递或返回给该函数。另一方面，如果将 p_fees 的链接性声明为外部的，则文件中位于该声明后面的所有
+函数都可以使用它。另外，通过在另一个文件中使用下述声明，便可在其中使用该指针:
+
+extern float *p_fees;
+
+1. 使用 new 运算符初始化
+
+如果要初始化动态分配的变量，该如何办呢？在 C++98 中，有时候可以这样做，C++11 增加了其他可能性。下面先来看看 C++98 提供的可能性。如果要为内置的标量类型
+(如 int 或 double)分配存储空间并初始化，可在类型名后面加上初始值，并将其用括号括起：
+
+int *pi = new int(6);
+double *pd = new double(19);
+
+然而，要初始化常规结构或数组，需要使用大括号的列表初始化，这要求编译器支持 C++11。C++11 允许您这样做:
+
+
+where *one = new where{2.2,32.32};
+int *ar = new int[3]{1,2,3};
+
+
+2. new 失败时
+
+new 可能找不到请求的内存量。在最初的 10 年中，C++ 在这种情况下让 new 返回空指针，但现在将引发异常 std::bad_alloc。
+
+
+3. new：运算符、函数和替换函数
+
+运算符 new 和 new[] 分别调用如下函数:
+
+void *operator new(std::size_t);
+void *operator new[](std::size_t);
+
+这些函数被称为分配函数(alloction function)，它们位于全局名称空间中。同样，也有由 delete 和 delete[] 调用的释放函数(deallocation function):
+
+
+void operator delete(void *);
+void operator delete[](void *);
+
+std::size_t 是一个 typedef，对应于合适的整型。对于下面这样的基本语句:
+
+
+int *pi = new int;
+
+将被转换为下面这样:
+
+int *pi = new(sizeof(int));
+
+而下面的语句:
+
+int *pa = new int[40];
+
+将被转换为下面这样:
+
+int *pa = new(40*sizeof(int));
+
+
+同样，下面的语句：
+
+delete pi;
+
+将转换为如下函数调用：
+
+delete(pi);
+
+有趣的是，C++ 将这些函数称为可替换的(replaceable)。这意味着如果您有足够的知识和意愿，可为 new 和 delete 提供替换函数，并根据需要对其进行定制。例如，可
+定义作用域为类的替换函数，并对其进行定制，以满足该类的内存分配需求。在代码中，仍将使用 new 运算符，但它将调用您定义的 new() 函数。
+
+4. 定位 new 运算符
+
+
+通常，new 负责在堆(heap) 中找到一个足以能够满足要求的内存块。new 运算符还有另一种变体，被称为定位(placement) new 运算符，它让您能够指定要使用的位置。'程
+序员可能使用这种特性来设置其内存管理规程、处理需要通过特定地址进行访问的硬件或在特定位置创建对象'。
+
+要使用定位 new 特性，首先需要包含头文件 new，它提供了这种版本的 new 运算符的原型；然后将 new 运算符用于提供了所需地址的参数。除需要指定参数外，句法与常规
+new 运算符相同。具体地说，使用定位 new 运算符时，变量后面可以有方括号，也可以没有。下面的代码段演示了 new 运算符的 4 种用法:
+
+#include <new>
+
+struct chaff
+{
+  char dross[20];
+  int slag;
+};
+
+char buffer1[50];
+char buffer2[100];
+
+
+int main()
+{
+  char *p1;
+  char *p2;
+  int *p3;
+  int *p4;
+  // first the regular form of new
+  p1 = new chaff;// place structure in heap
+  p3 = new int[20];// place int array in heap
+
+  // now, the two form of place new
+  p2 = new (buffer1) chaff;// place structure in buffer1
+  p4 = new (buffer2) int[20];// place int array in buffer2
+}
+
+出于简化的目的，这个示例使用两个静态数组来为定位 new 运算符提供内存空间。因此，上述代码从 buffer1 中分配空间给结构 chaff，从 buffer2 中分配空间给一个包
+含 20 个元素的 int 数组。
+
+熟悉定位 new 运算符后，来看一个示例程序。newplace.cpp 使用常规 new 运算符和定位 new 运算符创建动态分配的数组。该程序说明了常规 new 运算符和定位 new 运算
+符之间的一些重要差别，在查看该程序的输出后，将对此进行讨论。
+
+// newplace.cpp
+
+#include<iostream>
+#include<new>
+
+const int BUF = 1024;
+const int N = 5;
+char buffer[BUF];
+
+int main()
+{
+    using namespace std;
+    double *pd1,*pd2;
+    int i;
+    cout << "Calling new and placement new:\n";
+    pd1 = new double[N];// use heap
+    pd2 = new (buffer) double[N]; // use buffer array
+    for(int i = 0; i < N; i++)
+    {
+        pd2[i] = pd1[i] = 1000 + 20.0 * i;
+    }
+    cout << "Memory address :\n" << " heap: " << pd1 << " static: " << (void*)buffer << endl;
+    cout << "Memory contents :\n";
+    for(int i = 0; i < N; i++)
+    {
+        cout << pd1[i] << " at "<< &pd1[i] << ";";
+        cout << pd2[i] << " at "<< &pd2[i] << endl;
+    }
+    cout << "Calling new and placement new a second time:\n";
+    double *pd3,*pd4;
+    pd3 = new double[N];// find new address
+    pd4 = new (buffer)double[N];// override old data
+    for(int i = 0; i < N; i++)
+    {
+        pd4[i] = pd3[i] = 1000+40.0*i;
+    }
+    cout << "Memory contents :\n";
+    for(int i = 0; i < N; i++)
+    {
+        cout << pd3[i] << " at "<< &pd3[i] << ";";
+        cout << pd4[i] << " at "<< &pd4[i] << endl;
+    }
+    cout << "Calling new and placement new a third time:\n";
+    delete[] pd1;
+    pd1 = new double[N];
+    pd2 = new (buffer+N*sizeof(double))double[N];
+    for(int i = 0; i < N; i++
+    {
+        pd2[i] = pd1[i] = 1000 + 60.0 * i;
+    }
+    cout << "Memory contents :\n";
+    for(int i = 0; i < N; i++)
+    {
+        cout << pd1[i] << " at "<< &pd1[i] << ";";
+        cout << pd2[i] << " at "<< &pd2[i] << endl;
+    }
+    delete[] pd1;
+    delete[] pd3;
+    return 0;
+}
+
+
+ » g++ --std=c++11 newplace.cpp
+--------------------------------------------------------------------------------
+ » ./a.out
+
+Calling new and placement new:
+Memory address :
+ heap: 0x5584aab722c0 static: 0x5584a8f0c160
+Memory contents :
+1000 at 0x5584aab722c0;1000 at 0x5584a8f0c160
+1020 at 0x5584aab722c8;1020 at 0x5584a8f0c168
+1040 at 0x5584aab722d0;1040 at 0x5584a8f0c170
+1060 at 0x5584aab722d8;1060 at 0x5584a8f0c178
+1080 at 0x5584aab722e0;1080 at 0x5584a8f0c180
+Calling new and placement new a second time:
+Memory contents :
+1000 at 0x5584aab722f0;1000 at 0x5584a8f0c160
+1040 at 0x5584aab722f8;1040 at 0x5584a8f0c168
+1080 at 0x5584aab72300;1080 at 0x5584a8f0c170
+1120 at 0x5584aab72308;1120 at 0x5584a8f0c178
+1160 at 0x5584aab72310;1160 at 0x5584a8f0c180
+Calling new and placement new a third time:
+Memory contents :
+1000 at 0x5584aab722c0;1000 at 0x5584a8f0c188
+1060 at 0x5584aab722c8;1060 at 0x5584a8f0c190
+1120 at 0x5584aab722d0;1120 at 0x5584a8f0c198
+1180 at 0x5584aab722d8;1180 at 0x5584a8f0c1a0
+1240 at 0x5584aab722e0;1240 at 0x5584a8f0c1a8
+
+1. 首先要指出的一点是，定位 new 运算符确实将数组 p2 放在了数组 buffer 中，p2 和 buffer 的地址都是 0x5584a8f0c160。 然而，它们的类型不同，p1 是 double 
+   指针，而 buffer 是 char 指针(顺便说一句，这也是程序使用 (void *)对buffer 进行强制转换的原因，如果不这样做，cout 将显示一个字符串）同时，常规 new 将数
+   组 p1 放在很远的地方，其地址为 0x5584aab722c0，位于动态管理的堆中
+
+
+2. 第二个常规 new 运算符查找一个新的内存块，其起始地址为 0x5584aab722f0 ；但第二个定位 new 运算符分配与以前相同的内存块：起始地址为 0x5584a8f0c160 的内
+   存块。'定位 new 运算符使用传递给它的地址，它不跟踪哪些内存单元已被使用，也不查找未使用的内存块'。这将一些内存管理的负担交给了程序员
+  
+3. 在第三次调用定位 new 运算符时，提供了一个从数组 buffer 开头算起的偏移量，因此将分配新的内存:
+
+  pd2 = new (buffer+N*sizeof(double))double[N];// offset of 40 bytes
+
+
+4. 是否使用delete来释放内存。对于常规new运算符，下面的语句释放起始地址为 0x5584a8f0c160 的内存块，因此接下来再次调用 new 运算符时，该内存块是可用的
+
+delete[] pd1;
+
+然而，程序没有使用 delete 来释放使用定位 new 运算符分配的内存。事实上，在这个例子中不能这样做。buffer 指定的内存是静态内存，而 delete 只能用于这样的指针
+：指向常规 new 运算符分配的堆内存。也就是说，数组 buffer 位于 delete 的管辖区域之外。
+
+5. 定位 new 运算符的另一种用法是，将其与初始化结合使用，从而将信息放在特定的硬件地址处。
 
 
 
 
+// !! 名称空间
+
+在 C++ 中，名称可以是变量、函数、结构、枚举、类以及类和结构的成员。'当随着项目的增大，名称相互冲突的可能性也将增加'。例如, 两个库可能都定义了名为 List、
+Tree 和 Node 的类，但定义的方式不兼容。用户可能希望使用一个库的 List 类，而使用另一个库的 Tree 类。这种冲突被称为名称空间问题。
+
+C++ 标准提供了名称空间工具，以便更好地控制名称的作用域。
 
 
+// !! 传统的 C++ 名称空间
+
+介绍 C++ 中新增的名称空间特性之前，先复习一下 C++ 中已有的名称空间属性，并介绍一些术语，让读者熟悉名称空间的概念。
+
+1. 声明区域(declaration region), 声明区域是可以在其中进行声明的区域。例如，可以在函数外面声明全局变量，对于这种变量，其声明区域为其声明所在的文件。
+   对于在函数中声明的变量，其声明区域为其声明所在的代码块。
+
+2. 潜在作用域(potential scope), 变量的潜在作用域从声明点开始，到其声明区域的结尾。因此潜在作用域比声明区域小，这是由于变量必须定义后才能使用。
+
+3. 变量并非在其潜在作用域内的任何位置都是可见的。例如，它可能被另一个在嵌套声明区域中声明的同名变量隐藏。例如，在函数中声明的局部变量(对于这种变量，声明
+   区域为整个函数)将隐藏在同一个文件中声明的全局变量(对于这种变量，声明区域为整个文件)
 
 
-
-
-
+'C++ 关于全局变量和局部变量的规则定义了一种名称空间层次'。每个声明区域都可以声明名称，这些名称独立于在其他声明区域中声明的名称。在一个函数中声明的局部变量
+不会与在另一个函数中声明的局部变量发生冲突。
 
 
 
