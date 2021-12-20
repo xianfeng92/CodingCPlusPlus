@@ -867,5 +867,371 @@ C++ 标准提供了名称空间工具，以便更好地控制名称的作用域�
 不会与在另一个函数中声明的局部变量发生冲突。
 
 
+// !! 新的名称空间特性
+
+C++ 新增了这样一种功能，即'通过定义一种新的声明区域来创建命名的名称空间', 这样做的目的之一是提供一个声明名称的区域。一个名称空间中的名称不会与另外一个名称空
+间的相同名称发生冲突，同时允许程序的其他部分使用该名称空间中声明的东西。例如，下面的代码使用新的关键字 namespace 创建了两个名称空间：Jack 和 Jill。
+
+namespace jack {
+  double pail;
+  void fetch();
+  int pal;
+  struct well{....};
+}
+
+namespace jill{
+  double bucket(int n ){...};
+  double fetch;
+  int pal;
+  struct hill{....};
+}
+
+名称空间可以是全局的, 也可以位于另一个名称空间中，但不能位于代码块中。因此，在默认情况下，在名称空间中声明的名称的链接性为外部的(除非它引用了常量)。
+
+
+除了用户定义的名称空间外，还存在另一个名称空间——'全局名称空间(global namespace)。它对应于文件级声明区域，因此前面所说的全局变量现在被描述为位于全
+局名称空间中'。
+
+'名称空间是开放的(open)，即可以把名称加入到已有的名称空间中'。
+
+例如，下面这条语句将名称 goose 添加到 Jill 中已有的名称列表中:
+
+namespace jill{
+  char *goose(const char *);
+}
+
+同样，原来的 Jack 名称空间为 fetch() 函数提供了原型。可以在该文件后面（或另外一个文件中）再次使用 Jack 名称空间来提供该函数的代码:
+
+namespace jack {
+  void fetch(){
+    ....
+  }
+}
+
+
+当然，需要有一种方法来访问给定名称空间中的名称。'最简单的方法是，通过作用域解析运算符 ::'，使用名称空间来限定该名称:
+
+jack::pal = 23.32;// use a variable
+jack::Hill mole;// creat a type Hill structure
+jack::fetch();// use a function
+
+未被装饰的名称（如 pail）称为未限定的名称（unqualified name）; 包含名称空间的名称（如 Jack::pail）称为限定的名称（qualified name）。
+
+// !! using 声明和 using 编译指令
+
+我们并不希望每次使用名称时都对它进行限定，因此 C++ 提供了两种机制(using 声明和 using 编译指令)来简化对名称空间中名称的使用。
+
+'using 声明使特定的标识符可用，using 编译指令使整个名称空间可用'。
+
+using 声明由被限定的名称和它前面的关键字 using 组成:
+
+using jill::fetch;// using a declaration
+
+'using 声明将特定的名称添加到它所属的声明区域中'。例如 main() 中的 using 声明 Jill::fetch 将 fetch 添加到 main() 定义的声明区域中。完成该声明
+后，便可以使用名称 fetch 代替 Jill::fetch。下面的代码段说明了这几点:
+
+namespace jill {
+  double bucket(double n){...};
+  double fetch;
+  struct Hill{...};
+}
+
+char fetch;
+
+int main()
+{
+  using jill::fetch;
+  double fetch;// error already have a local fetch
+  cin >> fetch;// read a value into jill::fetch
+  cin >> ::fetch;// read a value into global fetch
+  ...
+}
+
+'由于 using 声明将名称添加到局部声明区域中'，因此这个示例避免了将另一个局部变量也命名为 fetch。另外，和其他局部变量一样，fetch 也将覆盖同名的全局变量。
+
+
+'在函数的外面使用 using 声明时，将把名称添加到全局名称空间中':
+
+void other();
+namespace Jill{
+  double bucket(double n){...};
+  double fetch;
+  struck Hill{...};
+}
+
+using Jill::fetch;// put fetch into global namespace
+
+int main()
+{
+  cin >> fetch;
+  other();
+}
+
+
+void other()
+{
+  cout << fetch;// display Jill::fetch
+}
+
+'using 声明使一个名称可用，而 using 编译指令使所有的名称都可用'。
+
+using 编译指令由名称空间名和它前面的关键字 using namespace 组成，它使名称空间中的所有名称都可用，而不需要使用作用域解析运算符:
+
+using namespace std;
+using namespace jack;
+
+在全局声明区域中使用' using 编译指令'，将使该名称空间的名称全局可用。这种情况已出现过多次:
+
+#include <iostream> // place names in namespace std
+using namespace std;// make names available globally
+
+
+在函数中使用 using 编译指令，将使其中的名称在该函数中可用，下面是一个例子:
+
+int main()
+{
+  using namespace jack;// make names available in main().
+  ...
+}
+
+'有关 using 编译指令和 using 声明，需要记住的一点是，它们增加了名称冲突的可能性'。也就是说，如果有名称空间 jack 和 jill，并在代码中使用作用域
+解析运算符，则不会存在二义性:
+
+jack::pal = 12;
+jill::pal = 21;
+
+变量 jack::pal 和 jill::pal 是不同的标识符，表示不同的内存单元。然而，如果使用 using 声明，情况将发生变化:
+
+using jack::pal;
+using jill::pal;
+pal = 4;// which one ? now have a conflict
+
+事实上，'编译器不允许您同时使用上述两个 using 声明，因为这将导致二义性'。
+
+// !! using 编译指令和 using 声明之比较
+
+使用 using 编译指令导入一个名称空间中所有的名称与使用多个 using 声明是不一样的，using 声明更像是大量使用作用域解析运算符。使用 using 声明时，就好像
+声明了相应的名称一样。如果某个名称已经在函数中声明了，则不能用 using 声明导入相同的名称。然而，使用 using 编译指令时，将进行名称解析，就像在包含 using 
+声明和名称空间本身的最小声明区域中声明了名称一样。
+
+在下面的示例中，名称空间为全局的。如果使用 using 编译指令导入一个已经在函数中声明的名称，则局部名称将隐藏名称空间名，就像隐藏同名的全局变量一样。不过仍可以
+像下面的示例中那样使用作用域解析运算符:
+
+
+namespace jill {
+  double bucket(double n){...};
+  double fetch;
+  struct hill{...};
+}
+
+char fetch// global namespace
+
+int main()
+{
+  using namespace jill;
+  hill Thrill;
+  double water = bucket(2);
+  double fetch;// not error, hide jill::fetch
+  cin >> fetch；
+  cin >> ::fetch;// read a value into global fetch
+  cin >>jill::fetch;// read a value into jill::fetch
+  return 0;
+}
+
+在 main() 中，名称 Jill::fetch 被放在局部名称空间中，但其作用域不是局部的，因此不会覆盖全局的 fetch。然而，局部声明的 fetch 将隐藏 Jill::fetch 和
+全局 fetch。然而，如果使用作用域解析运算符，则后两个 fetch 变量都是可用的。
+
+
+'一般说来，使用 using 声明比使用 using 编译指令更安全，这是由于它只导入指定的名称'。'如果该名称与局部名称发生冲突，编译器将发出指示'。using 编译指令导入
+所有名称，包括可能并不需要的名称。如果与局部名称发生冲突，则局部名称将覆盖名称空间版本，而编译器并不会发出警告。另外，名称空间的开放性意味着名称空间的名称可
+能分散在多个地方，这使得难以准确知道添加了哪些名称。
+
+下面是本书的大部分示例采用的方法:
+
+#include <iostream>
+int main()
+{
+  using namespace std;
+  ...
+}
+
+
+1. 首先，#include 语句将头文件 iostream 放到名称空间 std 中。
+
+2. 然后，using 编译指令使该名称空间在 main() 函数中可用
+
+
+有些示例采取下述方式：
+
+#include<iostream>
+using namespace std;
+
+int main()
+{
+
+}
+
+这将名称空间 std 中的所有内容导出到全局名称空间中, 使用这种方法的主要原因是方便。
+
+
+然而，名称空间的支持者希望有更多的选择，既可以使用解析运算符，也可以使用 using 声明。也就是说，不要这样做：
+
+using namespace std;
+
+而应这样做:
+
+int x;
+std::cin >> x;
+std::cout << x << std::endl;
+
+
+或者这样做:
+
+using std::cout;
+using std::cin;
+using std::endl;
+
+int x;
+cin >> x;
+cout << x << endl;
+
+
+// !! 名称空间的其他特性
+
+可以将名称空间声明进行嵌套:
+
+namespace elements
+{
+  namespace fire{
+    int flame;
+    ...
+  }
+  float water;
+} // namespace elements
+
+
+这里，flame 指的是 element::fire::flame。同样，可以使用下面的 using 编译指令使内部的名称可用:
+
+using namespace element::fire;
+
+另外，也可以在名称空间中使用 using 编译指令和 using 声明，如下所示:
+
+namespace myth
+{
+  using jill::fetch;
+  using namespace elements;
+  using std::cout;
+  using std::endl;
+}
+
+假设要访问 Jill::fetch。由于 Jill::fetch 现在位于名称空间 myth（在这里，它被叫做 fetch）中，因此可以这样访问它：
+
+std::cin >> myth::fetch;
+
+当然，由于它也位于 Jill 名称空间中，因此仍然可以称作 Jill::fetch:
+
+jill::fetch;
+std::cout << jill::fetch;
+
+如果没有与之冲突的局部变量，则也可以这样做：
+
+using namespace myth;
+cin >> fetch;
+
+// !! 未命名的名称空间
+
+可以通过省略名称空间的名称来创建未命名的名称空间：
+
+namespace{// unnamed namespace
+  int ice;
+  int bandycoot;
+}
+
+
+这就像后面跟着 using 编译指令一样，也就是说，在该名称空间中声明的名称的潜在作用域为: 从声明点到该声明区域末尾。
+
+从这个方面看，它们与全局变量相似。然而，由于这种名称空间没有名称，因此不能显式地使用 using 编译指令或 using 声明来使它在其他位置都可用。具体地说，
+不能在未命名名称空间所属文件之外的其他文件中，使用该名称空间中的名称。'这提供了链接性为内部的静态变量的替代品'。
+
+
+static int counts = 0;
+int other();
+
+int main()
+{
+  ...
+}
+
+int other()
+{
+  ...
+}
+
+
+采用名称空间的方法如下：
+
+namespace{
+  int counts = 0;
+}
+
+int other();
+
+int main()
+{
+  ...
+}
+
+int other()
+{
+  ...
+}
+
+
+// !!名称空间示例
+
+现在来看一个多文件示例，该示例说明了名称空间的一些特性。'namesp.h 是头文件，其中包含头文件中常包含的内容:常量、结构定义和函数原型'。在这个例子中，
+这些内容被放在两个名称空间中。第一个名称空间叫做 pers，其中包含 Person 结构的定义和两个函数的原型——一个函数用人名填充结构，另一个函数显示结构的内容；
+第二个名称空间叫做 debts，它定义了一个结构，该结构用来存储人名和金额。该结构使用了 Person 结构，因此，debts 名称空间使用一条 using 编译指令，让 
+pers 中的名称在 debts 名称空间可用, debts 名称空间也包含一些原型。
+
+#ifndef BCDA71E0_EE12_45DA_A931_41B2796B18FB
+#define BCDA71E0_EE12_45DA_A931_41B2796B18FB
+
+#include <string>
+namespace pers{
+
+    struct Person{
+        std::string fname;
+        std::string lname;
+    };
+
+    void getPerson(Person&);
+    void showPerson(const Person&);
+}
+
+namespace debts{
+    using namespace pers;
+    struct Debt{
+        Person name;
+        double amount;
+    };
+    void getDebt(Debt&);
+    void showDebt(const Debt &);
+    double sumDebt(const Debt deb[],int n);
+}
+
+#endif /* BCDA71E0_EE12_45DA_A931_41B2796B18FB */
+
+
+
+'namesp.cpp 是源代码文件，它提供了头文件中的函数原型对应的定义'。在名称空间中声明的函数名的作用域为整个名称空间，因此定义和声明必须位于同一个名称空间中。
+这正是名称空间的开放性发挥作用的地方。通过包含 namesp.h 导入了原来的名称空间。然后该文件将函数定义添加入到两个名称空间中。另外，文件 names.cpp 演示了如
+何使用 using 声明和作用域解析运算符来使名称空间 std 中的元素可用。
+
+
+
+
+
+
 
 
