@@ -542,6 +542,362 @@ Stock::show() const
 '如果构造函数使用了 new，则必须提供使用 delete 的析构函数'。
 
 
+// !! this 指针
+
+const Stock & topval(const Stock & s) const;
+
+'该函数隐式地访问一个对象，而显式地访问另一个对象，并返回其中一个对象的引用'。括号中的 const 表明，该函数不会修改被显式地访问的对象；而括号后的 const 
+表明，该函数不会修改被隐式地访问的对象。由于该函数返回了两个 const 对象之一的引用，因此返回类型也应为 const 引用。
+
+假设要对 Stock 对象 stock1 和 stock2 进行比较，并将其中股价总值较高的那一个赋给 top 对象，则可以使用下面两条语句之一:
+
+top = stock1.topval(stock2);
+top = stock2.topval(stock1);
+
+第一种格式隐式地访问 stock1，而显式地访问 stock2； 第二种格式显式地访问 stock1，而隐式地访问 stock2。无论使用哪一种方式，都将对这两个对象进行比较，并
+返回股价总值较高的那一个对象。
+
+实际上，这种表示法有些混乱。'如果可以使用关系运算符 > 来比较这两个对象，将更为清晰'。可以使用运算符重载完成这项工作。
+
+同时，还要注意的是 topval() 的实现，它将引发一个小问题。下面的部分实现强调了这个问题:
+
+const Stock & topval(const Stock & s) const
+{
+    if(s.total_val > total_val)
+    {
+        return s;
+    }
+    else
+    {
+        return ???;
+    }
+}
+
+其中 s.total_val 是作为参数传递的对象的总值，total_val 是用来调用该方法的对象的总值。如果 s.total_val 大于 toatl_val，则函数将返回指向 s 的引用；
+否则，将返回用来调用该方法的对象(在 OOP 中，是 topval 消息要发送给的对象)。
+
+问题在于，如何称呼这个对象？ 
+
+如果调用 stock1.topval(stock2)，则 s 是 stock2 的引用(即 stock2 的别名)，但 stock1 没有别名。
+
+C++ 解决这种问题的方法是: 使用被称为 this 的特殊指针。'this 指针指向用来调用成员函数的对象(this 被作为隐藏参数传递给方法)'。这样，函数调用 
+stock1.topval(stock2) '将 this 设置为 stock1 对象的地址'，使得这个指针可用于 topval() 方法。同样，函数调用 stock2.topval（stock1）'将 this 设置
+为 stock2 对象的地址'。
+
+
+'一般来说，所有的类方法都将 this 指针设置为调用它的对象的地址'。
+
+
+注意:
+
+'每个成员函数(包括构造函数和析构函数)都有一个 this 指针'。this 指针指向调用对象。如果方法需要引用整个调用对象，则可以使用表达式 *this。在函数的括号后面
+使用 const 限定符将 this 限定为 const，这样将不能使用 this 来修改对象的值。然而，'要返回的并不是 this，因为 this 是对象的地址，而是对象本身，即 *this'
+(将解除引用运算符*用于指针，将得到指针指向的值)。现在，可以将 *this 作为调用对象的别名来完成前面的方法定义。
+
+
+const Stock & topval(const Stock & s) const
+{
+    if(s.total_val > total_val)
+    {
+        return s;
+    }
+    else
+    {
+        return *this;
+    }
+}
+
+返回类型为引用意味着返回的是调用对象本身，而不是其副本。
+
+// !! 对象数组
+
+和 Stock 示例一样，用户通常要创建同一个类的多个对象。可以创建独立对象变量，但创建对象数组将更合适。这似乎是在介绍一个未知领域，但实际上，声明对象数组的方法
+与声明标准类型数组相同:
+
+Stock mystuff[4];// create an array with 4 stock object
+
+当程序创建未被显式初始化的类对象时，总是调用默认构造函数。上述声明要求，这个类要么没有显式地定义任何构造函数(在这种情况下，将使用不执行任何操作的隐式默认构造
+函数)，要么定义了一个显式默认构造函数。每个元素(mystuff[0]、mystuff[1] 等)都是 Stock 对象，可以使用 Stock 方法:
+
+
+mystuff[0].update(123.32);
+mystuff[1].show();
+
+可以用构造函数来初始化数组元素。在这种情况下，必须为每个元素调用构造函数:
+
+const int STKS = 4;
+Stock stock[STKS] = {
+    Stock("NIO",121,1111.23),
+    Stock("Apple",12,321.3),
+    Stock("Alibaba",232,321.3),
+    Stock("NIOXF",2222,2222.32)
+};
+
+这里的代码使用标准格式对数组进行初始化:用括号括起的、以逗号分隔的值列表。其中，每次构造函数调用表示一个值。如果类包含多个构造函数，则可以对不同的元素使用
+不同的构造函数。
+
+'初始化对象数组的方案是，首先使用默认构造函数创建数组元素，然后花括号中的构造函数将创建临时对象，然后将临时对象的内容复制到相应的元素中'。因此，要创建类对
+象数组，则这个类必须有默认构造函数。
+
+usestock3.cpp 在一个小程序中使用了这些原理，该程序对 4 个数组元素进行初始化，显示它们的内容，并找出这些元素中总值最高的一个。由于 topval() 每次只检查两个
+对象，因此程序使用 for 循环来检查整个数组。另外，它使用 stock 指针来跟踪值最高的元素。
+
+#include<iostream>
+#include "stock20.h"
+
+const int STKS =4;
+
+int main()
+{
+    Stock stocks[STKS] = {
+        Stock("NIO",22,12.21),
+        Stock("APPLE",21,12.21),
+        Stock("NIOXF",12321,21.234),
+        Stock("xforg",12,21.234)
+    };
+
+    std::cout << "Stock holdings\n";
+    int st;
+    for( st =0; st < STKS; st++ )
+    {
+        stocks[st].show();
+    }
+
+    // set pointer to first elements
+    const Stock *pStock = &stocks[0];
+    for( st = 1; st < STKS; st++ )
+    {
+        top =  &(top->topval(stocks[st]));
+    }
+
+    std::cout << "most valuable holdings:\n";
+    top->show();
+    return 0;
+}
+
+顺便说一句，知道 this 指针就可以更深入了解 C++ 的工作方式。例如，最初的 UNIX 实现使用 C++ 前端 cfront 将 C++ 程序转换为 C 程序。
+处理方法的定义时，只需将下面这样的 C++ 方法定义：
+
+void Stock::show() const
+{
+    cout << "Company is " << Company << "\n";
+}
+
+转换为下面这样的 C-风格定义：
+
+void show(const Stock *this) const
+{
+    cout << "Company is " << Company << "\n";
+}
+
+同样，该前端将下面的函数调用:
+
+top.show();
+
+转换为：
+
+show(&top);
+
+这样，将调用对象的地址赋给了 this 指针(实际情况可能更复杂些)。
+
+// !! 类作用域
+
+'在类中定义的名称(如类数据成员名和类成员函数名)的作用域都为整个类，作用域为整个类的名称只在该类中是已知的，在类外是不可知的'。
+
+因此，可以在不同类中使用相同的类成员名而不会引起冲突。例如，Stock 类的 shares 成员不同于 JobRide 类的 shares 成员。另外，类作用域意味着不能从外部直接
+访问类的成员，公有成员函数也是如此。也就是说，要调用公有成员函数，必须通过对象。
+
+
+Stock sleeper = {"NIO",123,32.21};
+sleeper.show();
+
+show();// invalid 
+
+同样，在定义成员函数时，必须使用'作用域解析运算符':
+
+void Stock::show() const
+{
+    ...
+}
+
+总之，在类声明或成员函数定义中，可以使用未修饰的成员名称(未限定的名称)，就像 sell() 调用 set_tot() 成员函数时那样。在其他情况下，使用类成员名时，必须根据
+上下文使用直接成员运算符(．)、间接成员运算符(->)或作用域解析运算符(::)。下面的代码片段演示了如何访问具有类作用域的标识符:
+
+
+class TK
+{
+private:
+    int fuss;// fuss has class scope
+public:
+    TK(int f = 9)
+    {
+        fuss = f;
+    }
+    void viewTK() const;// viewTK has class scope
+}
+
+void TK::viewTK() const
+{
+    cout << fuss << endl;
+}
+
+int main()
+{
+    Tk *pTk = new Tk();
+    Tk ee = TK(8);
+    ee.viewTK();
+    pTk->viewTK();
+    return 0;
+}
+
+
+// !! 作用域为类的常量
+
+'有时候，使符号常量的作用域为类很有用'。例如，类声明可能使用字面值 30 来指定数组的长度，由于该常量对于所有对象来说都是相同的，因此创建一个由所有对象共享的
+常量是个不错的主意。您可能以为这样做可行:
+
+class Bakery
+{
+private:
+    const int Months = 12;// declare a constant ? FAIL
+    double costs[Months];
+    ...
+}
+
+但这是行不通的，'因为声明类只是描述了对象的形式，并没有创建对象'。因此，在创建对象前，将没有用于存储值的空间(实际上，C++11 提供了成员初始化，但不适用于前述
+数组声明)。
+
+有两种方式可以实现这个目标，并且效果相同:
+
+1. 在类中声明一个枚举。在类声明中声明的枚举的作用域为整个类，因此可以用枚举为整型常量提供作用域为整个类的符号名称
+   也就是说，可以这样开始 Bakery 声明：
+
+class Bakery
+{
+private:
+    enum {Months=12};
+    double costs[Months];
+    ...
+};
+
+'用这种方式声明枚举并不会创建类数据成员'。也就是说，所有对象中都不包含枚举。另外，Months 只是一个符号名称，在作用域为整个类的代码中遇到它时，编译器将用 12 
+来替换它。由于这里使用枚举只是为了创建符号常量，并不打算创建枚举类型的变量，因此不需要提供枚举名。顺便说一句，在很多实现中，ios_base 类在其公有部分中完成了
+类似的工作，诸如 ios_base::fixed 等标识符就来自这里。其中，fixed 是 ios_base 类中定义的典型的枚举量。
+
+2. C++ 提供了另一种在类中定义常量的方式---使用关键字 static
+
+class Bakery
+{
+private:
+    static const int Months = 12;
+    double costs[Months];
+    ...
+};
+
+'这将创建一个名为 Months 的常量，该常量将与其他静态变量存储在一起，而不是存储在对象中'。因此，只有一个 Months 常量，被所有 Bakery 对象共享。
+
+
+// !! 作用域内枚举(C++11)
+
+传统的枚举存在一些问题，其中之一是两个枚举定义中的枚举量可能发生冲突。假设有一个处理鸡蛋和T恤的项目，其中可能包含类似下面这样的代码:
+
+enum egg{Small,Medium,Large};
+enum t_shirt{Small,Medium,Large};
+
+
+这将无法通过编译，因为 egg Small 和 t_shirt Small 位于相同的作用域内，它们将发生冲突。为避免这种问题，C++11 提供了一种新枚举，其枚举量的作用域为类。
+这种枚举的声明类似于下面这样：
+
+enum class egg{Small,Medium,Large};
+enum class t_shirt{Small,Medium,Large};
+
+无论使用哪种方式，都需要使用枚举名来限定枚举量:
+
+egg choice = egg::Small;
+t_shirt flod = t_shirt::Small;
+
+枚举量的作用域为类后，不同枚举定义中的枚举量就不会发生名称冲突了
+
+'C++11 还提高了作用域内枚举的类型安全'。在有些情况下，常规枚举将自动转换为整型，如将其赋给 int 变量或用于比较表达式时，但作用域内枚举不能隐式地转换
+为整型:
+
+enum egg_old{Small,Medium,Large};// unscoped
+enum class t_shirt{Small,Medium,Large};// scoped
+
+egg_old one = Medium;
+t_shirt rolf = t_shirt::Small;
+
+int king = one;// implicit type conversion for unscope
+int ring = rolf;// not allowed
+
+但在必要时，可进行显式类型转换：
+
+int ring = int(t_shirt::Small);
+
+枚举用某种底层整型类型表示，在 C++98 中，如何选择取决于实现，因此包含枚举的结构的长度可能随系统而异。'对于作用域内枚举，C++11 消除了这种依赖性。默认情况
+下，C++11 作用域内枚举的底层类型为 int'。另外，还提供了一种语法，可用于做出不同的选择：
+
+enum class:short pizza{Small,Medium,Large};
+
+:short 将底层类型指定为 short。
+
+
+// !!  抽象数据类型
+
+Stock 类非常具体。'然而，程序员常常通过定义类来表示更通用的概念'。例如，就实现计算机专家们所说的抽象数据类型(abstract data type，ADT) 而言，使用类是一
+种非常好的方式。
+
+'顾名思义，ADT 以通用的方式描述数据类型，而没有引入语言或实现细节'。例如，通过使用栈，可以以这样的方式存储数据，即总是从堆顶添加或删除数据。例如，C++ 程序
+使用栈来管理自动变量。当新的自动变量被生成后，它们被添加到堆顶; 消亡时，从栈中删除它们。
+
+下面简要地介绍一下栈的特征。首先，栈存储了多个数据项(该特征使得栈成为一个容器----一种更为通用的抽象) ；其次，栈由可对它执行的操作来描述。
+
+1. 可创建空栈
+
+2. 可将数据项添加到堆顶(压入)
+
+3. 可从栈顶删除数据项(弹出)
+
+4. 可查看栈否填满
+
+5. 可查看栈是否为空
+
+可以将上述描述转换为一个类声明，其中公有成员函数提供了表示栈操作的接口，而私有数据成员负责存储栈数据。'类概念非常适合于 ADT 方法'
+
+
+私有部分必须表明数据存储的方式。例如，可以使用常规数组、动态分配数组或更高级的数据结构(如链表)。然而，公有接口应隐藏数据表示，而以通用的术语来表达，如创建
+栈、压入等。
+
+#ifndef C0B90B36_16E9_4F12_9009_2C8517AFEA67
+#define C0B90B36_16E9_4F12_9009_2C8517AFEA67
+
+typedef unsigned long Item;
+class Stack
+{
+private:
+    enum {MAX = 10};
+    Item items[MAX];
+    int top;
+public:
+    Stack();
+    bool isEmpty() const;
+    bool isFull() const;
+    bool push(const Item& item);
+    bool pop(Item& item);// pop top into items
+};
+
+#endif /* C0B90B36_16E9_4F12_9009_2C8517AFEA67 */
+
+
+stack.h 中 '私有部分表明，栈是使用数组实现的；而公有部分隐藏了这一点'。因此，可以使用动态数组来代替数组，而不会改变类的接口。这意味着修改栈的实现后
+，不需要重新编写使用栈的程序，而只需重新编译栈代码，并将其与已有的程序代码链接起来即可。
+
+接口是冗余的，因为 pop() 和 push() 返回有关栈状态的信息(满或空)，而不是 void 类型。在如何处理超出栈限制或者清空栈方面，这为程序员提供了两种选择。他可以
+在修改栈前使用 isempty() 和 isfull()  来查看，也可以使用 push() 和 pop() 的返回值来确定操作是否成功。
+
+这个类不是根据特定的类型来定义栈，而是根据通用的 Item 类型来描述。在这个例子中，头文件使用 typedef 用 Item 代替 unsigned long。如果需要 double 栈或
+结构类型的栈，则只需修改 typedef 语句，而类声明和方法定义保持不变。
+
 
 
 
