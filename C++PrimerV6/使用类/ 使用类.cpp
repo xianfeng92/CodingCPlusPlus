@@ -668,7 +668,7 @@ double host = double(st);// syntax #1
 double host1 = (double)st;// syntax #2
 
 
-也可以让编译器来决定如何做：
+也可以让编译器来决定如何做:
 
 Stonewt well(20,3);
 double star = well;
@@ -677,34 +677,275 @@ double star = well;
 指出无法将 Stonewt 赋给 double)
 
 
-那么，如何创建转换函数呢 ？ 要转换为 typeName 类型，需要使用这种形式的转换函数
+那么，如何创建转换函数呢 ？ 要转换为 typeName 类型，需要使用这种形式的转换函数:
+
+operator typeName();
+
+请注意以下几点：
+
+1. 转换函数必须是类方法
+
+2. 转换函数不能指定返回类型
+
+3. 转换函数不能有参数
+
+例如，转换为 double 类型的函数的原型如下:
+
+operator double();
+
+typeName (这里为 double) 指出了要转换成的类型，因此不需要指定返回类型。'转换函数是类方法意味着：它需要通过类对象来调用，从而告知函数要转换的值'。因此，
+函数不需要参数。
+
+要添加将 stone_wt 对象转换为 int 类型和 double 类型的函数，需要将下面的原型添加到类声明中：
+
+operator int();
+operator double();
+
+
+// !! 自动应用类型转换
+
+
+将 int(poppins) 和 cout 一起使用。假设省略了显式强制类型转换:
+
+cout << "Poppins" << poppins >> "pounds" << endl;
+
+程序会像在下面的语句中那样使用隐式转换吗 ？
+
+double p_wt = poppins;
+
+答案是否定的。在 p_wt 示例中，'上下文表明，poppins 应被转换为 double 类型'。但在 cout 示例中，并没有指出应转换为 int 类型还是 double 类型。在缺少信
+息时，编译器将指出，程序中使用了二义性转换。该语句没有指出要使用什么类型。
+
+有趣的是，如果类只定义了 double 转换函数，则编译器将接受该语句。这是因为只有一种转换可能，因此不存在二义性。
+
+赋值的情况与此类似。对于当前的类声明来说，编译器将认为下面的语句有二义性而拒绝它。
+
+long gone = poppins;
+
+'在 C++ 中，int 和 double 值都可以被赋给 long 变量，所以编译器使用任意一个转换函数都是合法的。编译器不想承担选择转换函数的责任'。
+
+然而，如果删除了这两个转换函数之一，编译器将接受这条语句。
+
+当类定义了两种或更多的转换时，仍可以用显式强制类型转换来指出要使用哪个转换函数。可以使用下面任何一种强制类型转换表示法:
+
+
+long gone = (double)poppins;
+long gone = int(poppins);
+
+第一条语句将 poppins 转换为一个 double 值，然后赋值操作将该 double 值转换为 long 类型。同样，第二条语句将 poppins 首先转换为 int 类型，随后转换为
+long。 
+
+和转换构造函数一样，转换函数也有其优缺点。提供执行自动、隐式转换的函数所存在的问题是：在用户不希望进行转换时，转换函数也可能进行转换。例如，假设您在睡眠不足时
+编写了下面的代码：
+
+int arr[20];
+...
+Stonewt temp(14,4);
+
+...
+
+int Temp = 1;
+
+...
+
+cout << arr[temp] << endl; // using temp instead of Temp
+
+'通常，您以为编译器能够捕获诸如使用了对象而不是整数作为数组索引等错误'，但 Stonewt 类定义了一个 operator int()，因此 Stonewt 对象 temp 将被转换为 
+int 14 并用作数组索引。'原则上说，最好使用显式转换，而避免隐式转换'。在 C++98 中，关键字 explicit 不能用于转换函数，但C++11消除了这种限制。因此，
+在 C++11 中，可将转换运算符声明为显式的:
+
+class Stonewt
+{
+
+    ...
+
+    explicit operator int() const;
+    explicit operator double() const;
+
+}
+
+有了这些声明后，需要强制转换时将调用这些运算符。
+
+另一种方法是，用一个功能相同的非转换函数替换该转换函数即可，但仅在被显式地调用时，该函数才会执行。也就是说，可以将：
+
+Stonewt::operator int() const
+{
+    return (pounds + 0.5);
+}
+
+
+替换为：
+
+int Stonewt::Stone_to_int()
+{
+    return (pounds + 0.5);
+}
+
+
+这样，下面的语句将是非法的：
+
+int plb = poppins;
+
+
+但如果确实需要这种转换，可以这样做：
+
+int plb = poppins.Stone_to_int();
+
+警告：
+
+'应谨慎地使用隐式转换函数。通常，最好选择仅在被显式地调用时才会执行的函数'。
+
+
+总之，C++ 为类提供了下面的类型转换:
+
+1. 只有一个参数的类构造函数用于将类型与该参数相同的值转换为类类型。例如，将 int 值赋给 Stonewt 对象时，接受 int 参数的 Stonewt 类构造函数将自动被调用。
+   然而，在构造函数声明中使用 explicit 可防止隐式转换，而只允许显式转换
+
+2. 被称为转换函数的特殊类成员运算符函数，用于将类对象转换为其他类型。转换函数是类成员，没有返回类型、没有参数、名为 operator typeName()，其中，typeName 
+   是对象将被转换成的类型。将类对象赋给 typeName 变量或将其强制转换为 typeName 类型时，该转换函数将自动被调用
 
 
 
+// !! 转换函数和友元函数
+
+下面为 Stonewt 类重载加法运算符。在讨论 Time 类时指出过，可以使用成员函数或友元函数来重载加法。(出于简化的目的, 我们假设没有定义 operator double() 
+转换函数), 可以使用下面的成员函数实现加法:
+
+
+ Stonewt Stonewt::operator+(const Stonewt &st) const
+ {
+     double pds = pounds + st.pounds;
+     Stonewt sum(pds);
+     return sum;
+ }
+
+ 也可以将加法作为友元函数来实现，如下所示:
+
+ Stonewt operator+(const Stonewt &lt,const Stonewt &rt) const
+ {
+     double pds = lt.pounds + rt.pounds;
+     Stonewt sum(pds);
+     return sum;
+ }
+
+可以提供方法定义或友元函数定义，但不能都提供。上面任何一种格式都允许这样做：
+
+Stonewt jennySt (9,12);
+Stonewt bennySt(12,8);
+Stonewt total;
+total = jennySt + bennySt;
+
+
+另外，如果提供了 Stonewt(double) 构造函数，则也可以这样做：
+
+Stonewt jennySt (9,12);
+double kenddyD = 176.0;
+Stonewt total;
+total = jennySt + kenddyD;
+
+但只有友元函数才允许这样做：
+
+Stonewt jennySt (9,12);
+double kenddyD = 176.0;
+Stonewt total;
+total = kenddyD + jennySt;
+
+为了解其中的原因，将每一种加法都转换为相应的函数调用。首先:
+
+total = jennySt + kenddyD;
+
+被转换为：
+
+total = jennySt.operator+(kenddyD);// member function
+
+或
+
+total = operator+(jennySt,kenddyD);// friend function
 
 
 
+// !! 实现加法时的选择
+
+
+要将 double 量和 Stonewt 量相加，有两种选择:
+
+1. 第一种方法是将下面的函数定义为友元函数，让 Stonewt(double) 构造函数将 double 类型的参数转换为 Stonewt 类型的参数：
+
+operator+(const Stonewt &lt, const Stonewt &st)；
+
+2. 第二种方法是，将加法运算符重载为一个显式使用 double 类型参数的函数：
+
+Stonewt operator+(double x);// member function
+friend Stonewt operator+(double x, const Stonewt &st)；
+
+这样，下面的语句将与成员函数 operator +(double x) 完全匹配：
+
+total = jennySt + kenddyD;// Stonewt + double
+
+而下面的语句将与友元函数 operator +(double x, Stonewt &s) 完全匹配：
+
+total = kenddyD + jennySt;// double + Stonewt
+
+
+每一种方法都有其优点。'第一种方法(依赖于隐式转换)使程序更简短，因为定义的函数较少'。这也意味程序员需要完成的工作较少，出错的机会较小。这种方法的缺点是，每次
+需要转换时，都将调用转换构造函数，这增加时间和内存开销。'第二种方法（增加一个显式地匹配类型的函数）则正好相反。它使程序较长，程序员需要完成的工作更多，但运行
+速度较快'。
+
+'如果程序经常需要将 double 值与 Stonewt 对象相加，则重载加法更合适'; '如果程序只是偶尔使用这种加法，则依赖于自动转换更简单，但为了更保险，可以使用显式转换'。
+
+
+// !! 总结
+
+
+本章介绍了定义和使用类的许多重要方面, 其中的一些内容可能较难理解, 但'随着实践经验的不断增加, 您将逐渐掌握它们'。
+
+'一般来说，访问私有类成员的唯一方法是使用类方法。C++ 使用友元函数来避开这种限制'。要让函数成为友元，需要在类声明中声明该函数，并在声明前加上关键字 friend。
+
+C++ 扩展了对运算符的重载, 允许自定义特殊的运算符函数，这种函数描述了特定的运算符与类之间的关系。运算符函数可以是类成员函数，也可以是友元函数(一些运算符函数
+只能是类成员函数)。要调用运算符函数，可以直接调用该函数，也可以以通常的句法使用被重载的运算符。对于运算符 op，其运算符函数的格式如下:
+
+operatorop(argument-list);
+
+argument-list 表示该运算符的操作数。'如果运算符函数是类成员函数，则第一个操作数是调用对象，它不在 argument-list 中'。
+
+当运算符函数是成员函数时，则第一个操作数将是调用该函数的对象。
+
+'最常见的运算符重载任务之一是定义 << 运算符，使之可与 cout 一起使用，来显示对象的内容'。要让 ostream 对象成为第一个操作数，需要将运算符函数定义为友元；要使
+重新定义的运算符能与其自身拼接，需要将返回类型声明为 ostream &。下面的通用格式能够满足这种要求：
+
+ostream & operator<<(ostream & os, const c_name & obj)
+{
+    os << ....;
+    return os;
+}
+
+'C++ 允许指定在类和基本类型之间进行转换的方式'。首先，'任何接受唯一一个参数的构造函数都可被用作转换函数, 将类型与该参数相同的值转换为类'。如果将类型与该参数相
+同的值赋给对象，则 C++ 将自动调用该构造函数。
+
+'如果在该构造函数的声明前加上了关键字 explicit，则该构造函数将只能用于显式转换':
+
+bean = String("piano");
+
+'要将类对象转换为其他类型，必须定义转换函数，指出如何进行这种转换'。转换函数必须是成员函数。将类对象转换为 typeName 类型的转换函数的原型如下:
+
+operator typeName();
+
+注意，转换函数没有返回类型、没有参数，但必须返回转换后的值(虽然没有声明返回类型)。
 
 
 
+例如，下面是将 Vector 转换为 double 类型的函数：
 
 
+Vector::operator double() const
+{
+    ...
+    return a_double_value;
+}
 
+经验表明，最好不要依赖于这种隐式转换函数。
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+'您可能已经注意到了，与简单的 C-风格结构相比，使用类时，必须更谨慎、更小心，但作为补偿，它们为我们完成的工作也更多'。
 
 
 
