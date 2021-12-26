@@ -311,7 +311,6 @@ Klunk::Klunk()// explicit default constructor
 
 '带参数的构造函数也可以是默认构造函数，只要所有参数都有默认值'。例如，Klunk 类可以包含下述内联构造函数：
 
-
 Klunk::Klunk(ing n = 0)
 {
     klunc_c = n;
@@ -328,8 +327,442 @@ Klunk(ing n = 0){klunc_c = n;}
 Klunk kar(10);// ok
 Klunk bus;// invalid
 
-第二个声明既与构造函数#1（没有参数）匹配，也与构造函数#2（使用默认参数 0）匹配。这将导致编译器发出一条错误消息。
+第二个声明既与构造函数#1（没有参数）匹配，也与构造函数 #2（使用默认参数 0）匹配。这将导致编译器发出一条错误消息。
+
+// !! 复制构造函数
+
+'复制构造函数用于将一个对象复制到新创建的对象中'。也就是说，它用于初始化过程中(包括按值传递参数)，而不是常规的赋值过程中。
+
+类的复制构造函数原型通常如下:
+
+Class_Name(const Class_Name &);
+
+它接受一个指向类对象的常量引用作为参数。
+
+
+例如，String 类的复制构造函数的原型如下:
+
+StringBad(const StringBad &);
+
+对于复制构造函数，需要知道两点: 何时调用和有何功能。
+
+'何时调用复制构造函数'
+
+新建一个对象并将其初始化为同类现有对象时, 复制构造函数都将被调用。
+
+这在很多情况下都可能发生，'最常见的情况是将新对象显式地初始化为现有的对象'。例如，假设 motto 是一个 StringBad 对象，则下面 4 种声明都将调用复制
+构造函数:
+
+StringBad omino(motto);// call StringBad(const StringBad &)
+StringBad metoo = motto;// call StringBad(const StringBad &)
+StringBad also = StringBad(motto);// call StringBad(const StringBad&)
+StringBad * pstring = new StringBad(motto);// call StringBad(const StringBad &)
+
+其中中间的 2 种声明可能会使用复制构造函数直接创建 metoo 和 also ，也可能使用复制构造函数生成一个临时对象，然后将临时对象的内容赋给 metoo 和 also，
+这取决于具体的实现。最后一种声明使用 motto 初始化一个匿名对象，并将新对象的地址赋给 pstring 指针。
+
+每当程序生成了对象副本时，编译器都将使用复制构造函数。'具体地说，当函数按值传递对象或函数返回对象时，都将使用复制构造函数'。
+
+由于按值传递对象将调用复制构造函数，因此应该按引用传递对象。这样可以节省调用构造函数的时间以及存储新对象的空间。
+
+// !!默认的复制构造函数的功能
+
+'默认的复制构造函数逐个复制非静态成员(成员复制也称为浅复制)，复制的是成员的值'。
+
+下述语句：
+
+StringBad sailor = sports;
+
+与下面的代码等效(只是由于私有成员是无法访问的，因此这些代码不能通过编译):
+
+StringBad sailor;
+sailor.str = sports.str;
+sailor.len = sports.len;
+
+'如果成员本身就是类对象，则将使用这个类的复制构造函数来复制成员对象'。静态函数(如 num_strings) 不受影响，因为它们属于整个类，而不是各个对象。
+
+
+// !! 回到 Stringbad：复制构造函数的哪里出了问题
+
+解决办法是提供一个对计数进行更新的显式复制构造函数:
+
+StringBad::StringBad(const StringBad &)
+{
+    ++num_strings;
+    ...
+}
+
+提示:
+
+如果类中包含这样的静态数据成员, 即其值将在新对象被创建时发生变化，则应该提供一个显式复制构造函数来处理计数问题。
+
+1.定义一个显式复制构造函数以解决问题
+
+'解决类设计中这种问题的方法是进行深度复制(deep copy)'。也就是说，复制构造函数应当复制字符串并将副本的地址赋给 str 成员，而不仅仅是复制字符串地址。
+
+StringBad::StringBad(const StringBad &st)
+{
+    ++num_strings;
+    len = st.len;
+    str = new char[len+1];
+    std::strcpy(str,st.str);// copy string to new location
+    cout << num_strings << ": " << str << " object created\n";
+}
+
+必须定义复制构造函数的原因在于: '一些类成员是使用 new 初始化的、指向数据的指针，而不是数据本身'。
+
+警告：
+
+'如果类中包含了使用 new 初始化的指针成员，应当定义一个复制构造函数，以复制指向的数据，而不是指针，这被称为深度复制'。复制的另一种形式(成员复制或浅复制)
+只是复制指针值。浅复制仅浅浅地复制指针信息，而不会深入“挖掘”以复制指针引用的结构。
+
+
+// !! Stringbad 的其他问题: 赋值运算符
+
+ANSI C 允许结构赋值，而 'C++ 允许类对象赋值, 这是通过自动为类重载赋值运算符实现的'。这种运算符的原型如下:
+
+Class_Name & Class_Name::operator=(const Class_Name &);
+
+它接受并返回一个指向类对象的引用。例如，StringBad 类的赋值运算符的原型如下:
+
+StringBad & StringBad::operator=(const StringBad &);
+
+1．赋值运算符的功能以及何时使用它
+
+'将已有的对象赋给另一个对象时，将使用重载的赋值运算符':
+
+StringBad headline1("helloworld");
+...
+StringBad knot;
+knot = headline1;// assign operator invokes
+
+初始化对象时, 并不一定会使用赋值运算符:
+
+StringBad metto = knot;// use copy constructor, possible assign, too
+
+这里，metoo 是一个新创建的对象，被初始化为 knot 的值，因此使用复制构造函数。
+
+然而，正如前面指出的，实现时也可能分两步来处理这条语句: '使用复制构造函数创建一个临时对象，然后通过赋值将临时对象的值复制到新对象中'。这就是说，初始化总是会
+调用复制构造函数，而使用 = 运算符时也可能调用赋值运算符。
+
+与复制构造函数相似，赋值运算符的隐式实现也对成员进行逐个复制。如果成员本身就是类对象，则程序将使用为这个类定义的赋值运算符来复制该成员，但静态数据成员不受
+影响。
+
+2. 赋值的问题出在哪里
+
+将 headline1 赋给 knot：
+
+knot = headline1;
+
+3. 解决赋值的问题
+
+    '对于由于默认赋值运算符不合适而导致的问题，解决办法是提供赋值运算符(进行深度复制)定义'。其实现与复制构造函数相似，但也有一些差别。
+
+    1.由于目标对象可能引用了以前分配的数据，所以函数应使用 delete[] 来释放这些数据
+
+    2. 函数应当避免将对象赋给自身；否则，给对象重新赋值前，释放内存操作可能删除对象的内容
+
+    3. 函数返回一个指向调用对象的引用
+
+通过返回一个对象，函数可以像常规赋值操作那样，连续进行赋值，即如果 S0、S1 和 S2 都是 StringBad 对象，则可以编写这样的代码:
+
+S0 = S1 = S2;
+S0.operator=(S1.operator-(S2));
+
+
+下面的代码说明了如何为 StringBad 类编写赋值运算符：
+
+StringBad & StringBad::operator=(const StringBad & st)
+{
+    if(this == &st) return;
+    delete[] str;
+    len = st.len;
+    str = new char[len+1];
+    std::strcpy(str,st.str);
+    return *this;
+}
+
+代码首先检查自我复制，这是通过查看赋值运算符右边的地址(&st)是否与接收对象（this）的地址相同来完成的。如果相同，程序将返回 *this，然后结束。
+
+如果地址不同，函数将释放 str 指向的内存，这是因为稍后将把一个新字符串的地址赋给 str。如果不首先使用 delete 运算符，则上述字符串将保留在内存中。
+由于程序中不再包含指向该字符串的指针，因此这些内存被浪费掉。
+
+接下来的操作与复制构造函数相似，'即为新字符串分配足够的内存空间，然后将赋值运算符右边的对象中的字符串复制到新的内存单元中'。
+
+
+// !! 改进后的新 String 类
+
+有了更丰富的知识后，可以对 StringBad 类进行修订，将它重命名为 String 了。首先，添加前面介绍过的复制构造函数和赋值运算符，使类能够正确管理类对象使用的内存。
+其次，由于您已经知道对象何时被创建和释放，因此可以让类构造函数和析构函数保持沉默，不再在每次被调用时都显示消息。另外，也不用再监视构造函数的工作情况，因此可以
+简化默认构造函数，使之创建一个空字符串，而不是“C++”。
+
+
+接下来，可以在类中添加一些新功能。'string 类应该包含标准字符串函数库 cstring 的所有功能，才会比较有用'，但这里只添加足以说明其工作原理的功能(string 
+类只是一个用作说明的示例，而 C++ 标准 string 类的内容丰富得多）。
+
+具体地说，将添加以下方法：
+
+//返回被存储的字符串的长度
+int length() const { return len;}
+
+// 接下来的 3 个友元函数能够对字符串进行比较
+friend bool operator>(const string& lhs, const string& rhs);
+friend bool operator<(const string& lhs, const string& rhs);
+friend bool operator==(const string& lhs, const string& rhs);
+
+// operator>>()函数提供了简单的输入功能
+friend std::istream& operator>>(std::istream&, string&);
+
+// 两个 operator 函数提供了以数组表示法访问字符串中各个字符的功能
+char &operator[](int i);
+const char & operator[](int i) const;
+
+// 静态类方法 Howmany() 将补充静态类数据成员 num_string
+static int Howmany() const;
 
 
 
+1. 修订后的默认构造函数
 
+请注意新的默认构造函数，它与下面类似：
+
+String::String()
+{
+    len = 0;
+    str = new char[1];
+    str[0] = '\0';
+}
+
+您可能会问，为什么代码为：
+
+str = new char[1];
+
+而不是：
+
+str = new char;
+
+'上面两种方式分配的内存量相同，区别在于前者与类析构函数兼容，而后者不兼容'。
+
+析构函数中包含如下代码：
+
+delete[] str;
+
+delete[] 与使用 new[] 初始化的指针和空指针都兼容。因此对于下述代码:
+
+str = new char[1];
+str[0] = '\0';
+
+可修改为：
+
+str = 0;// set str to the null pointer
+
+对于以其他方式初始化的指针，使用 delete [] 时，结果将是不确定的:
+
+char words[15] = "bad idea";
+char *p1 = words;
+char *p2 = new char;
+char *p3;
+
+delete[] p1;// undefined
+delete[] p2;// undefined
+delete[] p3;// undefined
+
+
+C++11 空指针
+
+'在C++98 中，字面值0有两个含义:可以表示数字值零，也可以表示空指针，这使得阅读程序的人和编译器难以区分'。有些程序员使用（void *） 0 来标识空指针(空指针本身的
+内部表示可能不是零)，还有些程序员使用 NULL，这是一个表示空指针的 C 语言宏。
+
+C++11 供了更好的解决方案: 引入新关键字 nullptr，用于表示空指针。您仍可像以前一样使用 0——否则大量现有的代码将非法，但建议您使用 nullptr：
+
+str = nullptr;
+
+
+2. 比较成员函数
+
+在 String 类中，执行比较操作的方法有 3 个。如果按字母顺序(更准确地说，按照机器排序序列)，第一个字符串在第二个字符串之前，则 Operator<() 函数返回 true。
+要实现字符串比较函数，最简单的方法是使用标准的 strcmp() 函数，如果依照字母顺序，第一个参数位于第二个参数之前，则该函数返回一个负值; 如果两个字符串相同，则返回 
+0; 如果第一个参数位于第二个参数之后，则返回一个正值。因此，可以这样使用 strcmp()：
+
+bool operator<(const String &st1, const String &st2)
+{
+    if(std::strcmp(st1.str,st2.str))
+    {
+        return true;
+    }
+    return false;
+}
+
+因为内置的 < 运算符返回的是一个布尔值，所以可以将代码进一步简化为：
+
+bool operator<(const String &st1, const String &st2)
+{
+    return (std::strcmp(st1.str,st2.str) < 0);
+}
+
+
+同样，可以按照下面的方式来编写另外两个比较函数:
+
+bool operator>(const String &st1, const String &st2)
+{
+    return (st2 < st1);
+}
+
+bool operator==(const String &st1, const String &st2)
+{
+    return (std::strcmp(st1.str,st2.str) == 0);
+}
+
+将比较函数作为友元，有助于将 String 对象与常规的 C 字符串进行比较。例如，假设 answer 是 String 对象，则下面的代码：
+
+if("love" == answer)
+
+将被转换为:
+
+if(operator==("love",answer))
+
+然后，编译器将使用某个构造函数将代码转换为：
+
+if(operator==(String("love"), answer))
+
+这与原型是相匹配的。
+
+
+2. 使用中括号表示法访问字符
+
+对于标准C-风格字符串来说，可以使用中括号来访问其中的字符:
+
+char city[30] = "shanghai";
+cout << city[1] << endl;
+
+
+在 C++ 中, 两个中括号组成一个运算符——中括号运算符，可以使用方法 operator 来重载该运算符。通常，二元 C++ 运算符（带两个操作数）位于两个操作数之间，例如 
+2 + 5。但对于中括号运算符，一个操作数位于第一个中括号的前面, 另一个操作数位于两个中括号之间。因此，在表达式 city[0] 中，city是第一个操作数，[] 是运算符，
+0 是第二个操作数。
+
+假设 opera 是一个 String 对象:
+
+String opera = "NIO, to the moon";
+
+则对于表达式 opera[4]，C++ 将查找名称和特征标与此相同的方法：
+
+String::operator[](int i);
+
+'如果找到匹配的原型，编译器将使用下面的函数调用来替代表达式 opera[4]':
+
+opera.operator[](4);
+
+opera 对象调用该方法，数组下标 4 成为该函数的参数。
+
+下面是该方法的简单实现：
+
+char & String::operator[](int i)
+{
+    return str[i];
+}
+
+有了上述定义后，语句：
+
+cout << opera[4];
+
+将被转换为：
+
+cout << opera.operator[](4);
+
+将返回类型声明为 char &，便可以给特定元素赋值。例如，可以编写这样的代码：
+
+String means = "helloworld";
+means[0] = 'r';
+
+第二条语句将被转换为一个重载运算符函数调用:
+
+means.operator[](0) = 'r';
+
+这里将 r 赋给方法的返回值，而函数返回的是指向 means.str[0] 的引用，因此上述代码等同于下面的代码：
+
+means.str[0] = 'r';
+
+假设有下面的常量对象：
+
+const String answer = "helloworld";
+
+如果只有上述 operator 定义，则下面的代码将出错：
+
+cout << answer[1];
+
+原因是 answer 是常量，而上述方法无法确保不修改数据(实际上，有时该方法的工作就是修改数据，因此无法确保不修改数据)。
+
+
+'在重载时，C++ 将区分常量和非常量函数的特征标，因此可以提供另一个仅供 const String 对象使用的 operator 版本':
+
+const char & String::operator[](int i) const
+{
+    return str[i];
+}
+
+有了上述定义后，就可以读/写常规 String 对象了；而对于 const String 对象，则只能读取其数据。
+
+
+3. 静态类成员函数
+
+可以将成员函数声明为静态的(函数声明必须包含关键字 static，但如果函数定义是独立的，则其中不能包含关键字 static），这样做有两个重要的后果。
+
+    1. 首先，不能通过对象调用静态成员函数；实际上，静态成员函数甚至不能使用 this 指针。如果静态成员函数是在公有部分声明的，则可以使用类名和作用
+       域解析运算符来调用它。。例如，可以给 String 类添加一个名为 HowMany() 的静态成员函数，方法是在类声明中添加如下原型/定义：
+
+       static HowMany()
+       {
+           return num_strings;
+       }
+
+       调用它的方式如下：
+
+       String::HowMany();
+
+       其次，由于静态成员函数不与特定的对象相关联，因此只能使用静态数据成员。例如，静态方法 HowMany() 可以访问静态成员 num_string，但不能访问 str 和 
+       len。
+
+
+4. 进一步重载赋值运算符
+
+介绍针对 String 类的程序清单之前，先来考虑另一个问题。假设要将常规字符串复制到 String 对象中。例如，假设使用 getline() 读取了一个字符串，并要将这个字符串
+放置到 String 对象中，前面定义的类方法让您能够这样编写代码:
+
+String name;
+char temp[40];
+cin.getline(temp,40);
+name = temp;
+
+'但如果经常需要这样做，这将不是一种理想的解决方案'。为解释其原因，先来回顾一下最后一条语句是怎样工作的。
+
+1. 程序使用构造函数 String（const char *）来创建一个临时 String 对象，其中包含 temp 中的字符串副本(只有一个参数的构造函数被用作转换函数)。
+
+2. 使用 String & String::operator=（const String &） 函数将临时对象中的信息复制到 name 对象中
+
+3. 程序调用析构函数 ~String() 删除临时对象
+
+
+'为提高处理效率，最简单的方法是重载赋值运算符，使之能够直接使用常规字符串，这样就不用创建和删除临时对象了'。下面是一种可能的实现：
+
+String & String::operator=(const char *s)
+{
+    delete []str;
+    len = std::strlen(s);
+    str = new char[len + 1];
+    std::strcpy(str, s););
+    return *this;
+}
+
+一般说来，必须释放 str 指向的内存，并为新字符串分配足够的内存。
+
+sayings1.cpp，该程序允许输入几个字符串。程序首先提示用户输入，然后将用户输入的字符串存储到 String 对象中，并显示它们，最后指出哪个字符串最短、哪个字符串
+按字母顺序排在最前面。
+
+
+// !!在构造函数中使用 new 时应注意的事项
+
+至此，您知道使用 new 初始化对象的指针成员时必须特别小心。具体地说，应当这样做:
+
+1. 如果在构造函数中使用 new 来初始化指针成员，则应在析构函数中使用 delete
+
+2. 
