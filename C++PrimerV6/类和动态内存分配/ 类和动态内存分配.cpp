@@ -442,11 +442,11 @@ StringBad metto = knot;// use copy constructor, possible assign, too
 
 这里，metoo 是一个新创建的对象，被初始化为 knot 的值，因此使用复制构造函数。
 
-然而，正如前面指出的，实现时也可能分两步来处理这条语句: '使用复制构造函数创建一个临时对象，然后通过赋值将临时对象的值复制到新对象中'。这就是说，初始化总是会
-调用复制构造函数，而使用 = 运算符时也可能调用赋值运算符。
+然而，正如前面指出的，实现时也可能分两步来处理这条语句: '使用复制构造函数创建一个临时对象，然后通过赋值将临时对象的值复制到新对象中'。这就是说，初始化总
+是会调用复制构造函数，而使用 = 运算符时也可能调用赋值运算符。
 
-与复制构造函数相似，赋值运算符的隐式实现也对成员进行逐个复制。如果成员本身就是类对象，则程序将使用为这个类定义的赋值运算符来复制该成员，但静态数据成员不受
-影响。
+与复制构造函数相似，赋值运算符的隐式实现也对成员进行逐个复制。如果成员本身就是类对象，则程序将使用为这个类定义的赋值运算符来复制该成员，但静态数据成员不
+受影响。
 
 2. 赋值的问题出在哪里
 
@@ -492,9 +492,9 @@ StringBad & StringBad::operator=(const StringBad & st)
 
 // !! 改进后的新 String 类
 
-有了更丰富的知识后，可以对 StringBad 类进行修订，将它重命名为 String 了。首先，添加前面介绍过的复制构造函数和赋值运算符，使类能够正确管理类对象使用的内存。
-其次，由于您已经知道对象何时被创建和释放，因此可以让类构造函数和析构函数保持沉默，不再在每次被调用时都显示消息。另外，也不用再监视构造函数的工作情况，因此可以
-简化默认构造函数，使之创建一个空字符串，而不是“C++”。
+有了更丰富的知识后，可以对 StringBad 类进行修订，将它重命名为 String 了。首先，添加前面介绍过的复制构造函数和赋值运算符，使类能够正确管理类对象使用的
+内存。其次，由于您已经知道对象何时被创建和释放，因此可以让类构造函数和析构函数保持沉默，不再在每次被调用时都显示消息。另外，也不用再监视构造函数的工作情况
+，因此可以简化默认构造函数，使之创建一个空字符串，而不是“C++”。
 
 
 接下来，可以在类中添加一些新功能。'string 类应该包含标准字符串函数库 cstring 的所有功能，才会比较有用'，但这里只添加足以说明其工作原理的功能(string 
@@ -570,8 +570,8 @@ delete[] p3;// undefined
 
 C++11 空指针
 
-'在C++98 中，字面值0有两个含义:可以表示数字值零，也可以表示空指针，这使得阅读程序的人和编译器难以区分'。有些程序员使用（void *） 0 来标识空指针(空指针本身的
-内部表示可能不是零)，还有些程序员使用 NULL，这是一个表示空指针的 C 语言宏。
+'在C++98 中，字面值0有两个含义:可以表示数字值零，也可以表示空指针，这使得阅读程序的人和编译器难以区分'。有些程序员使用（void *） 0 来标识空指针(空指针本
+身的内部表示可能不是零)，还有些程序员使用 NULL，这是一个表示空指针的 C 语言宏。
 
 C++11 供了更好的解决方案: 引入新关键字 nullptr，用于表示空指针。您仍可像以前一样使用 0——否则大量现有的代码将非法，但建议您使用 nullptr：
 
@@ -581,8 +581,8 @@ str = nullptr;
 2. 比较成员函数
 
 在 String 类中，执行比较操作的方法有 3 个。如果按字母顺序(更准确地说，按照机器排序序列)，第一个字符串在第二个字符串之前，则 Operator<() 函数返回 true。
-要实现字符串比较函数，最简单的方法是使用标准的 strcmp() 函数，如果依照字母顺序，第一个参数位于第二个参数之前，则该函数返回一个负值; 如果两个字符串相同，则返回 
-0; 如果第一个参数位于第二个参数之后，则返回一个正值。因此，可以这样使用 strcmp()：
+要实现字符串比较函数，最简单的方法是使用标准的 strcmp() 函数，如果依照字母顺序，第一个参数位于第二个参数之前，则该函数返回一个负值; 如果两个字符串相同，则
+返回 0; 如果第一个参数位于第二个参数之后，则返回一个正值。因此，可以这样使用 strcmp()：
 
 bool operator<(const String &st1, const String &st2)
 {
@@ -636,9 +636,9 @@ char city[30] = "shanghai";
 cout << city[1] << endl;
 
 
-在 C++ 中, 两个中括号组成一个运算符——中括号运算符，可以使用方法 operator 来重载该运算符。通常，二元 C++ 运算符（带两个操作数）位于两个操作数之间，例如 
-2 + 5。但对于中括号运算符，一个操作数位于第一个中括号的前面, 另一个操作数位于两个中括号之间。因此，在表达式 city[0] 中，city是第一个操作数，[] 是运算符，
-0 是第二个操作数。
+在 C++ 中, 两个中括号组成一个运算符——中括号运算符，可以使用方法 operator 来重载该运算符。通常，二元 C++ 运算符（带两个操作数）位于两个操作数之间，例
+如 2 + 5。但对于中括号运算符，一个操作数位于第一个中括号的前面, 另一个操作数位于两个中括号之间。因此，在表达式 city[0] 中，city是第一个操作数，[] 是运
+算符，0 是第二个操作数。
 
 假设 opera 是一个 String 对象:
 
@@ -725,8 +725,8 @@ const char & String::operator[](int i) const
 
 4. 进一步重载赋值运算符
 
-介绍针对 String 类的程序清单之前，先来考虑另一个问题。假设要将常规字符串复制到 String 对象中。例如，假设使用 getline() 读取了一个字符串，并要将这个字符串
-放置到 String 对象中，前面定义的类方法让您能够这样编写代码:
+介绍针对 String 类的程序清单之前，先来考虑另一个问题。假设要将常规字符串复制到 String 对象中。例如，假设使用 getline() 读取了一个字符串，并要将这个字符
+串放置到 String 对象中，前面定义的类方法让您能够这样编写代码:
 
 String name;
 char temp[40];
@@ -755,8 +755,8 @@ String & String::operator=(const char *s)
 
 一般说来，必须释放 str 指向的内存，并为新字符串分配足够的内存。
 
-sayings1.cpp，该程序允许输入几个字符串。程序首先提示用户输入，然后将用户输入的字符串存储到 String 对象中，并显示它们，最后指出哪个字符串最短、哪个字符串
-按字母顺序排在最前面。
+sayings1.cpp，该程序允许输入几个字符串。程序首先提示用户输入，然后将用户输入的字符串存储到 String 对象中，并显示它们，最后指出哪个字符串最短、哪个字符
+串按字母顺序排在最前面。
 
 
 // !!在构造函数中使用 new 时应注意的事项
@@ -765,4 +765,585 @@ sayings1.cpp，该程序允许输入几个字符串。程序首先提示用户�
 
 1. 如果在构造函数中使用 new 来初始化指针成员，则应在析构函数中使用 delete
 
-2. 
+2. new 和 delete 必须相互兼容。new 对应于 delete，new[] 对应于 delete[]
+
+3. 如果有多个构造函数，则必须以相同的方式使用 new，要么都带中括号，要么都不带。因为只有一个析构函数，所有的构造函数都必须与它兼容。然而，可以在一个构造函数
+   中使用 new 初始化指针，而在另一个构造函数中将指针初始化为空( 0或 C++11 中的 nullptr)，这是因为 delete(无论是带中括号还是不带中括号)可以用于空指针
+
+   'NULL、0 还是 nullptr'
+
+    以前，空指针可以用 0 或 NULL(在很多头文件中，NULL 是一个被定义为 0 的符号常量)来表示。C 程序员通常使用 NULL 而不是 0，以指出这是一个指针，就像使用‘\0’
+    而不是 0 来表示空字符，以指出这是一个字符一样。然而，C++ 传统上更喜欢用简单的 0，而不是等价的 NULL。'C++11 提供了关键字 nullptr，这是一种更好的选择'。
+
+
+4. 应定义一个复制构造函数，通过深度复制将一个对象初始化为另一个对象。通常，这种构造函数与下面类似
+
+    String & String::operator=(const String & st)
+    {
+        if(*this == st)
+        {
+            return *this;
+        }
+        delete[] str;
+        len = st.len;
+        str = new char[len + 1];
+        std::strcpy(str,st.str);
+        return *this;
+    }
+
+    具体地说，该方法应完成这些操作: '检查自我赋值的情况，释放成员指针以前指向的内存，复制数据而不仅仅是数据的地址，并返回一个指向调用对象的引用'。
+
+
+// !! 应该和不应该
+
+下面的摘要包含了两个不正确的示例(指出什么是不应当做的)以及一个良好的构造函数示例:
+
+String::String()
+{
+    str = "default string";// opps, no new[]
+    len = std::strlen(str);
+}
+
+String::String(const char* s)
+{
+    len = std::strlen(s);
+    str = new char;// opps, no []
+    std::strcpy(str, s);// opps, no room
+}
+
+String::String(const String & st)
+{
+    len = st.len;
+    str = new char[len + 1];// good, allocate space
+    std::strcpy(str,st.str);// good, copy value
+}
+
+
+1. 第一个构造函数没有使用 new 来初始化 str。对默认对象调用析构函数时，析构函数使用 delete 来释放s tr。对不是使用 new 初始化的指针使用 delete 时，
+结果将是不确定的，并可能是有害的。
+
+    可将该构造函数修改为下面的任何一种形式：
+
+    String::String()
+    {
+        len = 0;
+        str = new char[1];
+        str[0] = '\0';
+    }
+
+
+    String::String()
+    {
+        len = 0;
+        str = 0;// or with c++ 11 nullptr
+    }
+
+
+    String::String()
+    {
+        static const char * s = "C++";
+        len = std::strlen(s);
+        str = new char[len + 1];
+        std::strcpy(str, s);
+    }
+
+
+2. 摘录中的第二个构造函数使用了 new，但分配的内存量不正确。因此，new 返回的内存块只能保存一个字符。试图将过长的字符串复制到该内存单元中，将导致内存问题。
+   另外，这里使用的 new 不带中括号，这与另一个构造函数的正确格式不一致。
+
+
+3. 第三个构造函数是正确的。
+
+最后，下面的析构函数无法与前面的构造函数正常地协同工作:
+
+String::~String()
+{
+    delete str;// opps, should delete [] str
+}
+
+该析构函数未能正确地使用 delete。由于构造函数创建的是一个字符数组，因此析构函数应该删除一个数组。
+
+
+// !! 包含类成员的类的逐成员复制
+
+假设类成员的类型为 String 类或标准 string 类:
+
+class Magazine
+{
+    private:
+        String title;
+        String publisher;
+}
+
+
+String 和 string 都使用动态内存分配，这是否意味着需要为 Magazine 类编写复制构造函数和赋值运算符？ 
+
+不，至少对这个类本身来说不需要。'默认的逐成员复制和赋值行为有一定的智能'。如果您将一个 Magazine 对象复制或赋值给另一个 Magazine 对象，逐成员复制将使用成员
+类型定义的复制构造函数和赋值运算符。也就是说，复制成员 title 时，将使用 String 的复制构造函数，而将成员 title 赋给另一个 Magazine 对象时，将使用 String 
+的赋值运算符，依此类推。然而，如果M agazine 类因其他成员需要定义复制构造函数和赋值运算符，情况将更复杂；在这种情况下，这些函数必须显式地调用 String 和 
+string 的复制构造函数和赋值运算符。
+
+// !!有关返回对象的说明
+
+当成员函数或独立的函数返回对象时, 有几种返回方式可供选择。可以返回指向对象的引用、指向对象的 const 引用或 const 对象。
+
+
+1. 返回指向 const 对象的引用
+
+使用 const 引用的常见原因是旨在提高效率，但对于何时可以采用这种方式存在一些限制。如果函数返回(通过调用对象的方法或将对象作为参数)传递给它的对象，可以通过返回引
+用来提高其效率。
+
+
+例如，假设要编写函数 Max()，它返回两个 Vector 对象中较大的一个。该函数将以下面的方式被使用:
+
+Vector force1(50,60);
+Vector force2(10,70);
+
+max = Max(force1,force2);
+
+下面两种实现都是可行的：
+
+//version1
+Vector Max(const Vector & v1, const Vector & v2)
+{
+    if(v1.magval() < v2.magval())
+    {
+        return v2;
+    }
+    return v1;
+}
+
+//version2
+const Vector & Max(const Vector & v1, const Vector & v2)
+{
+    if(v1.magval() < v2.magval())
+    {
+        return v2;
+    }
+    return v1;
+}
+
+这里有三点需要说明。首先，'返回对象将调用复制构造函数，而返回引用不会'。因此，第二个版本所做的工作更少，效率更高。其次，引用指向的对象应该在调用函数执行时存在
+。在这个例子中，引用指向 force1 或 force2，它们都是在调用函数中定义的，因此满足这种条件。第三，v1 和 v2 都被声明为 const 引用，因此返回类型必须为 const，
+这样才匹配。
+
+
+2. 返回指向非 const 对象的引用
+
+两种常见的返回非 const 对象情形是:'重载赋值运算符以及重载与 cout 一起使用的 << 运算符'。前者这样做旨在提高效率，而后者必须这样做。
+
+operator=() 的返回值用于连续赋值:
+
+String s1("good");
+String s2,s3;
+s3 = s2= s1;
+
+在上述代码中，s2.operator=() 的返回值被赋给 s3。为此，返回 String 对象或 String 对象的引用都是可行的。
+
+
+Operator<<() 的返回值用于串接输出：
+
+String s1("Happy");
+cout << s1 << "world";
+
+在上述代码中，operator<<（cout, s1） 的返回值成为一个用于显示字符串 “Happy” 的对象。返回类型必须是 ostream &，而不能仅仅是 ostream。如果使用返回类
+型 ostream，将要求调用 ostream 类的复制构造函数，而 ostream 没有公有的复制构造函数。幸运的是，返回一个指向 cout 的引用不会带来任何问题，因为 cout 
+已经在调用函数的作用域内。
+
+
+3. 返回对象
+
+'如果被返回的对象是被调用函数中的局部变量，则不应按引用方式返回它，因为在被调用函数执行完毕时，局部对象将调用其析构函数'。因此，当控制权回到调用函数时，引用
+指向的对象将不再存在。在这种情况下，应返回对象而不是引用。通常，'被重载的算术运算符属于这一类'。
+
+请看下述示例，它再次使用了 Vector 类:
+
+Vector force1(50,60);
+Vector force2(10,70);
+Vector net;
+net = force1 + force2;
+
+返回的不是 force1，也不是 force2，force1 和 force2 在这个过程中应该保持不变。因此，'返回值不能是指向在调用函数中已经存在的对象的引用'。相反，在 
+Vector::operator+() 中计算得到的两个矢量的和被存储在一个新的临时对象中，该函数也不应返回指向该临时对象的引用，而应该返回实际的 Vector 对象，而不
+是引用：
+
+Vector Vector::operator+(const Vector & b)
+{
+    return Vector(x+b.x,y+b.y);
+}
+
+'在这种情况下，存在调用复制构造函数来创建被返回的对象的开销，然而这是无法避免的'。
+
+
+4. 返回 const 对象
+
+前面的 Vector::operator+() 定义有一个奇异的属性，它旨在让您能够以下面这样的方式使用它：
+
+net = force1 + force2;
+
+然而，这种定义也允许您这样使用它:
+
+force1 + force2 = net;
+cout << "force1 + force2 = net" << (force1 + force2 = net).magval() << endl;
+
+
+这提出了三个问题。为何编写这样的语句？ 这些语句为何可行？ 这些语句有何功能？
+
+首先，没有要编写这种语句的合理理由，但并非所有代码都是合理的。即使是程序员也会犯错。例如，为 Vector 类定义 operator==()时，您可能错误地输入这样的
+代码：
+
+if(force1 + force2 = net)
+{
+
+}
+
+而不是：
+
+if(force1 + force2 == net)
+{
+
+}
+
+另外，程序员通常很有创意，这可能导致错误。
+
+其次，这种代码之所以可行，是因为复制构造函数将创建一个临时对象来表示返回值。因此，在前面的代码中，表达式 force1 + force2 的结果为一个临时对象。在语句1中，
+该临时对象被赋给 net；在语句 2和 3中， net 被赋给该临时对象。
+
+第三，使用完临时对象后，将把它丢弃。例如，对于语句 2，程序计算 force1 和 force2 之和，将结果复制到临时返回对象中，再用 net 的内容覆盖临时对象的内容，
+然后将该临时对象丢弃。原来的矢量全都保持不变。语句 3 显示临时对象的长度，然后将其删除。
+
+如果您担心这种行为可能引发的误用和滥用，有一种简单的解决方案: 将返回类型声明为 const Vector。例如，如果 Vector::operator+() 的返回类型被声明为 
+const Vector，则语句 1仍然合法，但语句 2和语句 3将是非法的。
+
+
+总之，'如果方法或函数要返回局部对象，则应返回对象，而不是指向对象的引用'。在这种情况下，将使用复制构造函数来生成返回的对象。如果方法或函数要返回一个没有公
+有复制构造函数的类(如 ostream 类)的对象，它必须返回一个指向这种对象的引用。最后，有些方法和函数(如重载的赋值运算符)可以返回对象，也可以返回指向对象的引用，
+在这种情况下，应首选引用，因为其效率更高。
+
+
+// !! 使用指向对象的指针
+
+C++ 程序经常使用指向对象的指针，因此，这里来练习一下。sayings2.cpp 使用两个指向 String 的指针实现了这种方法。最初，shortest 指针指向数组中的第一个对象。
+每当程序找到比指向的字符串更短的对象时，就把 shortest 重新设置为指向该对象。同样，first 指针跟踪按字母顺序排在最前面的字符串。这两个指针并不创建新的对象，
+而只是指向已有的对象。因此，这些指针并不要求使用 new 来分配内存。
+
+除此之外，程序 sayings2.cpp 还使用一个指针来跟踪新对象:
+
+String *favorite = new String(sayings[choice]);
+
+'这里指针 favorite 指向 new 创建的未被命名对象'。这种特殊的语法意味着使用对象 saying[choice] 来初始化新的 String 对象，这将调用复制构造函数，因为复制
+构造函数（const String &）的参数类型与初始化值（saying [choice]）匹配。程序使用 srand( )、rand( )和 time( ) 随机选择一个值。
+
+// !! 使用 new 初始化对象
+
+通常，如果 Class_name 是类，value 的类型为 Type_name，则下面的语句:
+
+Class_name *pclass = new Class_name(value);
+
+将调用如下构造函数：
+
+Class_name(Type_name);
+
+这里可能还有一些琐碎的转换，例如：
+
+Class_Name(const Type_name & );
+
+另外，如果不存在二义性，则将发生由原型匹配导致的转换(如从 int 到 double）。
+
+下面的初始化方式将调用默认构造函数:
+
+Class_Name *pclass = new Class_Name;
+
+// !! 再谈 new 和 delete
+
+string1.h, string1.cpp 和 saying2.cpp 组成的程序在两个层次上使用了 new 和 delete。
+
+1. 首先，它使用 new 为创建的每一个对象的名称字符串分配存储空间，这是在构造函数中进行的，因此析构函数使用 delete 来释放这些内存。这样，当对象被释放时，
+   用于存储字符串内容的内存将被自动释放。
+
+2. 使用 new 来为整个对象分配内存：
+   
+   String *favorite = new String(sayings[choice]);
+
+   '这不是为要存储的字符串分配内存，而是为对象分配内存'；'即为保存字符串地址的 str 指针和 len 成员分配内存'(程序并没有给 num_string 成员分配内存，
+    这是因为 num_string 成员是静态成员，它独立于对象被保存)。'创建对象将调用构造函数，后者分配用于保存字符串的内存，并将字符串的地址赋给 str。然后，当程
+    序不再需要该对象时，使用 delete 删除它'。对象是单个的，因此，程序使用不带中括号的 delete。与前面介绍的相同，这将只释放用于保存 str 指针和 len 成员的
+    空间，并不释放 str 指向的内存，而该任务将由析构函数来完成
+
+
+在下述情况下析构函数将被调用:
+
+1. 如果对象是动态变量，则当执行完定义该对象的程序块时，将调用该对象的析构函数
+
+2. 如果对象是静态变量(外部、静态、静态外部或来自名称空间)，则在程序结束时将调用对象的析构函数
+
+3. 如果对象是用 new 创建的，则仅当您显式使用 delete 删除对象时，其析构函数才会被调用
+
+
+// !! 指针和对象小结
+
+使用对象指针时，需要注意几点:
+
+1. 使用常规表示法来声明指向对象的指针
+
+    String *glamour;
+
+2. 可以将指针初始化为指向已有的对象
+
+    String *first = &sayings[0];
+
+3. 可以使用 new 来初始化指针，这将创建一个新的对象
+
+    String *favorite = new String(sayings[choice]);
+
+4. 对类使用 new 将调用相应的类构造函数来初始化新创建的对象
+
+    String *gleep = new String；// invokes default constructor
+    String *glob = new String("helloworld");// invokes String(const char *str)
+    String *favorite = new String(sayings[choice]);// invokes String(const String &str)
+
+5. 可以使用 -> 运算符通过指针访问类方法
+
+6. 可以对对象指针应用解除引用运算符 (*) 来获得对象
+
+// !! 再谈定位 new 运算符
+
+'定位 new 运算符让您能够在分配内存时能够指定内存位置'。placenew1.cpp 使用了定位 new 运算符和常规 new 运算符给对象分配内存，其中定义的类的构造函数和析构
+函数都会显示一些信息，让用户能够了解对象的历史。
+
+#include<iostream>
+#include<string>
+#include<new>
+
+using namespace std;
+
+const int BUF = 512;
+
+class JustTesting
+{
+    private:
+        string words;
+        int number;
+    public:
+        JustTesting(const string& s = "Just Testing", int n = 0)
+        {
+            words = s;
+            number = n;
+            cout << words << " constructed\n";
+        }
+        ~JustTesting()
+        {
+            cout << words << " destroyed\n";
+        }
+        void show() const
+        {
+            cout << words << ", " << number << endl;
+        }
+
+};
+
+int main()
+{
+    char *buffer = new char[BUF];// get a block of memory
+    JustTesting *pc1, *pc2;
+
+    pc1 = new(buffer) JustTesting;// place object in buffer
+    pc2 = new JustTesting("heap", 20);// place object on heap
+
+    cout << "Memory block address:\n" << "buffer: " << (void *)buffer
+    << " heap: " << pc2 << endl;
+    cout << "Memory contents:\n";
+    cout << pc1 <<": ";
+    pc1->show();
+    cout << pc2 <<": ";
+    pc2->show();
+
+    JustTesting *pc3,*pc4;
+    pc3 = new (buffer) JustTesting("bad idea",6);
+    pc4 = new JustTesting("heap2",10);
+
+    cout << "Memory contents :\n";
+    cout << pc3 << ":";
+    pc3->show();
+
+    cout << pc4 << ": ";
+    pc4->show();
+    delete pc2;// free heap1
+    delete pc4;// free heap2
+
+    delete[] buffer;// free buffer
+    cout << "done\n";
+    return 0;
+}
+
+该程序'使用 new 运算符创建了一个 512 字节的内存缓冲区'，然后使用 new 运算符在堆中创建两个 JustTesting 对象，并试图使用定位 new 运算符在内存缓冲区中创建
+两个 JustTesting 对象。最后，它使用 delete 来释放使用 new 分配的内存。
+
+下面是该程序的输出:
+
+
+ » g++ --std=c++11 placenew1.cpp
+--------------------------------------------------------------------------------
+» ./a.out
+
+Just Testing constructed
+heap constructed
+Memory block address:
+buffer: 0x5584224a6eb0 heap: 0x5584224a74d0
+Memory contents:
+0x5584224a6eb0: Just Testing, 0
+0x5584224a74d0: heap, 20
+bad idea constructed
+heap2 constructed
+Memory contents :
+0x5584224a6eb0:bad idea, 6
+0x5584224a7500: heap2, 10
+heap destroyed
+heap2 destroyed
+done
+-------
+
+在使用定位 new 运算符时存在两个问题。
+
+1. 首先，在创建第二个对象时，定位 new 运算符使用一个新对象来覆盖用于第一个对象的内存单元。显然，如果类动态地为其成员分配内存，这将引发问题
+
+2. 其次，将 delete 用于 pc2 和 pc4 时，将自动调用为 pc2 和 pc4 指向的对象调用析构函数；然而，将 delete[] 用于 buffer 时，不会为使用定位 new 
+   算符创建的对象调用析构函数
+
+程序员必须负责管用定位 new 运算符用从中使用的缓冲区内存单元。'要使用不同的内存单元，程序员需要提供两个位于缓冲区的不同地址，并确保这两个内存单元不重叠'。
+
+例如，可以这样做:
+pc1 = new(buffer) JustTesting;
+pc3 = new(buffer + sizeof(JustTesting)) JustTesting("hello",10);
+
+'如果使用定位 new 运算符来为对象分配内存，必须确保其析构函数被调用'。
+
+但如何确保呢？
+
+对于在堆中创建的对象，可以这样做：
+
+delete pc2;
+
+但不能像下面这样做：
+
+delete pc1;
+delete pc3;
+
+原因在于 delete 可与常规 new 运算符配合使用，但不能与定位 new 运算符配合使用。
+
+指针 pc3 没有收到 new 运算符返回的地址，因此 delete pc3 将导致运行阶段错误。在另一方面，指针 pc1 指向的地址与 buffer 相同，但 buffer 是使用 new []
+初始化的，因此必须使用 delete [] 而不是 delete 来释放。即使 buffer 是使用 new 而不是 new [] 初始化的，delete pc1 也将释放 buffer，而不是 pc1。
+这是因为 new/delete 系统知道已分配的 512 字节块 buffer，但对定位 new 运算符对该内存块做了何种处理一无所知。
+
+该程序确实释放了 buffer:
+
+delete[] buffer;// free buffer
+
+'delete[] buffer: 释放使用常规 new 运算符分配的整个内存块，但它没有为定位 new 运算符在该内存块中创建的对象调用析构函数'。。您之所以知道这一点，是因为该
+程序使用了一个显示信息的析构函数，该析构函数宣布了 “Heap1” 和 “Heap2” 的死亡，但却没有宣布 “Just Testing” 和 “Bad Idea” 的死亡。
+
+这种问题的解决方案是，'显式地为使用定位 new 运算符创建的对象调用析构函数'。正常情况下将自动调用析构函数，这是需要显式调用析构函数的少数几种情形之一。显式地调
+用析构函数时，必须指定要销毁的对象。由于有指向对象的指针，因此可以使用这些指针:
+
+pc3->~JustTesting();
+pc1->~JustTesting();
+
+
+placenew2.cpp '对定位 new 运算符使用的内存单元进行管理，加入到合适的 delete 和显式析构函数调用'。需要注意的一点是正确的删除顺序。对于使用定位 new 运算
+符创建的对象，应以与创建顺序相反的顺序进行删除。原因在于，晚创建的对象可能依赖于早创建的对象。另外，'仅当所有对象都被销毁后，才能释放用于存储这些对象的缓冲区'。
+
+#include<iostream>
+#include<string>
+#include<new>
+
+using namespace std;
+
+const int BUF = 512;
+
+class JustTesting
+{
+    private:
+        string words;
+        int number;
+    public:
+        JustTesting(const string& s = "Just Testing", int n = 0)
+        {
+            words = s;
+            number = n;
+            cout << words << " constructed\n";
+        }
+        ~JustTesting()
+        {
+            cout << words << " destroyed\n";
+        }
+        void show() const
+        {
+            cout << words << ", " << number << endl;
+        }
+
+};
+
+int main()
+{
+    char *buffer = new char[BUF];// get a block of memory
+    JustTesting *pc1, *pc2;
+
+    pc1 = new(buffer) JustTesting;// place object in buffer
+    pc2 = new JustTesting("heap", 20);// place object on heap
+
+    cout << "Memory block address:\n" << "buffer: " << (void *)buffer
+    << " heap: " << pc2 << endl;
+    cout << "Memory contents:\n";
+    cout << pc1 <<": ";
+    pc1->show();
+    cout << pc2 <<": ";
+    pc2->show();
+
+    JustTesting *pc3,*pc4;
+    // fix placement new location
+    pc3 = new (buffer+sizeof(JustTesting)) JustTesting("Bad Idea",6);
+    pc4 = new JustTesting("heap2",10);
+
+    cout << "Memory contents :\n";
+    cout << pc3 << ":";
+    pc3->show();
+
+    cout << pc4 << ": ";
+    pc4->show();
+    delete pc2;// free heap1
+    delete pc4;// free heap2
+
+    // explicit destroy placement new object
+    pc3->~JustTesting();
+    pc1->~JustTesting();
+
+    delete[] buffer;// free buffer
+    cout << "done\n";
+    return 0;
+}
+
+ » g++ --std=c++11 placenew2.cpp              
+---------------------------------
+ » ./a.out                                    
+Just Testing constructed
+heap constructed
+Memory block address:
+buffer: 0x5625e4e55eb0 heap: 0x5625e4e564d0
+Memory contents:
+0x5625e4e55eb0: Just Testing, 0
+0x5625e4e564d0: heap, 20
+Bad Idea constructed
+heap2 constructed
+Memory contents :
+0x5625e4e55ed8:Bad Idea, 6
+0x5625e4e56500: heap2, 10
+heap destroyed
+heap2 destroyed
+Bad Idea destroyed
+Just Testing destroyed
+done
+----------
+
+'该程序使用定位 new 运算符在相邻的内存单元中创建两个对象，并调用了合适的析构函数'。
+
+
