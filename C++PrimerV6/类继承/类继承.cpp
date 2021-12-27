@@ -75,6 +75,131 @@ int main()
     return 0;
 }
 
+注意到该程序实例化对象时将C-风格字符串作为参数:
+
+TableTennisPlayer player1("Chuck","BLer",true);
+TableTennisPlayer player2("Tara","Boomda",false);
+
+但构造函数的形参类型被声明为 const string &。这导致类型不匹配，但 string 类有一个将 const char * 作为参数的构造函数，使用C-风格字符串初始化 string
+对象时，将自动调用这个构造函数。可将 string 对象或C-风格字符串作为构造函数 TableTennisPlayer 的参数；将前者作为参数时，将调用接受 const string &
+作为参数的 string 构造函数，而将后者作为参数时，将调用接受 const char * 作为参数的 string 构造函数。
+
+// !! 派生一个类
+
+Webtown 俱乐部的一些成员曾经参加过当地的乒乓球锦标赛，需要这样一个类，它能包括成员在比赛中的比分。与其从零开始，不如从 TableTennisClass 类派生出一个类。
+首先将 RatedPlayer 类声明为从 TableTennisClass 类派生而来:
+
+class RatedPlayer : public TableTennisPlayer
+{
+
+}
+
+冒号指出 RatedPlayer 类的基类是 TableTennisplayer 类。'上述特殊的声明头表明 TableTennisPlayer 是一个公有基类，这被称为公有派生'。派生类对象包含基
+类对象。'使用公有派生，基类的公有成员将成为派生类的公有成员；基类的私有部分也将成为派生类的一部分，但只能通过基类的公有和保护方法访问'。
+
+上述代码完成了哪些工作呢？ Ratedplayer 对象将具有以下特征：
+
+1. 派生类对象存储了基类的数据成员(派生类继承了基类的实现)
+
+2. 派生类对象可以使用基类的方法(派生类继承了基类的接口)
+
+因此，RatedPlayer 对象可以存储运动员的姓名及其是否有球桌。另外，RatedPlayer 对象还可以使用 TableTennisPlayer 类的 Name()、hasTable() 和 
+ResetTable()方法。
+
+需要在继承特性中添加什么呢 ？
+
+1. 派生类需要自己的构造函数
+
+2. 派生类可以根据需要添加额外的数据成员和成员函数
+
+在这个例子中，派生类需要另一个数据成员来存储比分，还应包含检索比分的方法和重置比分的方法。因此，类声明与下面类似:
+
+class RatedPlayer : public TableTennisPlayer
+{
+    private:
+        unsigned int rating;// add a data member
+    public:
+        RatedPlayer(unsigned int r = 0, const string &fn = "none", const string &ln = "none", bool ht = false);
+        RatedPlayer(unsigned int r, const TableTennisPlayer &tp);
+        unsigned int rating() const { return rating;}// add a method
+        void resetRating(unsigned int r) { rating = r; }// add a method
+};
+
+
+'构造函数必须给新成员(如果有的话)和继承的成员提供数据'。在第一个 RatedPlayer 构造函数中，每个成员对应一个形参；而第二个 Ratedplayer 构造函数使用一个 
+TableTennisPlayer 参数，该参数包括 firstname、lastname 和 hasTable。
+
+
+// !! 构造函数：访问权限的考虑
+
+'派生类不能直接访问基类的私有成员，而必须通过基类方法进行访问'。例如，RatedPlayer 构造函数不能直接设置继承的成员( firstname、lastname 和 hasTable），
+而必须使用基类的公有方法来访问私有的基类成员。具体地说, 派生类构造函数必须使用基类构造函数。
+
+'创建派生类对象时，程序首先创建基类对象'。'从概念上说，这意味着基类对象应当在程序进入派生类构造函数之前被创建'。C++ 使用成员初始化列表语法来完成这种工作。
+例如，下面是第一个 RatedPlayer 构造函数的代码:
+
+RatedPlayer::RatedPlayer(unsigned int r, const string &fn, const string & ln, bool ht):TableTennisPlayer(fn,ln,ht)
+{
+    rating = r;
+}
+
+其中 TableTennisPlayer(fn,ln,ht) 是成员初始化列表。
+
+
+如果省略成员初始化列表，情况将如何呢？
+
+RatedPlayer::RatedPlayer(unsigned int r, const string &fn, const string & ln, bool ht)
+{
+    rating = r;
+}
+
+必须首先创建基类对象, 如果不调用基类构造函数，程序将使用默认的基类构造函数，因此上述代码与下面等效:
+
+RatedPlayer::RatedPlayer(unsigned int r, const string &fn, const string & ln, bool ht):TableTennisPlayer()
+{
+    rating = r;
+}
+
+除非要使用默认构造函数，否则应显式调用正确的基类构造函数。
+
+
+下面来看第二个构造函数的代码：
+
+RatedPlayer::RatedPlayer(unsigned int r, const TableTennisPlayer &tp):TableTennisPlayer(tp)
+{
+    rating = r;
+}
+
+由于 tp 的类型为 TableTennisPlayer &，因此将调用基类的复制构造函数。'基类没有定义复制构造函数，如果需要使用复制构造函数但又没有定义，编译器将自动生成一个'。
+在这种情况下，执行成员复制的隐式复制构造函数是合适的, 因为这个类没有使用动态内存分配(string 成员确实使用了动态内存分配，成员复制将使用 string 类的复制构造
+函数来复制 string 成员)。
+
+'也可以对派生类成员使用成员初始化列表语法'。在这种情况下，应在列表中使用成员名，而不是类名。所以，第二个构造函数可以按照下述方式编写:
+
+RatedPlayer::RatedPlayer(unsigned int r, const TableTennisPlayer &tp):TableTennisPlayer(tp),rating(r)
+{
+
+}
+
+
+有关派生类构造函数的要点如下:
+
+1. 首先创建基类对象
+
+2. 派生类构造函数应通过成员初始化列表将基类信息传递给基类构造函数
+
+3. 派生类构造函数应初始化派生类新增的数据成员
+
+
+// !! 使用派生类
+
+要使用派生类，程序必须要能够访问基类声明。tabtenn1.h 将这两种类的声明置于同一个头文件中。也可以将每个类放在独立的头文件中，但由于这两个类是相关的，所以把
+其类声明放在一起更合适。
+
+
+
+
+
 
 
 
