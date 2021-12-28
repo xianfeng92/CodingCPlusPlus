@@ -477,7 +477,102 @@ b2_ref.ViewAcct();// using BrassPlus::ViewAcct()
 
 
 
-介绍 brass.cpp 的具体细节(如一些方法的格式化处理)之前，先来看一下与继承直接相关的方面。
+介绍 brass.cpp 的具体细节(如一些方法的格式化处理)之前, 先来看一下与继承直接相关的方面。
+
+'记住，派生类并不能直接访问基类的私有数据，而必须使用基类的公有方法才能访问这些数据'。访问的方式取决于方法。构造函数使用一种技术，而其他成员函数使用另一
+种技术。
+
+'派生类构造函数在初始化基类私有数据时, 采用的是成员初始化列表语法'。RatedPlayer 类构造函数和 BrassPlus 构造函数都使用这种技术：
+
+// BrassPlus Method
+BrassPlus::BrassPlus(const string& s, long an, double bal, double ml, double r):Brass(s,an,bal)
+{
+    maxLoan = ml;
+    ownsBank = 0.0;
+    rate = r;
+}
+
+使用成员初始化列表语法, 将基类信息传递给基类构造函数，然后使用构造函数体初始化 BrassPlus 类新增的数据项。
+
+非构造函数不能使用成员初始化列表语法, 但'派生类方法可以调用公有的基类方法'。
+
+// redefine how ViewAcct works
+void BrassPlus::ViewAcct() const
+{
+    // set up ###.## format
+    format initialState = setFormat();
+    precis prec = cout.precision(2);
+
+    // 使用作用域解析运算符来调用基类方法
+    Brass::ViewAcct();
+    cout << " Maximim loan: $" << maxLoan << endl;
+    cout << "Own to back $: " << ownsBank << endl;
+    cout.precision(3);// ###.### format
+    cout << " Loan Rate: " << 100 * rate << "%\n";
+    restore(initialState, prec);
+}
+
+换句话说， BrassPlus::ViewAcct() 显示新增的 BrassPlus 数据成员，并调用基类方法 Brass::ViewAcct() 来显示基类数据成员。'在派生类方法中，标准技术
+是使用作用域解析运算符来调用基类方法'。
+
+方法 ViewAcct() 和 Withdraw() 使用格式化方法 setf() 和 precision() 将浮点值的输出模式设置为定点，即包含两位小数。设置模式后，输出的模式将保持不变
+，因此该方法将格式模式重置为调用前的状态。
+
+
+// !!使用 Brass 和 BrassPlus 类
+
+#include<iostream>
+#include "brass.h"
+
+using std::cout;
+using std::endl;
+
+int main()
+{
+    Brass piggy("nio", 234, 32.21);
+    BrassPlus hoggy("XF", 122442, 32.21);
+
+    piggy.ViewAcct();
+    cout << endl;
+
+    hoggy.ViewAcct();
+    cout << endl;
+
+    cout << "Deposit $1000 into the hoggy Account:\n";
+    hoggy.Deposit(1000);
+    cout << "new Balance :$ " << hoggy.Balance() << endl;
+
+    cout << " Withdraw $4200 from the piggy Account:\n";
+    piggy.Withdraw(4200.00);
+    cout << "piggy Account balance :$ " << piggy.Balance() << endl;
+    cout << "withdraw $4200 from the hoggy Account:\n";
+    hoggy.Withdraw(4200);
+    hoggy.ViewAcct();
+
+    return 0;
+}
+
+// !! 演示虚方法的行为
+
+在 usebrass1.cpp 中，方法是'通过对象(而不是指针或引用)调用的，没有使用虚方法特性'。
+
+下面来看一个使用了虚方法的例子。假设要同时管理 Brass 和 BrassPlus 账户，如果能使用同一个数组来保存 Brass 和 BrassPlus 对象，将很有帮助，但这是不可能的。
+数组中所有元素的类型必须相同，而 Brass 和 BrassPlus 是不同的类型。然而，可以创建指向 Brass 的指针数组。这样，每个元素的类型都相同，但由于使用的是公有继承
+模型，因此 Brass 指针既可以指向 Brass 对象，也可以指向 BrassPlus 对象。'因此，可以使用一个数组来表示多种类型的对象, 这就是多态性'。
+
+
+// !! 为何需要虚析构函数
+
+在 usebrass2.cpp 中，'使用 delete 释放由 new 分配的对象的代码说明了为何基类应包含一个虚析构函数'，虽然有时好像并不需要析构函数。如果析构函数不是虚的，
+则将只调用对应于指针类型的析构函数。'如果析构函数是虚的，将调用相应对象类型的析构函数'。
+
+
+// !! 静态联编和动态联编
+
+
+
+
+
 
 
 
