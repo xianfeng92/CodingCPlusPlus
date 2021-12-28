@@ -25,8 +25,8 @@ C++ 类提供了更高层次的重用性。目前，很多厂商提供了类库�
 
 // !! 一个简单的基类
 
-从一个类派生出另一个类时，原始类称为基类，继承类称为派生类。为说明继承，首先需要一个基类。Webtown 俱乐部决定跟踪乒乓球会会员。作为俱乐部的首席程序员，需要设
-计一个简单的 TableTennisPlayer 类。
+从一个类派生出另一个类时，原始类称为基类，继承类称为派生类。为说明继承，首先需要一个基类。Webtown 俱乐部决定跟踪乒乓球会会员。作为俱乐部的首席程序员，需
+要设计一个简单的 TableTennisPlayer 类。
 
 
 
@@ -125,7 +125,6 @@ class RatedPlayer : public TableTennisPlayer
         void resetRating(unsigned int r) { rating = r; }// add a method
 };
 
-
 '构造函数必须给新成员(如果有的话)和继承的成员提供数据'。在第一个 RatedPlayer 构造函数中，每个成员对应一个形参；而第二个 Ratedplayer 构造函数使用一个 
 TableTennisPlayer 参数，该参数包括 firstname、lastname 和 hasTable。
 
@@ -181,7 +180,6 @@ RatedPlayer::RatedPlayer(unsigned int r, const TableTennisPlayer &tp):TableTenni
 
 }
 
-
 有关派生类构造函数的要点如下:
 
 1. 首先创建基类对象
@@ -193,8 +191,296 @@ RatedPlayer::RatedPlayer(unsigned int r, const TableTennisPlayer &tp):TableTenni
 
 // !! 使用派生类
 
-要使用派生类，程序必须要能够访问基类声明。tabtenn1.h 将这两种类的声明置于同一个头文件中。也可以将每个类放在独立的头文件中，但由于这两个类是相关的，所以把
-其类声明放在一起更合适。
+要使用派生类，程序必须要能够访问基类声明。tabtenn1.h 将这两种类的声明置于同一个头文件中。也可以将每个类放在独立的头文件中，但由于这两个类是相关的，
+所以把其类声明放在一起更合适。
+
+// !!派生类和基类之间的特殊关系
+
+派生类与基类之间有一些特殊关系。
+
+1. 派生类对象可以使用基类的方法,条件是方法不是私有的:
+
+RatedPlayer rplayer1(1140,"Moly","Duck",true);
+rplayer1.Name();
+
+2. '基类指针可以在不进行显式类型转换的情况下指向派生类对象; 基类引用可以在不进行显式类型转换的情况下引用派生类对象'
+
+RatedPlayer rplayer1(1140,"Moly","Duck",true);
+TableTennisPlayer  &rt = rplayer1;
+TableTennisPlayer *pt = &rplayer1;
+
+rt.Name();
+pt->Name();
+
+'基类指针或引用只能用于调用基类方法'，因此，不能使用 rt 或 pt 来调用派生类的 resetRating 方法。
+
+通常，C++ 要求引用和指针类型与赋给的类型匹配，但这一规则对继承来说是例外。然而，这种例外只是单向的，不可以将基类对象和地址赋给派生类引用和指针：
+
+TableTennisPlayer player("Besty","NIO",true);
+
+RatedPlayer &rp = player;// not allowed
+RatedPlayer *pt = &player;// not allowed
+
+上述规则是有道理的。例如，如果允许基类引用隐式地引用派生类对象，则可以使用基类引用为派生类对象调用基类的方法。因为派生类继承了基类的方法，所以这样做不会出现问
+题。如果可以将基类对象赋给派生类引用，将发生什么情况呢？ '派生类引用能够为基对象调用派生类方法，这样做将出现问题'。例如，将 RatedPlayer::Rating() 方法用
+于 TableTennisPlayer 对象是没有意义的，因为 TableTennisPlayer 对象没有 rating 成员。
+
+
+如果基类引用和指针可以指向派生类对象，将出现一些很有趣的结果。其中之一是基类引用定义的函数或指针参数可用于基类对象或派生类对象。
+
+例如，在下面的函数中：
+
+void show(const TableTennisPlayer &rt)
+{
+    using std::cout;
+    cout << "Name ";
+    rt.Name();
+    cout << "Table:";
+    if(rt.hasTable())
+    {
+        cout << "has a table\n";
+    }
+    else
+    {
+        cout << " has no table\n";
+    }
+}
+
+形参 rt 是一个基类引用，它可以指向基类对象或派生类对象，所以可以在 Show() 中使用 TableTennisPlayer 参数或 RatedPlayer 参数：
+
+TableTennisPlayer player("Besty","NIO",true);
+RatedPlayer rplayer1(1140,"Moly","Duck",true);
+show(player);
+show(rplayer1);
+
+对于形参为指向基类的指针的函数, 也存在相似的关系。它可以使用基类对象的地址或派生类对象的地址作为实参。
+
+
+'引用兼容性属性也让您能够将基类对象初始化为派生类对象'，尽管不那么直接。假设有这样的代码:
+
+RatedPlayer rplayer1(1140,"Moly","Duck",true);
+TableTennisPlayer player2(rplayer1);
+
+要初始化 player2 ，匹配的构造函数的原型如下:
+
+TableTennisPlayer(const RatedPlayer &rplayer);// doesn't exist'
+
+类定义中没有这样的构造函数，但存在隐式复制构造函数:
+
+// implicit copy constructor
+TableTennisPlayer(const TableTennisPlayer &player);
+
+'形参是基类引用，因此它可以引用派生类'。这样，将 player2 初始化为 rplayer1 时，将要使用该构造函数，它复制 firstname、lastname 和 hasTable 成
+员。换句话来说，它将 player2 初始化为嵌套在 RatedPlayer 对象 rplayer1 中的 TableTennisPlayer 对象。
+
+
+同样，也可以将派生对象赋给基类对象：
+
+RatedPlayer rplayer1(1140,"Moly","Duck",true);
+TableTennisPlayer player;
+player = rplayer1;
+
+在这种情况下，程序将使用隐式重载赋值运算符:
+
+TableTennisPlayer &operator=(const TableTennisPlayer &rp) const;
+
+基类引用指向的也是派生类对象，因此 rplayer1 的基类部分被复制给 player。
+
+
+// !! 继承：is-a 关系
+
+'派生类和基类之间的特殊关系是基于 C++ 继承的底层模型的'。实际上，C++ 有 3 种继承方式：公有继承、保护继承和私有继承。公有继承是最常用的方式，它建立一
+种 is-a 关系，即'派生类对象也是一个基类对象, 可以对基类对象执行的任何操作，也可以对派生类对象执行'。
+
+'因为派生类可以添加特性，所以，将这种关系称为 is-a-kind-of(是一种) 关系可能更准确'，但是通常使用术语 is-a。
+
+'继承可以在基类的基础上添加属性, 但不能删除基类的属性'。在有些情况下，可以设计一个包含共有特征的类，然后以 is-a 或 has-a 关系，在这个类的基础上定义
+相关的类。
+
+1. '公有继承不建立 has-a 关系'。例如，午餐可能包括水果，但通常午餐并不是水果。所以，不能通过从 Fruit 类派生出 Lunch 类来在午餐中添加水果。在午餐中加
+    入水果的正确方法是将其作为一种 has-a 关系: 午餐有水果。最容易的建模方式是，将 Fruit 对象作为 Lunch 类的数据成员
+
+2. '公有继承不能建立 is-like-a 关系'，也就是说，它不采用明喻。人们通常说律师就像鲨鱼，但律师并不是鲨鱼。
+
+3. '公有继承不建立 is-implemented-as-a（作为……来实现）关系'。例如，可以使用数组来实现栈，但从 Array 类派生出 Stack 类是不合适的，因为栈不是数组
+
+4. '公有继承不建立 uses-a 关系'。例如，计算机可以使用激光打印机，但从 Computer 类派生出 Printer类是没有意义的。。然而，可以使用友元函数或类来处理
+    Printer 对象和 Computer 对象之间的通信
+
+'在 C++ 中，完全可以使用公有继承来建立 has-a、is-implemented-as-a 或 uses-a 关系；然而，这样做通常会导致编程方面的问题。因此，还是坚持使用 is-a 关系'。
+
+
+// !! 多态公有继承
+
+RatedPlayer 继承示例很简单, 派生类对象使用基类的方法，而未做任何修改。然而，可能会遇到这样的情况，即'希望同一个方法在派生类和基类中的行为是不同的'。
+换句话来说，方法的行为应取决于调用该方法的对象。'这种较复杂的行为称为多态---具有多种形态，即同一个方法的行为随上下文而异'。
+
+有两种重要的机制可用于实现多态公有继承:
+
+1. 在派生类中重新定义基类的方法
+
+2. 使用虚方法
+
+现在来看另一个例子。由于 Webtown 俱乐部的工作经历，您成了 Pontoon 银行的首席程序员。银行要求您完成的第一项工作是开发两个类。一个类用于表示基本支票账户
+— Brass Account，另一个类用于表示代表 Brass Plus 支票账户，它添加了透支保护特性。也就是说，如果用户签出一张超出其存款余额的支票——但是超出的数额并不是很
+大，银行将支付这张支票，对超出的部分收取额外的费用，并追加罚款。可以根据要保存的数据以及允许执行的操作来确定这两种账户的特征。
+
+下面是用于 Brass Account 支票账户的信息:
+
+客户姓名；
+账号；
+当前结余。
+
+下面是可以执行的操作:
+
+创建账户；
+存款；
+取款；
+显示账户信息。
+
+Pontoon 银行希望 Brass Plus 支票账户包含 Brass Account 的所有信息及如下信息:
+
+透支上限；
+透支贷款利率；
+当前的透支总额。
+不需要新增操作，但有两种操作的实现不同;
+对于取款操作，必须考虑透支保护；
+显示操作必须显示 Brass Plus 账户的其他信息。
+
+// !! 开发 Brass 类和 BrassPlus 类
+
+Brass Account 类的信息很简单，但是银行没有告诉您有关透支系统的细节。当您向友好的 Pontoon 银行代表询问时，他提供了如下信息:
+
+1. Brass Plus 账户限制了客户的透支款额。默认为 500 元，但有些客户的限额可能不同
+
+2. 银行可以修改客户的透支限额
+
+3. Brass Plus 账户对贷款收取利息。默认为 11.125%，但有些客户的利率可能不同
+
+4. 银行可以修改客户的利率
+
+5. 账户记录客户所欠银行的金额(透支数额加利息)。用户不能通过常规存款或从其他账户转账的方式偿付，而必须以现金的方式交给特定的银行工作人员。如果有必要，
+   工作人员可以找到该客户。欠款偿还后，欠款金额将归零。最后一种特性是银行出于做生意的考虑而采用的，这种方法有它有利的一面——使编程更简单。
+
+上述列表表明，新的类需要构造函数，而且构造函数应提供账户信息，设置透支上限（默认为500元）和利率（默认为11.125%）。另外，还应有重新设置透支限额、利率和
+当前欠款的方法。要添加到 Brass 类中的就是这些，这将在 BrassPlus 类声明中声明。有关这两个类的信息声明，类声明应类似于 brass.h。
+
+
+#ifndef E0360DBD_DD97_4EE2_9D11_7AB406B2FFA6
+#define E0360DBD_DD97_4EE2_9D11_7AB406B2FFA6
+
+#include<string>
+
+class Brass
+{
+private:
+    std::string fullName;
+    long acctNum;
+    double balance;
+public:
+    Brass(const std::string &s = "NullBody", long an = -1, double bal = 0.0);
+    void Deposit(double amt);
+    virtual void withDraw(double amt);
+    double Balance() const {return balance;}
+    virtual void ViewAcct() const;
+    virtual ~Brass() {};
+};
+
+class BrassPlus : public Brass
+{
+private:
+    double maxLoan;
+    double rate;
+    double ownsBank;
+public:
+    BrassPlus(const std::string &s = "NullBody", double an = -1, double bal = 0.0, double ml = 500, double r = 0.11125);
+    BrassPlus(const Brass &ba, double ml = 500, double r = 0.11125);
+    virtual void ViewAcct() const;
+    virtual void withDraw(double amt);
+    void ResetMax(double m){ maxLoan = m;}
+    void ResetRate(double m){ rate = m;}
+    void resetOwns() { ownsBank = 0;}
+};
+
+#endif /* E0360DBD_DD97_4EE2_9D11_7AB406B2FFA6 */
+
+需要说明的有下面几点:
+
+1. BrassPlus 类在 Brass 类的基础上添加了 3 个私有数据成员和 3 个公有成员函数
+
+2. Brass 类和 BrassPlus 类都声明了 ViewAcct() 和 Withdraw() 方法，但 BrassPlus 对象和 Brass 对象的这些方法的行为是不同的
+
+3. Brass 类在声明 ViewAcct() 和 Withdraw() 时使用了新关键字 virtual。这些方法被称为虚方法(virtual method)
+
+4. Brass 类还声明了一个虚析构函数，虽然该析构函数不执行任何操作
+
+
+第一点没有什么新鲜的。RatedPlayer 类在 TableTennisPlayer 类的基础上添加新数据成员和 2 个新方法的方式与此类似。第二点介绍了声明如何指出方法在派生类的
+行为的不同。两个 ViewAcct() 原型表明将有 2 个独立的方法定义。基类版本的限定名为 Brass::ViewAcct()，派生类版本的限定名为 BrassPlus::ViewAcct()。
+程序将使用对象类型来确定使用哪个版本:
+
+Brass dom("hell0", 11224, 4182.45);
+BrassPlus dot("NIO", 12118, 2590.32);
+
+dom.ViewAcct();// using Brass::ViewAcct()
+dot.ViewAcct();// using BrassPlus::ViewAcct()
+
+同样，Withdraw() 也有 2 个版本，一个供 Brass 对象使用，另一个供 BrassPlus 对象使用。对于在两个类中行为相同的方法（如Deposit( )和Balance( )），则
+只在基类中声明。
+
+第三点(使用 virtual)比前两点要复杂。'如果方法是通过引用或指针而不是对象调用的，它将确定使用哪一种方法'。'如果没有使用关键字 virtual，程序将根据引用类型
+或指针类型选择方法'。'如果使用了 virtual，程序将根据引用或指针指向的对象的类型来选择方法'。
+
+如果 ViewAcct() 不是虚的，则程序的行为如下:
+
+Brass dom("hell0", 11224, 4182.45);
+BrassPlus dot("NIO", 12118, 2590.32);
+
+Brass &b1_ref = dom;
+Brass &b2_ref = dot;
+
+b1_ref.ViewAcct();// using Brass::ViewAcct()
+b2_ref.ViewAcct();// using Brass::ViewAcct()
+
+引用变量的类型为 Brass，所以选择了 Brass::ViewAccount()。
+
+如果 ViewAcct() 是虚的，则行为如下：
+
+Brass dom("hell0", 11224, 4182.45);
+BrassPlus dot("NIO", 12118, 2590.32);
+
+Brass &b1_ref = dom;
+Brass &b2_ref = dot;
+
+b1_ref.ViewAcct();// using Brass::ViewAcct()
+b2_ref.ViewAcct();// using BrassPlus::ViewAcct()
+
+这里两个引用的类型都是 Brass，但 b2_ref 引用的是一个 BrassPlus 对象，所以使用的是 BrassPlus::ViewAcct()。
+
+
+因此，'经常在基类中将派生类会重新定义的方法声明为虚方法'。方法在基类中被声明为虚的后，它在派生类中将自动成为虚方法。然而，在派生类声明中使用关键字 virtual 
+来指出哪些函数是虚函数也不失为一个好办法。
+
+第四点是, 基类声明了一个虚析构函数。这样做是为了确保释放派生对象时, 按正确的顺序调用析构函数。
+
+
+注意:
+
+'如果要在派生类中重新定义基类的方法，通常应将基类方法声明为虚的'。'这样，程序将根据对象类型而不是引用或指针的类型来选择方法版本'。为基类声明一个虚析构函数
+也是一种惯例。
+
+
+// !! 类实现
+
+接下来需要实现类，其中的部分工作已由 brass.h 中的内联函数定义完成了。brass.cpp 列出了其他方法的定义。'注意，关键字 virtual 只用于类声明的方法原型中，
+而没有用于 brass.cpp 的方法定义中'。
+
+
+
+介绍 brass.cpp 的具体细节(如一些方法的格式化处理)之前，先来看一下与继承直接相关的方面。
+
+
+
 
 
 
