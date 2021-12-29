@@ -120,6 +120,16 @@ void BrassPlus::Withdraw(double amt)
     }
     else if(amt <= bal + maxLoan - ownsBank)
     {
-        
+        double advance = bal - amt;
+        ownsBank += advance *(1 + rate);
+        cout << " Bank advance: $ " << advance << endl;
+        cout << " Finance Charge: $ " << advance * rate << endl;
+        Deposit(advance);
+        AcctABC::Withdraw(amt);
     }
+    else
+    {
+        cout << " Credit exceeded,m Translation cancelled\n";
+    }
+    Restore(f);
 }

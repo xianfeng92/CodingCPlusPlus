@@ -847,8 +847,234 @@ void Move(int x, int y) = 0;
 类共有的所有方法和数据成员'，'那些在 BrassPlus 类和 Brass 类中的行为不同的方法应被声明为虚函数'。至少应有一个虚函数是纯虚函数，这样才能使 AcctABC 成为抽
 象类。
 
+#include<iostream>
+#include "acctabc.h"
+
+using std::cout;
+using std::endl;
+using std::ios_base;
+using std::string;
+
+AcctABC::AcctABC(const std::string &s, long an, double bal)
+{
+    fullName = s;
+    acctNum = an;
+    balance = bal;
+}
+
+AcctABC::Deposit(double amt)
+{
+    if(amt < 0)
+    {
+        cout << "Negative deposit not allowed:\n"
+        << " default is cancelled:\n";
+    }
+    else
+    {
+        balance += amt;
+    }
+}
+
+AcctABC::Withdraw(double amt)
+{
+    balance -= amt;
+}
+
+
+AcctABC::Formating AcctABC::setFormat() const
+{
+    // set up ###.## format
+    Formating f;
+    f.flag = cout.setf(ios_base::fixed,ios_base::floatfield);
+    f.pr = cout.precision(2);
+    return f;
+}
+
+
+void AcctABC::restore(Formating &f)
+{
+    cout.setf(f.flag, ios_base::floatfield);
+    cout.precision(f.pr);
+}
+
+
+// Brass Method
+
+void Brass::Withdraw(double amt)
+{
+    if(amt < 0)
+    {
+        cout << "Negative deposit not allowed:\n"
+        << " default is cancelled:\n";
+    }
+    else if(amt < Balance())
+    {
+        AcctABC::Withdraw(amt);
+    }
+    else
+    {
+        cout << "Withdraw amount of $: " << amt << " exceeded your balance." << "withdraw cancelled\n";
+    }
+}
+
+void Brass::ViewAcct() const
+{
+    Formating f = setFormat();
+    cout << "Brass Client: " << FullName() << endl;
+    cout << "Account Number: " << AcctNum() << endl;
+    cout << " Balance: " << Balance() << endl;
+    Restore(f);
+}
+
+
+// Brass Plus Method
+
+BrassPlus::BrassPlus(const string &s, long an, double bal, double ml, double r):AcctABC(s,an,bal)
+{
+    maxLoan = ml;
+    ownsBank = 0.0;
+    rate = r;
+}
+
+BrassPlus::BrassPlus(const Brass & ba, double ml, double):AcctABC(ba)
+{
+    maxLoan = ml;
+    ownsBank = 0.0;
+    rate = r;
+}
+
+void BrassPlus::ViewAcct() const
+{
+    Formating f = setFormat();
+
+    cout << " BrassPlus Clent: " << FullName() << endl;
+    cout << " Account Number: " << AcctNum() << endl;
+    cout << " Balance： " << Balance() << endl;
+    cout << " Max Loan is " << maxLoan << endl;
+    cout << " Own to bank " << ownsBank << endl;
+    cout.precision(3);
+    cout << " Loan rate " << 100 * rate << endl;
+    Restore(f);
+}
+
+
+void BrassPlus::Withdraw(double amt)
+{
+    Formating f = setFormat();
+
+    double bal = Balance();
+    if(amt <= bal)
+    {
+        AcctABC::Withdraw(amt);
+    }
+    else if(amt <= bal + maxLoan - ownsBank)
+    {
+        double advance = bal - amt;
+        ownsBank += advance *(1 + rate);
+        cout << " Bank advance: $ " << advance << endl;
+        cout << " Finance Charge: $ " << advance * rate << endl;
+        Deposit(advance);
+        AcctABC::Withdraw(amt);
+    }
+    else
+    {
+        cout << " Credit exceeded,m Translation cancelled\n";
+    }
+    Restore(f);
+}
 
 
 
+保护方法 FullName() 和 AcctNum() 提供了对数据成员 fullName 和 acctNum 的只读访问，使得可以进一步定制每个派生类的 ViewAcct()
 
 
+// !! 继承和动态内存分配
+
+如果基类使用动态内存分配，并重新定义赋值和复制构造函数，这将怎样影响派生类的实现呢？ 这个问题的答案取决于派生类的属性。如果派生类也使用动态内存分配，
+那么就需要学习几个新的小技巧。下面来看看这两种情况。
+
+1. 第一种情况：派生类不使用 new
+
+#ifndef A5FCE15F_3113_4BFB_99EE_B50278FB9BBC
+#define A5FCE15F_3113_4BFB_99EE_B50278FB9BBC
+
+class baseDMA
+{
+private:
+    char * label;
+    int rating;
+public:
+    baseDMA(char * l = "null", int r = 0);
+    baseDMA(const baseDMA & other);
+    virtual ~baseDMA();
+    baseDMA & operator=(const baseDMA & other);
+    ...
+};
+
+#endif /* A5FCE15F_3113_4BFB_99EE_B50278FB9BBC */
+
+
+声明中包含了构造函数使用 new 时需要的特殊方法: 析构函数、复制构造函数和重载赋值运算符。
+
+
+现在，从 baseDMA 派生出 lackDMA 类，而后者不使用 new，也未包含其他一些不常用的、需要特殊处理的设计特性:
+
+#ifndef B2A5975E_FE84_4AED_BAC1_54191EA043BB
+#define B2A5975E_FE84_4AED_BAC1_54191EA043BB
+
+#include "baseDMA.h"
+
+class lackDMA: public baseDMA
+{
+private:
+    char color[40];
+public:
+...
+};
+
+#endif /* B2A5975E_FE84_4AED_BAC1_54191EA043BB */
+
+
+是否需要为 lackDMA 类定义显式析构函数、复制构造函数和赋值运算符呢？不需要。
+
+1. 首先，来看是否需要析构函数。'如果没有定义析构函数，编译器将定义一个不执行任何操作的默认析构函数'。实际上，派生类的默认构造函数总是要进行一些操作:
+   执行自身的代码后调用基类析构函数。因为我们假设 lackDMA 成员不需执行任何特殊操作，所以默认析构函数是合适的。
+
+2. 接着来看复制构造函数。'默认复制构造函数执行成员复制, 这对于动态内存分配来说是不合适的，但对于新的 lacksDMA 成员来说是合适的'。因此只需考虑继承的 
+   baseDMA 对象。'要知道，成员复制将根据数据类型采用相应的复制方式'，因此，将 long 复制到 long 中是通过使用常规赋值完成的；'复制类成员或继承的类组件
+   时，则是使用该类的复制构造函数完成的'。所以，lacksDMA 类的默认复制构造函数使用显式 baseDMA 复制构造函数来复制 lacksDMA 对象的 baseDMA 部分。
+   因此，默认复制构造函数对于新的 lacksDMA 成员来说是合适的，同时对于继承的 baseDMA 对象来说也是合适的。
+
+3. 对于赋值来说，也是如此。类的默认赋值运算符将自动使用基类的赋值运算符来对基类组件进行赋值。因此，默认赋值运算符也是合适的。
+
+
+
+2. 第二种情况：派生类使用 new
+
+假设派生类使用了 new：
+
+#ifndef B0010983_F900_46A5_8E62_ECC2C647F8E8
+#define B0010983_F900_46A5_8E62_ECC2C647F8E8
+#include "baseDMA.h"
+
+class hasDMA : public baseDMA
+{
+private:
+    char * style;// using new in constructor
+public:
+.../
+};
+
+#endif /* B0010983_F900_46A5_8E62_ECC2C647F8E8 */
+
+在这种情况下必须为派生类定义显式析构函数、复制构造函数和赋值运算符。下面依次考虑这些方法。
+
+
+总之，当基类和派生类都采用动态内存分配时, 派生类的析构函数、复制构造函数、赋值运算符都必须使用相应的基类方法来处理基类元素。这种要求是通过三种不同的
+方式来满足的:
+
+1. 对于析构函数，这是自动完成的
+
+2. 对于构造函数，这是通过在初始化成员列表中调用基类的复制构造函数来完成的如果不这样做，将自动调用基类的默认构造函数。
+
+3. 对于赋值运算符，这是通过使用作用域解析运算符显式地调用基类的赋值运算符来完成的。
