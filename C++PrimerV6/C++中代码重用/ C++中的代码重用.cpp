@@ -109,3 +109,223 @@ operator<() 方法将 Student 对象按姓名进行排序，为此可以定义 S
 
 现在需要提供 Student 类的定义，当然它应包含构造函数以及一些用作 Student 类接口的方法。
 
+为简化表示，Student 类的定义中包含下述 typedef:
+
+typedef std::valarray<double> ArrayDb;
+
+这样，在以后的代码中便可以使用 ArrayDb 来表示 std::valarray<double>， 因此类方法和友元函数可以使用 ArrayDb 类型。将该 typedef 放在类定义的私有部分意味
+着可以在 Student 类的实现中使用它，但在 Student 类外面不能使用。
+
+
+请注意关键字 explicit 的用法：
+
+    explicit Student(const std::string &s):name(s),scores(){}
+    explicit Student(int n):name("Nully"),scores(n){}
+
+'可以用一个参数调用的构造函数将用作从参数类型到类类型的隐式转换函数', 但这通常不是好主意。
+
+C++和约束
+
+C++ 包含让程序员能够限制程序结构的特性--使用 explicit 防止单参数构造函数的隐式转换，使用 const 限制方法修改数据，等等。这样做的根本原因是:'在编译阶段出现
+错误优于在运行阶段出现错误'。
+
+
+// !! 初始化被包含的对象
+
+构造函数全都使用您熟悉的成员初始化列表语法来初始化 name 和 score 成员对象。在前面的一些例子中，构造函数用这种语法来初始化内置类型的成员:
+
+Queue::Queue(int qs):qsize(qs){...}
+
+另外，前面介绍的示例中的构造函数还使用成员初始化列表初始化派生对象的基类部分:
+
+hasDMA::hasDMA(const hasDMA &dma):baseDMA(dma){...}
+
+对于继承的对象，构造函数在成员初始化列表中使用类名来调用特定的基类构造函数。对于成员对象, 构造函数则使用成员名。
+
+     Student(const char *str, const double *pd, int n):name(str),scores(pd,n){}
+
+因为该构造函数初始化的是成员对象，而不是继承的对象，所以在初始化列表中使用的是成员名，而不是类名。初始化列表中的每一项都调用与之匹配的构造函数，即 name(str) 
+调用构造函数 string(const char *)，scores(pd, n) 调用构造函数 ArrayDb(const double *, int)。
+
+
+如果不使用初始化列表语法，情况将如何呢？
+
+'C++ 要求在构建对象的其他部分之前，先构建继承对象的所有成员对象'。因此，如果省略初始化列表，C++ 将使用成员对象所属类的默认构造函数。
+
+
+
+'初始化顺序'
+
+'当初始化列表包含多个项目时，这些项目被初始化的顺序为它们被声明的顺序，而不是它们在初始化列表中的顺序'。
+
+例如，假设Student构造函数如下:
+
+     Student(const char *str, const double *pd, int n):name(str),scores(pd,n){}
+
+则 name 成员仍将首先被初始化，因为在类定义中它首先被声明。对于这个例子来说，初始化顺序并不重要，但如果代码使用一个成员的值作为另一个成员的初始化表达式的一部
+分时, 初始化顺序就非常重要了。
+
+
+
+// !! 使用被包含对象的接口
+
+被包含对象的接口不是公有的，但可以在类方法中使用它。例如，下面的代码说明了如何定义一个返回学生平均分数的函数:
+
+double Student::average() const
+{
+    if(scores.size() > 0)
+    {
+        return scores.sum() / scores.size();
+    }
+    else
+    {
+        return 0;
+    }
+}
+
+上述代码定义了可由 Student 对象调用的方法，该方法内部使用了 valarray 的方法 size() 和 sum()。这是因为 scores 是一个 valarray 对象，所以它可以调用
+valarray 类的成员函数。总之，Student 对象调用 Student 的方法，而后者使用被包含的 valarray 对象来调用 valarray 类的方法。
+
+同样，可以定义一个使用 string 版本的 << 运算符的友元函数:
+
+ostream & operator << (ostream & os, const String &st)
+{
+    os << "Scores for " << st.name << '\n';
+    ...
+}
+
+因为 st.name 是一个 string 对象，所以它将调用函数 operatot<<(ostream &, const string &)，该函数位于 string 类中。
+
+
+同样，该函数也可以使用 valarray 的 << 实现来进行输出，不幸的是没有这样的实现；因此，Student 类定义了一个私有辅助方法来处理这种任务:
+
+ostream & Student::arr_out(ostream &os) const
+{
+    int i;
+    int lim = scores.size();
+    if(lim > 0)
+    {
+        for(int i = 0; i < lim; i++)
+        {
+            os << scores[i] << " ";
+            if(i % 5 == 4)
+            {
+                os << endl;
+            }
+        }
+        if(i % 5 != 0)
+        {
+            os << endl;
+        }
+
+    }
+    else
+    {
+        os << "Empty array";
+    }
+    return os;
+}
+
+
+通过使用这样的辅助方法，可以将零乱的细节放在一个地方，使得友元函数的编码更为整洁:
+
+ostream operator<<(ostream& os, const Student &stu)
+{
+    os << "Scores for " << stu.name << " ";
+    stu.arr_out(os);
+    return os;
+}
+
+
+辅助函数也可用作其他用户级输出函数的构建块——如果您选择提供这样的函数的话。
+
+Student.cpp 是 Student 类的类方法文件，其中包含了让您能够使用 [] 运算符来访问 Student 对象中各项成绩的方法。
+
+
+
+// !! 使用新的 Student 类
+
+下面编写一个小程序来测试这个新的 Student 类。出于简化的目的，该程序将使用一个只包含 3 个 Student 对象的数组，其中每个对象保存 5 个考试成绩。
+
+
+
+
+
+
+// !! 私有继承
+
+C++ 还有另一种实现 has-a 关系的途径--私有继承。使用私有继承, 基类的公有成员和保护成员都将成为派生类的私有成员。这意味着基类方法将不会成为派生对象公有
+接口的一部分, 但可以在派生类的成员函数中使用它们。
+
+使用公有继承, 基类的公有方法将成为派生类的公有方法。总之，派生类将继承基类的接口; 这是 is-a 关系的一部分。使用私有继承，基类的公有方法将成为派生类的私有方法。
+总之，派生类不继承基类的接口。正如从被包含对象中看到的，这种不完全继承是 has-a 关系的一部分。
+
+
+使用私有继承，类将继承实现。例如，如果从 String 类派生出 Student 类，后者将有一个 String 类组件，可用于保存字符串。另外，Student 方法可以使用 String 方法
+来访问 String 组件。
+
+'包含将对象作为一个命名的成员对象添加到类中, 而私有继承将对象作为一个未被命名的继承对象添加到类中'。我们将使用术语子对象(subobject)来表示通过继承或包含添加
+的对象。
+
+因此私有继承提供的特性与包含相同: '获得实现，但不获得接口'。所以，私有继承也可以用来实现 has-a 关系。
+
+接下来介绍如何使用私有继承来重新设计 Student 类。
+
+
+// !! Student类示例（新版本）
+
+要进行私有继承，请使用关键字 private 而不是 public 来定义类(实际上，private 是默认值，因此省略访问限定符也将导致私有继承)。Student 类应从两个类派生而来
+，因此声明将列出这两个类:
+
+class Student::private std::string,private std::valarray<double>
+{
+
+}
+
+使用多个基类的继承被称为多重继承(multiple inheritance，MI)。通常，MI 尤其是公有 MI 将导致一些问题，必须使用额外的语法规则来解决它们。
+
+
+新的 Student 类不需要私有数据，因为两个基类已经提供了所需的所有数据成员。包含版本提供了两个被显式命名的对象成员，而私有继承提供了两个无名称的子对象成员。这是
+这两种方法的第一个主要区别。
+
+
+1. 初始化基类组件
+
+隐式地继承组件而不是成员对象将影响代码的编写，因为再也不能使用 name 和 scores 来描述对象了，而必须使用用于公有继承的技术。例如，对于构造函数，包含将使这样的
+构造函数：
+
+     Student(const char *str, const double *pd, int n):name(str),scores(pd,n){}
+
+
+对于继承类, 新版本的构造函数将使用成员初始化列表语法，它使用类名而不是成员名来标识构造函数：
+
+ Student(const char *str, const double *pd, int n):std::string(str),ArrayDb(pd,n){}
+
+在这里，ArrayDb 是 std::valarray<double> 的别名。成员初始化列表使用 std::string(str)，而不是 name(str)。这是包含和私有继承之间的第二个主要区别。
+
+
+2. 访问基类的方法
+
+'使用私有继承时，只能在派生类的方法中使用基类的方法'。但有时候可能希望基类工具是公有的。
+
+然而，私有继承使得能够使用类名和作用域解析运算符来调用基类的方法:
+
+double Student::Average() const
+{
+    if(ArrayDb::size() > 0)
+    {
+        return ArrayDb::sum() / ArrayDb::size();
+    }
+    else
+    {
+        return 0;
+    }
+}
+
+总之, 使用包含时将使用对象名来调用方法，而使用私有继承时将使用类名和作用域解析运算符来调用方法。
+
+
+
+
+
+
