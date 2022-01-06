@@ -325,6 +325,199 @@ double Student::Average() const
 总之, 使用包含时将使用对象名来调用方法，而使用私有继承时将使用类名和作用域解析运算符来调用方法。
 
 
+3. 访问基类对象
+
+'使用作用域解析运算符可以访问基类的方法，但如果要使用基类对象本身，该如何做呢'？
+
+例如，Student 类的包含版本实现了 Name() 方法，它返回 string 对象成员 name；但使用私有继承时，该 string 对象没有名称。那么，Student 类的代码如何访问内部
+的 string 对象呢？
+
+'答案是使用强制类型转换'。由于 Student 类是从 string 类派生而来的，因此可以通过强制类型转换，将 Student 对象转换为 string 对象；结果为继承而来的 string 
+对象。
+
+const string & Student::Name() const
+{
+    return (const string &)*this;
+}
+
+上述方法返回一个引用，该引用指向用于调用该方法的 Student 对象中的继承而来的 string 对象。
+
+
+4. 访问基类的友元函数
+
+用类名显式地限定函数名不适合于友元函数，这是因为友元不属于类。然而，可以通过显式地转换为基类来调用正确的函数。例如，对于下面的友元函数定义:
+
+ostream & operator<<(ostream & os, const Student &st)
+{
+    os << "Scores for" << (const string &)st << "\n";
+    ...
+}
+
+
+5. 使用修改后的 Student 类
+
+
+
+// !! 使用包含还是私有继承
+
+
+由于既可以使用包含，也可以使用私有继承来建立 has-a 关系，那么应使用种方式呢？
+
+大多数 C++ 程序员倾向于使用包含。首先，它易于理解。类声明中包含表示被包含类的显式命名对象，代码可以通过名称引用这些对象，而使用继承将使关系更抽象。其次，继承会
+引起很多问题，尤其从多个基类继承时，可能必须处理很多问题，如包含同名方法的独立的基类或共享祖先的独立基类。总之，使用包含不太可能遇到这样的麻烦。另外，包含能够包括
+多个同类的子对象。如果某个类需要 3 个 string 对象，可以使用包含声明 3 个独立的 string 成员。而继承则只能使用一个这样的对象(当对象都没有名称时，将难以区分)。
+
+
+通常，应使用包含来建立 has-a 关系；如果新类需要访问原有类的保护成员，或需要重新定义虚函数，则应使用私有继承。
+
+// !! 保护继承
+
+保护继承是私有继承的变体。保护继承在列出基类时使用关键字 protected：
+
+class Student::protected std::string, protected valarray<double>
+{
+
+}
+
+'使用保护继承时，基类的公有成员和保护成员都将成为派生类的保护成员'。和私有继承一样，基类的接口在派生类中也是可用的，但在继承层次结构之外是不可用的。当从派生类派生
+出另一个类时，私有继承和保护继承之间的主要区别便呈现出来了。使用私有继承时，第三代类将不能使用基类的接口，这是因为基类的公有方法在派生类中将变成私有方法；使用保护
+继承时，基类的公有方法在第二代中将变成受保护的，因此第三代派生类可以使用它们。
+
+
+
+// !! 使用 using 重新定义访问权限
+
+使用保护派生或私有派生时，基类的公有成员将成为保护成员或私有成员。假设要让基类的方法在派生类外面可用，方法之一是定义一个使用该基类方法的派生类方法。
+
+例如，假设希望 Student 类能够使用 valarray 类的 sum() 方法，可以在 Student 类的声明中声明一个 sum() 方法，然后像下面这样定义该方法:
+
+double Student::sum() const// public student method
+{
+    return std::valarray<double>::sum();
+}
+
+这样 Student 对象便能够调用 Student::sum()，后者进而将 valarray<double>::sum()方法应用于被包含的 valarray 对象（如果ArrayDb typedef在作用域中，
+也可以使用 ArrayDb 而不是 std::valarray<double>）。
+
+
+另一种方法是，将函数调用包装在另一个函数调用中，即使用一个 using 声明(就像名称空间那样)来指出派生类可以使用特定的基类成员，即使采用的是私有派生。例如，假设希望
+通过 Student 类能够使用 valarray 的方法 min() 和 max()，可以在 studenti.h 的公有部分加入如下 using 声明:
+
+
+class Student::private std::string, private std::valarray<double>
+{
+    public:
+        using std::valarray<double>::min;
+        using std::valarray<double>::max;
+    ...
+};
+
+
+上述 using 声明使得 valarray<double>::min() 和 valarray<double>::max() 可用，就像它们是 Student 的公有方法一样：
+
+cout << "high Score" << ada[i].max() << "\n";
+
+注意，using 声明只使用成员名----没有圆括号、函数特征标和返回类型。
+
+例如，为使 Student 类可以使用 valarray 的 operator 方法，只需在 Student 类声明的公有部分包含下面的 using 声明
+
+using std::valarray<double>::operator[];
+
+这将使两个版本（const和非const）都可用。这样，便可以删除 Student::operator[]() 的原型和定义。'using 声明只适用于继承，而不适用于包含'。
+
+
+
+// !! 类模板
+
+'继承(公有、私有或保护)和包含并不总是能够满足重用代码的需要'。例如，Stack 类和 Queue类都是容器类(container class)，容器类设计用来存储其他对象或数据
+类型。
+
+例如，Stack 类设计用于存储 unsigned long 值。可以定义专门用于存储 double 值或 string 对象的 Stack 类，除了保存的对象类型不同外，这两种 Stack 类的
+代码是相同的。'然而，与其编写新的类声明，不如编写一个泛型(即独立于类型的）栈，然后将具体的类型作为参数传递给这个类'。
+
+这样就可以使用通用的代码生成存储不同类型值的栈。
+
+'C++ 的类模板为生成通用的类声明提供了一种更好的方法'。模板提供参数化(parameterized)类型，即能够将类型名作为参数传递给接收方来建立类或函数。
+
+// !! 定义类模板
+
+template <class Type>
+
+关键字 template 告诉编译器，将要定义一个模板。尖括号中的内容相当于函数的参数列表。可以把关键字 class 看作是变量的类型名，该变量接受类型作为其值，把 Type 
+看作是该变量的名称。
+
+
+较新的 C++ 实现允许在这种情况下使用不太容易混淆的关键字 typename 代替 class：
+
+template<typename Type>// newer choice
+
+当模板被调用时，Type 将被具体的类型值(如 int 或 string)取代。
+
+
+在模板定义中，可以使用泛型名来标识要存储在栈中的类型。对于 Stack 来说，这意味着应将声明中所有的 typedef 标识符 Item 替换为 Type。
+
+例如，
+
+Item items[MAX];
+
+应改为：
+
+Type items[MAX];
+
+可以使用模板成员函数替换原有类的类方法。每个函数头都将以相同的模板声明打头:
+
+template<typename Type>
+
+同样应使用泛型名 Type 替换 typedef 标识符 Item。另外，还需将类限定符从 Stack::改为 Stack<Type>::。
+
+例如:
+
+bool Stack::push(const Item &item)
+{
+    ...
+}
+
+应该为:
+
+template<typename Type>
+bool Stack::push(const Type &item)
+{
+    ...
+
+}
+
+
+stacktp.h 列出了类模板和成员函数模板。知道这些模板不是类和成员函数定义至关重要。'它们是 C++ 编译器指令, 说明了如何生成类和成员函数定义'。模板的具体实现---如
+用来处理 string 对象的栈类---被称为实例化(instantiation)或具体化(specialization)。不能将模板成员函数放在独立的实现文件中。由于模板不是函数，它们不能单独
+编译。模板必须与特定的模板实例化请求一起使用。为此, '最简单的方法是将所有模板信息放在一个头文件中，并在要使用这些模板的文件中包含该头文件'。
+
+
+// !! 使用模板类
+
+'仅在程序包含模板并不能生成模板类，而必须请求实例化'。为此，需要声明一个类型为模板类的对象，方法是使用所需的具体类型替换泛型名。
+
+例如，下面的代码创建两个栈，一个用于存储 int，另一个用于存储 string 对象:
+
+Stack<int> kernels;
+Stack<string> colonels;
+
+看到上述声明后，'编译器将按 Stack<Type> 模板来生成两个独立的类声明和两组独立的类方法'。类声明 Stack<int> 将使用 int 替换模板中所有的 Type，而类声明 
+Stack<string> 将用 string 替换 Type。当然，使用的算法必须与类型一致。例如，Stack 类假设可以将一个项目赋给另一个项目。这种假设对于基本类型、结构和类来
+说是成立的，但对于数组则不成立。
+
+泛型标识符---例如这里的Type——称为类型参数(type parameter)，这意味着它们类似于变量，但赋给它们的不能是数字，而只能是类型。因此，在 kernel 声明中，类型参数
+ Type 的值为 int。
+
+注意，必须显式地提供所需的类型，这与常规的函数模板是不同的，因为编译器可以根据函数的参数类型来确定要生成哪种函数:
+
+template <typename Type>
+void sumple(Type t)
+{
+    cout << t << endl;
+}
+
+simple(1);
+simple("two");
 
 
 
