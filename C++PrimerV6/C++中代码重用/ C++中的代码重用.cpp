@@ -520,5 +520,177 @@ simple(1);
 simple("two");
 
 
+// !! 深入探讨模板类
+
+1. 不正确地使用指针栈
+
+Stack<char *> st;// create a stack for pointer to char
+
+
+
+// !! 数组模板示例和非类型参数
+
+模板常用作容器类, 这是因为类型参数的概念非常适合于将相同的存储方案用于不同的类型。确实，'为容器类提供可重用代码是引入模板的主要动机'。
+
+首先介绍一个允许指定数组大小的简单数组模板。
+
+1. 一种方法是在类中使用动态数组和构造函数参数来提供元素数目
+
+2. 另一种方法是使用模板参数来提供常规数组的大小，C++11 新增的模板 array 就是这样做的。
+
+#ifndef CF3B74C8_81D9_4300_8B7F_5145A19FFF05
+#define CF3B74C8_81D9_4300_8B7F_5145A19FFF05
+
+#include<iostream>
+#include<cstdlib>
+
+template <typename T,int n>
+class ArrayTP
+{
+    private:
+        T ar[n];
+    public:
+        ArrayTP();
+        explicit ArrayTP(const T & v);
+        virtual T &operator[](int i);
+        virtual T operator[] (int i) const;
+};
+
+template <typename T,int n>
+ArrayTP<T,n>::ArrayTP(const T & v)
+{
+    for(int i = 0; i < n; i++)
+    {
+        ar[i] = v;
+    }
+}
+
+template <typename T,int n>
+T & ArrayTP<T,n>::operator[] (int i)
+{
+    if(i < 0 || i >= n)
+    {
+        std::cerr << "Error in array of limits:" << i << " is out of range\n";
+        std::Exit(EXIT_FAILURE);
+    }
+    return ar[i];
+}
+
+
+template <typename T,int n>
+T ArrayTP<T,n>::operator[] (int i) const
+{
+    if(i < 0 || i >= n)
+    {
+        std::cerr << "Error in array of limits:" << i << " is out of range\n";
+        std::Exit(EXIT_FAILURE);
+    }
+    return ar[i];
+}
+
+#endif /* CF3B74C8_81D9_4300_8B7F_5145A19FFF05 */
+
+
+
+请注意程序 arraytp.h 中的模板头：
+
+template <typename T,int n>
+
+关键字 typename 指出 T 为类型参数，int 指出 n 的类型为 int。这种参数(指定特殊的类型而不是用作泛型名)称为非类型(non-type)或表达式（expression）参数。
+
+假设有下面的声明：
+
+ArrayTP<double,12> eggweight;
+
+这将导致编译器定义名为 ArrayTP<double, 12> 的类，并创建一个类型为 ArrayTP<double, 12> 的 eggweight 对象。定义类时，编译器将使用 double 替换 T，
+使用 12 替换 n。
+
+表达式参数有一些限制。表达式参数可以是整型、枚举、引用或指针。另外，模板代码不能修改参数的值，也不能使用参数的地址。所以，在 ArrayTP 模板中不能使用诸如 n++ 
+和 &n 等表达式。另外，实例化模板时，用作表达式参数的值必须是常量表达式。
+
+与 Stack 中使用的构造函数方法相比，这种改变数组大小的方法有一个优点。'构造函数方法使用的是通过 new 和 delete 管理的堆内存'，而'表达式参数方法使用的是为自
+动变量维护的内存栈'。这样，执行速度将更快，尤其是在使用了很多小型数组时。
+
+表达式参数方法的主要缺点是: '每种数组大小都将生成自己的模板'。也就是说, 下面的声明将生成两个独立的类声明:
+
+ArrayTP<double,12> eggweight;
+ArrayTP<double,13> donuts;
+
+但下面的声明只生成一个类声明, 并将数组大小信息传递给类的构造函数:
+
+Stack<int> eggs(12);
+Stack<int> dunkers(13);
+
+另一个区别是，构造函数方法更通用，这是因为数组大小是作为类成员(而不是硬编码)存储在定义中的。这样可以将一种尺寸的数组赋给另一种尺寸的数组，也可以创建允许数组
+大小可变的类。
+
+
+// !!  模板多功能性
+
+'可以将用于常规类的技术用于模板类'。模板类可用作基类，也可用作组件类，还可用作其他模板的类型参数。例如，可以使用数组模板实现栈模板， 也可以使用数组模板来构造数
+组---数组元素是基于栈模板的栈。
+
+即可以编写下面的代码：
+
+template<typename T>
+class Array
+{
+    private:
+        T entry;
+    ...
+};
+
+template <typename Type>
+class GrowArray: public Array<Type> {...}// inheritance
+
+
+template <typename Tp>
+class Stack
+{
+    private:
+        Array<Tp> ar;// use an array as a component
+};
+
+
+1. 递归使用模板
+
+'另一个模板多功能性的例子是, 可以递归使用模板'。
+
+例如，对于前面的数组模板定义，可以这样使用它：
+
+ArrayTP<ArrayTP<int,5>,10> twodee;
+
+这使得 twodee 是一个包含 10 个元素的数组, 其中每个元素都是一个包含 5 个 int 元素的数组。
+
+与之等价的常规数组声明如下:
+
+int twodee[10][5];
+
+twod.cpp 使用了这种方法，同时使用 ArrayTP 模板创建了一维数组, 来分别保存这 10 个组(每组包含 5 个数)的总数和平均值。方法调用 cout.width(2) 以两个字符的宽
+度显示下一个条目(如果整个数字的宽度不超过两个字符)。
+
+
+2. 使用多个类型参数
+
+'模板可以包含多个类型参数'。假设希望类可以保存两种值，则可以创建并使用 Pair 模板来保存两个不同的值(标准模板库提供了类似的模板，名为 pair) 。pairs.cpp 所示的
+小程序是一个这样的示例。其中，方法 first() const 和 second() const 报告存储的值，由于这两个方法返回 Pair 数据成员的引用，因此让您能够通过赋值重新设置存储的值。
+
+
+3. 默认类型模板参数
+
+类模板的另一项新特性是,可以为类型参数提供默认值:
+
+template <typename T1, typename T2 = int>
+class ToPo
+{
+
+};
+
+
+
+// !! 模板的具体化
+
+
+
 
 

@@ -17,6 +17,45 @@ int main()
 
     while (cin >> ch && std::toupper(ch) != 'Q')
     {
-        
+        while(cin.get() != '\n')
+        {
+            continue;
+        }
+        if(!std::isalpha(ch))
+        {
+            cout << '\a';
+            continue;
+        }
+        switch(ch)
+        {
+            case 'A':
+            case 'a':
+            cout << "Enter a P0 number to add." << std::endl;
+            cin >> po;
+            if(st.isFull())
+            {
+                cout << "stack already full." << std::endl;
+            }
+            else
+            {
+                st.push(po);
+            }
+            break;
+            case 'P':
+            case 'p':
+            if(st.isEmpty())
+            {
+                cout << "Empty stack." << std::endl;
+            }
+            else
+            {
+                st.pop(po);
+                cout << "P0 #" << po << "poped\n";
+                break;
+            }
+        }
+        cout << "Please add A to add purchase order." << std::endl;
     }
+    cout << "Bye~\n";
+    return 0;
 }
