@@ -687,9 +687,253 @@ class ToPo
 };
 
 
-
 // !! 模板的具体化
 
+'类模板与函数模板很相似,因为可以有隐式实例化、显式实例化和显式具体化，它们统称为具体化(specialization)'。模板以泛型的方式描述类, 而具体化是使用具体的类
+型生成类声明。
+
+
+1. 隐式实例化
+
+到目前为止，本章所有的模板示例使用的都是隐式实例化(implicit instantiation)，即它们声明一个或多个对象，指出所需的类型，而编译器使用通用模板提供的处方生成具
+体的类定义:
+
+ArrayTP<int, 100> stuffer;
+
+编译器在需要对象之前, 不会生成类的隐式实例化：
+
+ArrayTP<double, 100> *pt;// a pointer, no object needed yet
+pt = new ArrayTP<double, 100>// now object is needed
+
+第二条语句导致编译器生成类定义, 并根据该定义创建一个对象。
+
+
+2. 显式实例化
+
+'当使用关键字 template 并指出所需类型来声明类时, 编译器将生成类声明的显式实例化'(explicit instantiation)。声明必须位于模板定义所在的名称空间中。例如，下面
+的声明将 ArrayTP<string, 100> 声明为一个类:
+
+
+template class ArrayTP<string, 100>// generate ArrayTP<string, 100> class
+
+
+在这种情况下, 虽然没有创建或提及类对象, 编译器也将生成类声明(包括方法定义)。和隐式实例化一样，也将根据通用模板来生成具体化。
+
+
+3．显式具体化
+
+显式具体化(explicit specialization)是特定类型(用于替换模板中的泛型)的定义。有时候，可能需要在为特殊类型实例化时，对模板进行修改，使其行为不同。在这种情况下，
+可以创建显式具体化。例如，假设已经为用于表示排序后数组的类(元素在加入时被排序)定义了一个模板:
+
+template <typename T>
+class SortedArray
+{
+    private:
+
+};
+
+另外，假设模板使用 > 运算符来对值进行比较。对于数字，这管用; 如果 T 表示一种类，则只要定义了 T::operator>() 方法，这也管用；但如果 T 是由 const char * 表示的字
+符串，这将不管用。实际上，模板倒是可以正常工作，但字符串将按地址(按照字母顺序)排序。这要求类定义使用 strcmp()，而不是 > 来对值进行比较。在这种情况下，可以提供一个显
+式模板具体化，这将采用为具体类型定义的模板，而不是为泛型定义的模板。'当具体化模板和通用模板都与实例化请求匹配时，编译器将使用具体化版本'。
+
+具体化类模板定义的格式如下:
+
+template<> class ClassName<specialized-type-name> {...}
+
+要使用新的表示法提供一个专供 const char * 类型使用的 SortedArray 模板，可以使用类似于下面的代码:
+
+template<> class SortedArray<const char *>
+{
+    ....
+};
+
+
+其中的实现代码将使用 strcmp()（而不是>）来比较数组值。现在，当请求 const char * 类型的 SortedArray 模板时，编译器将使用上述专用的定义，而不是通用的模板
+定义:
+
+SortedArray<int> scores;// use general definition
+SortedArray<const char*> dates;// use specification definition 
+
+// !! 成员模板
+
+'模板可用作结构、类或模板类的成员'。要完全实现 STL 的设计，必须使用这项特性。tempmemb.cpp 是一个简短的模板类示例，该模板类将另一个模板类和模板函数作为其成员。
+
+#include<iostream>
+
+using std::cout;
+using std::endl;
+
+template <typename T>
+class beta
+{
+    private:
+        template <typename V>
+        class hold
+        {
+            private:
+                V val;
+            public:
+                hold(V v = 0) : val(v){}
+                void show() const { cout << val << std::endl; }
+                V value() const { return val; }
+        };
+        hold<T> q;
+        hold<int> n;
+    public:
+        beta(T t, int i):q(t), n(i){}
+        template <typename U>
+        U blab(U u, T t){return (n.Value() + q.Value())*u /t;}
+        void show() const { q.show(); n.show(); }
+};
+
+int main()
+{
+    beta<double> guy(3.5,3);
+    cout << "T was set to double\n";
+    guy.show();
+    cout << "V was set to T, which is double, Then V was set to int\n";
+    cout << guy.blab(10,2.3) << endl;
+    cout << "U was set to int\n";
+    cout << guy.blab(10.0,2.3) << endl;
+    cout << " U was set to double\n"
+    cout << "done\n";
+    return 0;
+}
+
+hold 模板是在私有部分声明的，因此只能在 beta 类中访问它。beta 类使用 hold 模板声明了两个数据成员:
+
+        hold<T> q;
+        hold<int> n;
+
+n 是基于 int 类型的 hold 对象，而 q 成员是基于T类型(beta模板参数)的 hold 对象。在 main() 中，下述声明使得 T 表示的是 double，因此 q 的类型为
+hold<double>:
+
+beta<double> guy(3.5,3);
+
+blab() 方法的 U 类型由该方法被调用时的参数值显式确定，T 类型由对象的实例化类型确定。在这个例子中，guy 的声明将 T 的类型设置为 double，而下述方法调用的
+第一个参数将 U 的类型设置为 int（参数10对应的类型）:
+
+cout << guy.blab(10,2.5) << endl;
+
+
+
+// !! 将模板用作参数
+
+模板可以包含类型参数（如 typename T）和非类型参数（如 int n）。'模板还可以包含本身就是模板的参数，这种参数是模板新增的特性，用于实现 STL'。
+
+在程序 tempparm.cpp 所示的示例中, 开头的代码如下:
+
+template<template <typename T> class Thing>
+class Crab
+
+模板参数是 template <typename T> class Thing，其中 template <typename T>class 是类型， Thing 是参数。
+
+这意味着什么呢？假设有下面的声明：
+
+Crab<King> legs;
+
+为使上述声明被接受，模板参数 King 必须是一个模板类，其声明与模板参数 Thing 的声明匹配:
+
+template <typename T>
+class King
+{
+
+};
+
+在 tempparm.cpp 中，Crab 的声明声明了两个对象:
+
+Thing<int> s1;
+Thing<double> s2;
+
+
+// !! 模板别名(C++11)
+
+如果能为类型指定别名，将很方便，在模板设计中尤其如此。可使用 typedef 为模板具体化指定别名:
+
+typedef std::array<double,12> arrd;
+typedef std::array<int,12> arri;
+typedef std::array<string,12> arrstr;
+arrd gallons;
+arri days;
+arrstr months;
+
+但如果您经常编写类似于上述 typedef 的代码，您可能怀疑要么自己忘记了可简化这项任务的 C++ 功能，要么 C++ 没有提供这样的功能。
+
+C++11 新增了一项功能----使用模板提供一系列别名，如下所示:
+
+template<typename T>
+using arrayType = std::array<T,12>;
+
+这将 arrtype 定义为一个模板别名，可使用它来指定类型，如下所示:
+
+arrayType<double> gallons;
+arrayType<int> days;
+arrayType<std::string> months;
+
+总之, arrtype<T> 表示类型 std::array<T, 12>。
+
+C++11 允许将语法 using = 用于非模板。用于非模板时，这种语法与常规 typedef 等价:
+
+typedef const char * pc1;
+using pc2 =  const char *;
+
+习惯这种语法后，您可能发现其可读性更强，因为它让类型名和类型信息更清晰。
+
+
+// !! 总结
+
+C++ 提供了几种重用代码的手段。
+
+1. 公有继承能够建立 is-a 关系，这样派生类可以重用基类的代码。
+
+2. 私有继承和保护继承也使得能够重用基类的代码，但建立的是 has-a 关系。
+   使用私有继承时， 基类的公有成员和保护成员将成为派生类的私有成员； 使用保护继承时，基类的公有成员和保护成员将成为派生类的保护成员。'无论使用哪种继承，基类的
+   公有接口都将成为派生类的内部接口'。'这有时候被称为继承实现，但并不继承接口，因为派生类对象不能显式地使用基类的接口'。因此，不能将派生对象看作是一种基类对象
+   由于这个原因，在不进行显式类型转换的情况下, 基类指针或引用将不能指向派生类对象
+
+3. 通过开发包含对象成员的类来重用类代码。这种方法被称为包含、层次化或组合，它建立的也是 has-a 关系。'与私有继承和保护继承相比, 包含更容易实现和使用，所以通常
+   优先采用这种方式'。
+
+4. 类模板使得能够创建通用的类设计, 其中类型(通常是成员类型)由类型参数表示。
+
+
+典型的模板如下：
+
+template<typename T>
+class IC
+{
+    private:
+        T v;
+        ...
+    public:
+        IC(const T &val):v(val){}
+        ...
+};
+
+
+其中，T 是类型参数，用作以后将指定的实际类型的占位符(这个参数可以是任意有效的 C++ 名称，但通常使用 T 和 Type)。
+
+类定义(实例化)在声明类对象并指定特定类型时生成。例如，下面的声明导致编译器生成类声明，用声明中的实际类型 short 替换模板中的所有类型参数 T:
+
+class IC<short> sic;
+
+这里，类名为 IC<short>，而不是 IC, IC<short> 称为模板具体化。具体地说，这是一个隐式实例化。
+
+使用关键字 template 声明类的特定具体化时，将发生显式实例化:
+
+template class IC<int>;
+
+在这种情况下, 编译器将使用通用模板生成一个 int 具体化----IC<int>，虽然尚未请求这个类的对象。
+
+
+类模板还可以包含本身就是模板的参数：
+
+template<template<typename T1> class CL,typename U, int n>
+class Hello{...}
+
+模板类可用作其他类、结构和模板的成员。
+
+'所有这些机制的目的都是为了让程序员能够重用经过测试的代码, 而不用手工复制它们'。这样可以简化编程工作，提供程序的可靠性。
 
 
 
