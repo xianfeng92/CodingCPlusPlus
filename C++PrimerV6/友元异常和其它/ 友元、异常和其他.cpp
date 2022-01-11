@@ -1295,3 +1295,213 @@ cout << "Now processing type is" << typeid(pg).name() << endl;
 
 // !! 误用 RTTI 的例子
 
+C++ 界有很多人对 RTTI 口诛笔伐，他们认为 RTTI 是多余的，是导致程序效率低下和糟糕编程方式的罪魁祸首。这里不讨论对 RTTI 的争论，而介绍一下应避免的编程方式。
+
+    Grand *pg;
+    Superb *ps;
+    for(int i = 0; i < 5; i++)
+    {
+        pg = GetOne();
+        pg->speak();
+        if(ps = dynamic_cast<Superb*>(pg))
+        {
+            ps->say();
+        }
+        if(typeid(Magnificent) == typeid(pg))
+        {
+            cout << "Yes, you are really Magnificent\n";
+        }
+    }
+
+通过放弃 dynamic_cast 和虚函数，而使用 typeid，可以将上述代码重新编写为:
+
+    Grand *pg;
+    Superb *ps;
+    for(int i = 0; i < 5; i++)
+    {
+        pg = GetOne();
+        if(typeid(Magnificent) == typeid(pg))
+        {
+            pm = (Magnificent*)pg;
+            pm->speak();
+            pm->say();
+        }
+        else if(typeid(Superb) == typeid(pg))
+        {
+            ps = (Superb*)pg;
+            ps->speak();
+            ps->say()
+        }
+        else
+        {
+            ps->speak();
+        }
+    }
+
+上述代码不仅比原来的更难看、更长，而且显式地指定各个类存在严重的缺陷。
+
+例如，假设您发现必须从 Magnificent 类派生一个 Insufferable 类，而后者需要重新定义 Speak() 和 Say()。使用 typeid 来显示地测试每个类型时，必须修改
+for 循环的代码，添加一个 else if，但无需修改原来的版本。下面的语句适用于所有从 Grand 派生而来的类:
+
+if(ps = dynamic_cast<Superb*>(pg))
+{
+    ps->say();
+}
+
+
+// !! 类型转换运算符
+
+'在 C++ 的创始人 Bjarne Stroustrup 看来，C 语言中的类型转换运算符太过松散'。
+
+例如，请看下面的代码:
+
+
+struct Data
+{
+    double data[200];
+};
+
+struct Junk
+{
+    int junk[100];
+};
+
+Data d = {2.3,3.4,4.5};
+char *pch = (char*)&d;// type cast #1 --- convert address to string
+char ch = char(&d);// type cast #2 --- convert address to char
+Junk *pj = (Junk*)(&d);// type cast #3 --- convert address to junk pointer
+
+首先，上述 3 种类型转换中，哪一种有意义？
+
+除非不讲理，否则它们中没有一个是有意义的。其次，这 3 种类型转换中哪种是允许的呢 ？在 C 语言中都是允许的。
+
+对于这种松散情况，Stroustrop 采取的措施是，更严格地限制允许的类型转换，并添加 4 个类型转换运算符，使转换过程更规范:
+
+1. dynamic_cast
+
+2. const_cast
+
+3. static_cast
+
+4. reinterpret_cast
+
+'可以根据目的选择一个适合的运算符，而不是使用通用的类型转换'。这指出了进行类型转换的原因，并让编译器能够检查程序的行为是否与设计者想法吻合。
+
+
+dynamic_cast 运算符已经在前面介绍过了。总之，假设 High 和 Low 是两个类，而 ph 和 pl 的类型分别为 High * 和 Low *，则仅当 Low 是 High 的可访问基类
+(直接或间接)时，下面的语句才将一个 Low* 指针赋给 pl:
+
+pl = dynamic_cast<Low*>(ph);
+
+否则，该语句将空指针赋给 pl。通常，该运算符的语法如下:
+
+dynamic_cast<typename>(expression);
+
+'该运算符的用途是，使得能够在类层次结构中进行向上转换(由于 is-a 关系，这样的类型转换是安全的)，而不允许其他转换'。
+
+
+const_cast 运算符用于执行只有一种用途的类型转换，即改变值为 const 或 volatile，其语法与 dynamic_cast 运算符相同:
+
+const_cast<typename>(expression);
+
+再次假设 High 和 Low 是两个类:
+
+High bar;
+const High *pbar = &bar;
+...
+High *pb = const_cast<High*>(pbar);// valid
+const Low *pl = const_cast<const Low *>(pbar);// invalid
+
+1. 第一个类型转换使得 *pb 成为一个可用于修改 bar 对象值的指针，它删除 const 标签
+
+2. 第二个类型转换是非法的，因为它同时尝试将类型从 const High * 改为 const Low *
+
+'提供该运算符的原因是，有时候可能需要这样一个值，它在大多数时候是常量，而有时又是可以修改的'。在这种情况下，可以将这个值声明为 const，并在需要修改它的时候，
+使用 const_cast。
+
+#include <iostream>
+using std::cout;
+using std::endl;
+
+int main()
+{
+    int pop1 = 10086;
+    const int pop2 = 100;
+
+    cout << "pop1: " << pop1 << ", pop2: " << pop2 << endl;
+    change(&pop1,-103);
+    change(&pop2,-103);
+    cout << "pop1: " << pop1 << ", pop2: " << pop2 << endl;
+    return 0;
+}
+
+
+void change(const int *pt, int n)
+{
+    int *pc;
+    pc = const_cast<int*>(pt);
+    *pc+=n;
+}
+
+const_cast 运算符可以删除 const int* pt 中的 const，使得编译器能够接受 change() 中的语句:
+
+   *pc+=n;
+
+
+但由于 pop2 被声明为 const，因此编译器可能禁止修改它，如下面的输出所示:
+
+ » g++ --std=c++11 constcast.cpp
+--------------------------------------------------------------------------------
+ » ./a.out
+
+pop1: 10086, pop2: 100
+pop1: 9983, pop2: 100
+
+
+正如您看到的，调用 change() 时，修改了 pop1，但没有修改 pop2。在 chang()中，指针被声明 为const int *，因此不能用来修改指向的 int。指针 pc 删除了
+const 特征，因此可用来修改指向的值，但仅当指向的值不是 const 时才可行。因此，pc 可用于修改 pop1，但不能用于修改 pop2。
+
+
+static_cast 运算符的语法与其他类型转换运算符相同:
+
+static_cast<typename>(expression);
+
+'仅当 type_name 可被隐式转换为 expression 所属的类型或 expression 可被隐式转换为 type_name 所属的类型时，上述转换才是合法的，否则将出错'。
+
+假设 High 是 Low 的基类，而 Pond 是一个无关的类，则从 High 到 Low 的转换、从 Low 到 High 的转换都是合法的，而从 Low 到 Pond 的转换是不允许的:
+
+High bar;
+Low blow;
+
+...
+High *pb = static_cast<High *>(&blow);// valid upcast
+Low *p1 = static_cast<High *>(&bar);// valid downcast
+Pond *pp = static_cast<Pond *>(&blow);// invalid
+
+
+1. 第一种转换是合法的，因为向上转换可以显示地进行
+
+2. 第二种转换是从基类指针到派生类指针，在不进行显示类型转换的情况下，将无法进行。但由于无需进行类型转换，便可以进行另一个方向的类型转换，因此使用
+   static_cast 来进行向下转换是合法的
+
+由于无需进行类型转换, 枚举值就可以被转换为整型，所以可以用 static_cast 将整型转换为枚举值。同样，可以使用 static_cast 将 double 转换为 int、将 float
+转换为 long 以及其他各种数值转换
+
+
+// !! 总结
+
+'友元使得能够为类开发更灵活的接口'。类可以将其他函数、其他类和其他类的成员函数作为友元。在某些情况下，可能需要使用前向声明，需要特别注意类和方法声明的顺序，以正
+确地组合友元。
+
+'嵌套类是在其他类中声明的类, 它有助于设计这样的助手类，即实现其他类', 但不必是公有接口的组成部分。
+
+C++ 异常机制为处理拙劣的编程事件，如不适当的值、I/O 失败等，提供了一种灵活的方式。引发异常将终止当前执行的函数，将控制权传给匹配的 catch 块。catch 块紧跟在
+try 块的后面，为捕获异常，直接或间接导致异常的函数调用必须位于 try 块中。这些代码试图解决问题或终止程序。类可以包含嵌套的异常类，嵌套异常类在相应的问题被发现
+时将被引发。'函数可以包含异常规范，指出在该函数中可能引发的异常；但 C++11 摒弃了这项功能'。未被捕获的异常(没有匹配的 catch 块的异常)在默认情况下将终止程序，
+意外异常(不与任何异常规范匹配的异常)也是如此。
+
+'RTTI(运行阶段类型信息)特性让程序能够检测对象的类型'。'dynamic_cast 运算符用于将派生类指针转换为基类指针'，其主要用途是确保可以安全地调用虚函数。Typeid 
+运算符返回一个 type_info 对象。可以对两个 typeid 的返回值进行比较, 以确定对象是否为特定的类型，而返回的 type_info 对象可用于获得关于对象的信息。
+
+
+与通用转换机制相比，dynamic_cast、static_cast、const_cast 和 reinterpret_cast 提供了更安全、更明确的类型转换。
