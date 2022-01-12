@@ -659,4 +659,243 @@ shared_ptr<string> pvac(vacation); // NO
 
 先来看下面的赋值语句:
 
+auto_ptr<string> ps(new string("I want to be a string"));
+auto_ptr<string> vocation;
+vocation = ps;
+
+上述赋值语句将完成什么工作呢？
+
+如果 ps 和 vocation 是常规指针，则两个指针将指向同一个 string 对象。这是不能接受的，因为程序将试图删除同一个对象两次——一次是ps过期时，另一次是vocation过
+期时。要避免这种问题，方法有多种。
+
+1. 定义赋值运算符，使之执行深复制。这样两个指针将指向不同的对象，其中的一个对象是另一个对象的副本。
+
+2. 建立所有权(ownership)概念，对于特定的对象，只能有一个智能指针可拥有它，这样只有拥有对象的智能指针的构造函数会删除该对象。然后，让赋值操作转让所有权。这就是
+   用于 auto_ptr 和 unique_ptr 的策略，但 unique_ptr 的策略更严格
+
+3. 创建智能更高的指针，跟踪引用特定对象的智能指针数。这称为引用计数(reference counting)。例如，赋值时，计数将加1，而指针过期时，计数将减1。仅当最后一个指针过
+   期时，才调用 delete。这是 shared_ptr 采用的策略。
+
+#include<iostream>
+#include<memory>
+#include<string>
+
+int main()
+{
+    using namespace std;
+    auto_ptr<string> films[5] =
+    {
+        auto_ptr<string> (new string("following")),
+        auto_ptr<string> (new string("nio")),
+        auto_ptr<string> (new string("apple")),
+        auto_ptr<string> (new string("hell")),
+        auto_ptr<string> (new string("funck"))
+    };
+
+    auto_ptr<string> pwin;
+    pwin = films[2];// films[2] lose ownership
+    for(int i = 0; i < 5; i++)
+    {
+        cout << *films[i] << endl;
+    }
+    cout << "the winter is " << *pwin << endl;
+    return 0;
+}
+
+ » ./a.out hel
+following
+nio
+[1]    176168 segmentation fault (core dumped)  ./a.out hel
+--------------------------------------------------------------------------------
+» 
+
+这里的问题在于，下面的语句将所有权从 films[2] 转让给 pwin:
+
+    pwin = films[2];// films[2] lose ownership
+
+
+这导致 films[2] 不再引用该字符串。在 auto_ptr 放弃对象的所有权后，便可能使用它来访问该对象。当程序打印 films[2] 指向的字符串时，却发现这是一个空指针，这
+显然讨厌的意外。
+
+
+flow.cpp 中使用 shared_ptr 代替 auto_ptr(这要求编译器支持 C++11 新增的 shared_ptr 类)，则程序将正常运行。
+
+#include<iostream>
+#include<memory>
+#include<string>
+
+int main()
+{
+    using namespace std;
+    shared_ptr<string> films[5] =
+    {
+        shared_ptr<string> (new string("following")),
+        shared_ptr<string> (new string("nio")),
+        shared_ptr<string> (new string("apple")),
+        shared_ptr<string> (new string("hell")),
+        shared_ptr<string> (new string("funck"))
+    };
+
+    shared_ptr<string> pwin;
+    pwin = films[2];// films[2] lose ownership
+    for(int i = 0; i < 5; i++)
+    {
+        cout << *films[i] << endl;
+    }
+    cout << "the winter is " << *pwin << endl;
+    return 0;
+}
+
+ » g++ --std=c++11 flow_s.cpp 
+--------------------------------------------------------------------------------
+ » ./a.out hel
+following
+nio
+apple
+hell
+funck
+the winter is apple
+
+
+'使用 auto_ptr 时，该程序在运行阶段崩溃。如果使用 unique_ptr，结果将如何呢？与 auto_ptr 一样，unique_ptr 也采用所有权模型。但使用 unique_ptr 时，程序
+不会等到运行阶段崩溃，而在编译器因下述代码行出现错误'
+
+
+ » g++ --std=c++11 fowl_u.cpp 
+fowl_u.cpp: In function ‘int main()’:
+fowl_u.cpp:18:19: error: use of deleted function ‘std::unique_ptr<_Tp, _Dp>& std::unique_ptr<_Tp, _Dp>::operator=
+(const std::unique_ptr<_Tp, _Dp>&) [with _Tp = std::__cxx11::basic_string<char>; _Dp = std::default_delete<std::__cxx11::basic_string
+<char> >]’
+   18 |     pwin = films[2];// films[2] lose ownership
+      |                   ^
+In file included from /usr/include/c++/9/memory:80,
+                 from fowl_u.cpp:2:
+/usr/include/c++/9/bits/unique_ptr.h:415:19: note: declared here
+  415 |       unique_ptr& operator=(const unique_ptr&) = delete;
+
+
+// !! unique_ptr 为何优于 auto_ptr
+
+请看下面的语句:
+
+auto_ptr<string> p1(new string("hello"));
+auto_ptr<string> p2;
+p2 = p1; // #3
+
+在语句 #3 中，p2 接管 string 对象的所有权后，p1 的所有权将被剥夺。前面说过，这是件好事，可防止 p1 和 p2 的析构函数试图删除同一个对象；但如果程序随后试图
+使用 p1，这将是件坏事，因为 p1 不再指向有效的数据
+
+
+下面来看使用 unique_ptr 的情况:
+
+unique_ptr<string> p1(new string("hello"));
+unique_ptr<string> p2;
+p2 = p1; // #3
+
+
+编译器认为语句#3非法，避免了 p1 不再指向有效数据的问题。因此，unique_ptr 比 auto_ptr 更安全('编译阶段错误比潜在的程序崩溃更安全')
+
+
+但有时候，将一个智能指针赋给另一个并不会留下危险的悬挂指针。假设有如下函数定义:
+
+unique_ptr<string> demo(const char *s)
+{
+    unique_ptr<string> temp(new string(s));
+    return temp;
+}
+
+并假设编写了如下代码:
+
+unique_ptr<string> ps;
+ps = demo("fuckyou");
+
+
+demo() 返回一个临时 unique_ptr，然后 ps 接管了原本归返回的 unique_ptr 所有的对象，而返回的 unique_ptr 被销毁。这没有问题，因为 ps 拥有了 string
+对象的所有权。'这里的另一个好处是 demo() 返回的临时 unique_ptr很快被销毁，没有机会使用它来访问无效的数据'。换句话说，没有理由禁止这种赋值。神奇的是，编译
+器确实允许这种赋值！
+
+
+总之，程序试图将一个 unique_ptr 赋给另一个时，如果源 unique_ptr 是个临时右值，编译器允许这样做; 如果源 unique_ptr 将存在一段时间，编译器将禁止这样做:
+
+using namespace std;
+unique_ptr<string> pu1(new string("fuck"));
+unique_ptr<string> pu2;
+pu2 = pu1;// #1 not allowed
+unique_ptr<string> pu3;
+pu3 = unique_ptr<string>(new string("you!"));// #2 allowed
+
+语句 #1 将留下悬挂的 unique_ptr（pul），这可能导致危害。语句 #2 不会留下悬挂的 unique_ptr，因为它调用 unique_ptr 的构造函数，该构造函数创建的临时对象
+在其所有权转让给 pu 后就会被销毁。
+
+C++ 有一个标准库函数 std::move()，让您能够将一个 unique_ptr 赋给另一个。下面是一个使用前述 demo() 函数的例子，该函数返回一个 unique_ptr<string>对象:
+
+using namespace std;
+unique_ptr<string> pu1(new string("fuck"));
+unique_ptr<string> pu2;
+pu2 = move(pu1);// enable assignment
+unique_ptr<string> pu3;
+
+
+相比于 auto_ptr，unique_ptr 还有另一个优点。它有一个可用于数组的变体。别忘了，必须将 delete 和 new 配对，将 delete[]和 new[] 配对。模板 auto_ptr 
+使用 delete 而不是 delete[]，因此只能与 new 一起使用，而不能与 new[] 一起使用。但 unique_ptr 有使用 new[] 和 delete[] 的版本:
+
+    std::unique_ptr<double[]> pda(new double(5));// will use delete[]
+
+警告:
+
+使用 new 分配内存时，才能使用 auto_ptr 和 shared_ptr
+
+
+// !! 选择智能指针
+
+应使用哪种智能指针呢？
+
+1. 如果程序要使用多个指向同一个对象的指针，应选择 shared_ptr
+
+    这样的情况包括: 有一个指针数组，并使用一些辅助指针来标识特定的元素，如最大的元素和最小的元素; 两个对象包含都指向第三个对象的指针；STL 容器包含指针。
+    很多 STL 算法都支持复制和赋值操作，这些操作可用于 shared_ptr，但不能用于 unique_ptr(编译器发出警告)和 auto_ptr(行为不确定)
+
+2. 如果程序不需要多个指向同一个对象的指针，则可使用 unique_ptr
+
+    如果函数使用 new 分配内存，并返回指向该内存的指针，将其返回类型声明为 unique_ptr 是不错的选择。这样，所有权将转让给接受返回值的 unique_ptr，而该智
+    能指针将负责调用 delete
+
+    unique_ptr<int> make_int(int n)
+    {
+        return unique_ptr<int>(new int(n));
+    }
+
+
+    void show(unique_ptr<int> &pi)// pass by reference
+    {
+        cout << *pa << endl;
+    }
+
+    int main()
+    {
+        ...
+        vector<unique_ptr<int>> vp(size);
+        for(int i=0; i<vp.size(); i++)
+        {
+            vp[i] = make_int(rand() % 1000);
+            vp.push_back(make_int(rand() % 1000));
+            for_each(vp.begin(), vp.end(),show);
+        }
+    }
+
+
+其中的 push_back() 调用没有问题，因为它返回一个临时 unique_ptr，该 unique_ptr 被赋给 vp 中的一个 unique_ptr
+
+在 unique_ptr 为右值时，可将其赋给 shared_ptr，这与将一个 unique_ptr 赋给另一个需要满足的条件相同
+
+unique_ptr<int> pup(make_int(rand() % 1000));
+shared_ptr<int> sup(pup);// not allowed, pup is left value
+shared_ptr<int> sus(make_int(rand() % 1000));// okay
+
+模板 shared_ptr 包含一个显式构造函数，可用于将右值 unique_ptr 转换为 shared_ptr。shared_ptr 将接管原来归 unique_ptr 所有的对象。
+
+如果您的编译器没有提供 unique_ptr，可考虑使用 BOOST 库提供的 scoped_ptr, 它与 unique_ptr 类似
+
+
+// !! 标准模板库
 
