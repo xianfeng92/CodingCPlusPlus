@@ -328,3 +328,335 @@ good bye!
 词的字母'。如果猜错 6 次，玩家就输了。该程序使用 find() 函数来检查玩家的猜测，使用 += 运算符创建一个 string 对象来记录玩家的错误猜测。为记录玩家猜对的情况
 ，程序创建了一个单词，其长度与被猜的单词相同，但包含的是连字符。玩家猜对字符时，将用该字符替换相应的连字符。
 
+#include<iostream>
+#include<string>
+#include<cstdlib>
+#include<ctime>
+#include<cctype>
+
+using std::string;
+const int NUM = 26;
+const string worldlist[NUM] = 
+{
+    "applist","bee","hello","worldlist","Sorry","please","enter","your","name","help",
+    "me","get","it","done","see","about","NOT","tiom","shares","Student","shortest",
+    "other","full","funny","integer","xforg"
+}
+
+int main()
+{
+    using std::cout;
+    using std::endl;
+    using std::cin;
+    using std::tolower;
+
+    std::srand(std::time(NULL));
+    char play;
+    cout << "Will you play a word game ?<y/n>\n";
+    cin >> play;
+    play = tolower(play);
+    while(play == 'y')
+    {
+        string target = worldlist[std::rand() % NUM];
+        int length = target.length();
+        string attempt(length,'-');
+        string badchars;
+        int guesses = 6;
+        cout << "Guess my secret word. It has " << length << " Letters and your guess\n"
+        << "one letter at a time. You get " << guesses << " wrong guesses.\n";
+        cout << "your word is " << attempt << endl;
+        while(guesses > 0 && attempt != target)
+        {
+            char letter;
+            cout << "Guess a letter: ";
+            cin >> letter;
+            if(badchars.find(letter) != string::npos || attempt.find(letter) != string::npos)
+            {
+                cout << "You already guess that, Try Again\n";
+                continue;
+            }
+            int loc = target.find(letter);
+            if(loc == string::npos)
+            {
+                cout << "Oh, bad guess!\n";
+                --guesses;
+                badchars += letter;// add to string
+            }
+            else
+            {
+                cout << "Good guess\n";
+                attempt[loc] = letter;
+                loc = target.find(letter,loc+1);
+                while(loc != string::npos)
+                {
+                    attempt[loc] =letter;
+                    loc = target.find(letter,loc+1);
+                }
+            }
+            cout << "your word is " << attempt << endl;
+
+            if(attempt != target)
+            {
+                if(badchars.length() > 0)
+                {
+                    cout << "Bad choice " << badchars << endl;
+                }
+                cout << "guesses " << guesses << endl;
+            }
+        }
+        if(guesses > 0)
+        {
+            cout << "That right!\n";
+        }
+        else
+        {
+            cout << "sorry the word is " << target << ".\n";
+            cout << "Will you play again ?"
+            cin >> play;
+            play = tolower(play);
+        }
+    }
+    cout << "Bye\n";
+    return 0;
+}
+
+
+1. 由于关系运算符被重载，因此可以像对待数值变量那样对待字符串:
+
+    while(guesses > 0 && attempt != target)
+
+    与对C-风格字符串使用 strcmp() 相比，这样简单些。
+
+2. 使用 find() 来检查玩家以前是否猜过某个字符。如果是，则它要么位于 badchars 字符串(猜错)中，要么位于 attempt 字符串(猜对)中：
+
+    if(badchars.find(letter) != string::npos || attempt.find(letter) != string::npos)
+
+    npos 变量是 string 类的静态成员，它的值 string 对象能存储的最大字符数。'由于索引从0开始，所以它比最大的索引值大 1，因此可以使用它来表示没有查找到字符
+    或字符串'。
+
+3. 该程序利用了这样一个事实: '+= 运算符的某个重载版本使得能够将一个字符附加到字符串中'
+
+    badchars += letter;
+
+
+
+// !!string 还提供了哪些功能
+
+string 库提供了很多其他的工具，包括完成下述功能的函数:
+
+1. 删除字符串的部分或全部内容
+2. 用一个字符串的部分或全部内容替换另一个字符串的部分或全部内容
+3. 将数据插入到字符串中或删除字符串中的数据
+4. 将一个字符串的部分或全部内容与另一个字符串的部分或全部内容进行比较
+5. 从字符串中提取子字符串
+6. 将一个字符串中的内容复制到另一个字符串中、交换两个字符串的内容
+
+
+首先来看自动调整大小的功能。在 str2.cpp中，每当程序将一个字母附加到字符串末尾时将发生什么呢？不能仅仅将已有的字符串加大，因为相邻的内存可能被占用了。因此，可
+能需要分配一个新的内存块，并将原来的内容复制到新的内存单元中。如果执行大量这样的操作，效率将非常低，因此很多 C++ 实现分配一个比实际字符串大的内存块，为字符串提
+供了增大空间。然而，如果字符串不断增大，超过了内存块的大小，程序将分配一个大小为原来两倍的新内存块，以提供足够的增大空间，避免不断地分配新的内存块。
+'方法 capacity() 返回当前分配给字符串的内存块的大小，而 reserve() 方法让您能够请求内存块的最小长度'。
+
+str2.cpp 是一个使用这些方法的示例。
+
+#include<iostream>
+#include<string>
+
+int main()
+{
+    using namespace std;
+    string empty;
+    string small = "bit";
+    string large = "Are you OK？ See you later\n";
+    cout << "Sizes\n";
+    cout << "\tempty " << empty.size() << "\n";
+    cout<< "\tsmall " << small.size() << "\n";
+    cout <<"\tlarge " << large.size() << "\n";
+
+    cout << "Capacities\n";
+    cout << "\tempty " << empty.capacity() << "\n";
+    cout<< "\tsmall " << small.capacity() << "\n";
+    cout <<"\tlarge " << large.capacity() << "\n";
+
+    empty.reserve(50);
+    cout << "Capacities after empty.reserve(50):" << empty.capacity() << "\n";
+    return 0;
+}
+
+ » g++ --std=c++11 str2.cpp
+--------------------------------------------------------------------------------
+ » ./a.out hel
+Sizes
+	empty 0
+	small 3
+	large 28
+Capacities
+	empty 15
+	small 15
+	large 28
+Capacities after empty.reserve(50):50
+
+如果您有 string 对象，但需要C-风格字符串，该如何办呢？
+
+例如，您可能想打开一个其名称存储在 string 对象中的文件:
+
+string filename;
+cout << "Enter filename\n";
+cin >> filename;
+ofstream fout;
+
+不幸的是，open() 方法要求使用一个C-风格字符串作为参数；幸运的是，c_str() 方法返回一个指向C-风格字符串的指针，该C-风格字符串的内容与用于调用 c_str() 
+方法的 string 对象相同。因此可以这样做:
+
+    fout.open(filename.c_str());
+
+
+// !! 字符串种类
+
+本节将 string 类看作是基于 char 类型的。事实上，正如前面指出的，string 库实际上是基于一个模板类的:
+
+    template <typename charT,typename traits = char_traits<charT>,typename Allocator = allocator<charT> >
+
+    basic_string{...}
+
+模板 basic_string 有 4 个具体化，每个具体化都有一个 typedef 名称:
+
+typedef basic_string<char> string;
+typedef basic_string<wchar_t> wstring;
+typedef basic_string<char16_t> u16string;// C++11
+typedef basic_string<char32_t> u32string;// C++11
+
+这让您能够使用基于类型 wchar_t、char16_t、char32_t 和 char 的字符串。甚至可以开发某种类似字符的类，并对它使用 basic_string 类模板（只要它满足某些要求）。
+traits 类描述关于选定字符类型的特定情况，如如何对值进行比较。对于 wchar_t、char16_t、char32_t 和 char 类型，有预定义的 char_traits 模板具体化，它们
+都是 traits 的默认值。Allocator 是一个管理内存分配的类。对于各种字符类型，都有预定义的 allocator 模板具体化，它们都是默认的。它们使用 new 和 delete。
+
+
+// !! 智能指针模板类
+
+智能指针是行为类似于指针的类对象，但这种对象还有其他功能。
+
+
+void remodel(std::string &str)
+{
+    std::string *ps = new std::string(str);
+    ...
+    str = ps;
+    return 0;
+}
+
+您可能发现了其中的缺陷。每当调用时，该函数都分配堆中的内存，但从不收回，从而导致内存泄漏。您可能也知道解决之道——只要别忘了在 return 语句前添加下面的语句，
+以释放分配的内存即可:
+
+    delete ps;
+
+'但凡涉及“别忘了”的解决方法，很少是最佳的'。因为您有时可能忘了，有时可能记住了，但可能在不经意间删除或注释掉了这些代码。即使确实没有忘记，也可能有问题。
+
+请看下面的变体：
+
+void remodel(std::string &str)
+{
+    std::string *ps = new std::string(str);
+    ...
+    if(wire_thing)
+    {
+        throw exception();
+    }
+    str = ps;
+    delete ps;
+    return 0;
+}
+
+当出现异常时，delete 将不被执行，因此也将导致内存泄漏。
+
+当 remodel() 这样的函数终止(不管是正常终止，还是由于出现了异常而终止)，本地变量都将从栈内存中删除--因此指针 ps 占据的内存将被释放。如果 ps 指向的内存也被释
+放，那该有多好啊。如果 ps 有一个析构函数，该析构函数将在 ps 过期时释放它指向的内存。因此 ps 的问题在于，它只是一个常规指针, 不是有析构函数的类对象。'如果它是
+对象，则可以在对象过期时，让它的析构函数删除指向的内存'。这正是 auto_ptr、unique_ptr 和 shared_ptr 背后的思想。模板 auto_ptr 是 C++98 提供的解决方案，
+C++11 已将其摒弃，并提供了另外两种解决方案。然而，虽然 auto_ptr 被摒弃，但它已使用了多年；同时，如果您的编译器不支持其他两种解决方案，auto_ptr 将是唯一的选择
+
+// !! 使用智能指针
+
+这三个智能指针模板(auto_ptr、unique_ptr 和 shared_ptr)都定义了类似指针的对象，可以将 new 获得的地址赋给这种对象。当智能指针过期时，其析构函数将使用
+delete 来释放内存。因此，如果将 new 返回的地址赋给这些对象, 将无需记住稍后释放这些内存: '在智能指针过期时，这些内存将自动被释放'。
+
+
+要创建智能指针对象，必须包含头文件 memory，该文件模板定义。
+
+然后使用通常的模板语法来实例化所需类型的指针。例如，模板 auto_ptr 包含如下构造函数：
+
+
+template<typename T> class auto_ptr
+{
+    public:
+        explicit auto_ptr(int *p = 0) throw();
+    ...
+};
+
+本书前面说过，throw() 意味着构造函数不会引发异常；与 auto_ptr 一样， throw() 也被摒弃。因此，请求 X 类型的 auto_ptr 将获得一个指向 X 类型的 auto_ptr
+
+auto_ptr<double> ad(new double());
+auto_ptr<string> as(new string());
+
+'new double 是 new 返回的指针，指向新分配的内存块'。它是构造函数 auto_ptr<double> 的参数，即对应于原型中形参 p 的实参。同样，new string 也是构造函数的
+实参。
+
+其他两种智能指针使用同样的语法:
+
+unique_ptr<double> ud(new double);
+shared_ptr<string> ss(new string);
+
+
+因此，要转换 remodel() 函数，应按下面 3 个步骤进行:
+
+1．包含头文件 memory
+2．将指向 string 的指针替换为指向 string 的智能指针对象；
+3．删除 delete 语句
+
+#include<memory>
+void remodel(std::string &str)
+{
+    std::unique_ptr<string> ps(new std::string(str));
+    ...
+    if(wire_thing)
+    {
+        throw exception();
+    }
+    str = *ps;
+    return 0;
+}
+
+注意到智能指针模板位于名称空间 std 中。
+
+
+smrtptrs.cpp 是一个简单的程序，演示了如何使用全部三种智能指针。要编译该程序，您的编译器必须支持 C++11 新增的类 share_ptr 和 unique_ptr。每个智能指针
+都放在一个代码块内，这样离开代码块时，指针将过期。Report类使用方法报告对象的创建和销毁。
+
+
+所有智能指针类都一个 explicit 构造函数，该构造函数将指针作为参数。因此不能自动将指针转换为智能指针对象:
+
+shared_ptr<double> pd;
+double *p_reg = new double();
+ps = p_reg;// not allowed(explicit conversion)
+ps = shared_ptr<double>(p_reg);// okay
+
+shared_ptr<double> pshare = p_reg;// not allowed(explicit conversion)
+shared_ptr<double> pshare(p_reg);// okay
+
+
+由于智能指针模板类的定义方式， 智能指针对象的很多方面都类似于常规指针。例如，如果 ps 是一个智能指针对象，则可以对它执行解除引用操作（* ps）、用它来访问结构
+成员(ps->puffIndex) 将它赋给指向相同类型的常规指针。
+
+但在此之前，先说说对全部三种智能指针都应避免的一点：
+
+string vacation("I want lonely as a cloud");
+shared_ptr<string> pvac(vacation); // NO
+
+'pvac 过期时，程序将把 delete 运算符用于非堆内存，这是错误的'。
+
+
+// !! 有关智能指针的注意事项
+
+为何有三种智能指针呢？实际上有 4 种，但本书不讨论 weak_ptr。为何摒弃 auto_ptr 呢?
+
+先来看下面的赋值语句:
+
+
