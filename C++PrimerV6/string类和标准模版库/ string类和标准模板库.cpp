@@ -899,3 +899,52 @@ shared_ptr<int> sus(make_int(rand() % 1000));// okay
 
 // !! 标准模板库
 
+STL 提供了一组表示容器、迭代器、函数对象和算法的模板。
+
+1. 容器是一个与数组类似的单元, 可以存储若干个值。STL 容器是同质的，即存储的值的类型相同
+
+2. 算法是完成特定任务(如对数组进行排序或在链表中查找特定值)的处方
+
+3. 迭代器能够用来遍历容器的对象，与能够遍历数组的指针类似，是广义指针
+
+4. 函数对象是类似于函数的对象, 可以是类对象或函数指针(包括函数名，因为函数名被用作指针)
+
+'STL 使得能够构造各种容器(包括数组、队列和链表)和执行各种操作（包括搜索、排序和随机排列）'。
+
+STL 不是面向对象的编程，而是一种不同的编程模式---泛型编程(generic programming)。这使得 STL 在功能和方法方面都很有趣。
+
+
+// !! 模板类 vector
+
+可以创建 vector 对象，将一个 vector 对象赋给另一个对象，使用 [] 运算符来访问 vector 元素。'要使类成为通用的，应将它设计为模板类'，STL 正是这样做的---
+在头文件 vector 中定义了一个 vector 模板。
+
+要创建 vector 模板对象，可使用通常的 <type> 表示法来指出要使用的类型。另外，vector 模板使用动态内存分配，因此可以用初始化参数来指出需要多少矢量:
+
+#include <vector>
+using namespace std;
+vector<int> ratings(5);
+int n;
+cin>>n;
+vector<double> scores(n);
+
+由于运算符 [] 被重载，因此创建 vector 对象后，可以使用通常的数组表示法来访问各个元素:
+
+ratings[0] = 9;
+for(int i = 1; i <n ; i++)
+{
+    cout << scores[i] << endl;
+}
+
+分配器
+
+'各种 STL 容器模板都接受一个可选的模板参数, 该参数指定使用哪个分配器对象来管理内存'。例如，vector 模板的开头与下面类似:
+
+template <class T, class Allocator = allocator<T> >
+class Vector
+{
+
+};
+
+如果省略该模板参数的值, 则容器模板将默认使用 allocator<T> 类。这个类使用 new 和 delete。
+
