@@ -1517,9 +1517,92 @@ istream_iterator 也使用两个模板参数。第一个参数指出要读取的
 
 // !! 其他有用的迭代器
 
+除了 ostream_iterator 和 istream_iterator 之外，头文件 iterator 还提供了其他一些专用的预定义迭代器类型。它们是 reverse_iterator、back_insert_iterator
+front_insert_iterator 和 insert_iterator。
+
+我们先来看 reverse -iterator 的功能。对 reverse_iterator 执行递增操作将导致它被递减。为什么不直接对常规迭代器进行递减呢？主要原因是为了简化对已有的函数的使
+用。假设要显示 dice 容器的内容，正如刚才介绍的，可以使用 copy() 和 ostream_iterator 来将内容复制到输出流中:
+
+ostream_iterator<int, char> out_iter(cout, " ");
+copy(dice.begin(), dice.end(), out_iter);// display in forward order
+
+现在假设要反向打印容器的内容。vector 类有一个名为 rbegin() 的成员函数和一个名为 rend()的成员函数，前者返回一个指向超尾的反向迭代器，后者返回一个指向第一个元素
+的反向迭代器。因为对迭代器执行递增操作将导致它被递减，所以可以使用下面的语句来反向显示内容:
+
+ostream_iterator<int, char> out_iter(cout, " ");
+copy(dice.rbegin(), dice.rend(), out_iter);// display in reverse order
+
+甚至不必声明反向迭代器。
+
+必须对反向指针做一种特殊补偿。假设 rp 是一个被初始化为 dice.rbegin() 的反转指针。那么 *rp 是什么呢？ 因为 rbegin() 返回超尾，因此不能对该地址进行解引用。
+同样，如果 rend() 是第一个元素的位置, 则 copy() 必须提早一个位置停止，因为区间的结尾处不包括在区间中。
+
+'反向指针通过先递减，再解除引用解决了这两个问题'。即 *rp 将在 *rp 的当前值之前对迭代器执行解除引用。也就是说，如果 rp 指向位置 6，则 *rp 将是位置5的值，依次
+类推。
+
+#include<iostream>
+#include<vector>
+#include<iterator>
+
+int main()
+{
+    using namespace std;
+
+    int casts[10] = {0,1,2,3,4,5,6,7,8,9};
+    vector<int> dice(10);
+    // copy from array to vector
+    copy(casts, casts+10, dice.begin());
+
+    cout << "Let the dice be cast!\n";
+    // create an ostream_iterator
+    ostream_iterator<int, char> out_iter(cout, " ");
+    // copy from vector to ostream_iterator
+    copy(dice.begin(), dice.end(), out_iter);
+
+    cout << endl;
+    cout << "Implicit use of reverse iterator\n";
+    copy(dice.rbegin(), dice.rend(), out_iter);
+
+    cout << endl;
+
+    cout << "Explicit use of reverse iterator\n";
+    vector<int>::reverse_iterator ri;
+    for(ri = dice.rbegin(); ri != dice.rend(); ++ri)
+    {
+        cout << *ri << endl;
+    }
+    cout << endl;
+    return 0;
+}
 
 
 
+// !! 容器种类
+
+STL 具有容器概念和容器类型。'概念是具有名称(如容器、序列容器、关联容器等)的通用类别'; '容器类型是可用于创建具体容器对象的模板'。以前的 11 个容器类型分别
+是 deque、list、queue、priority_queue、stack、vector、map、multimap、set、multiset 和 bitset；C++11 新增了 forward_list、unordered_map、
+unordered_multimap、unordered_set 和 unordered_multiset，且不将 bitset 视为容器，而将其视为一种独立的类别。
+
+// !! 容器概念
+
+没有与基本容器概念对应的类型，但概念描述了所有容器类都通用的元素。它是一个概念化的抽象基类——说它概念化，是因为容器类并不真正使用继承机制。'换句话说，容器概念指
+定了所有 STL 容器类都必须满足的一系列要求'。
+
+1. '容器是存储其他对象的对象'。被存储的对象必须是同一种类型的，它们可以是 OOP 意义上的对象，也可以是内置类型值。存储在容器中的数据为容器所有，这意味着当容器过期
+    时，存储在容器中的数据也将过期(然而，如果数据是指针的话，则它指向的数据并不一定过期)。
+
+2.  '不能将任何类型的对象存储在容器中，具体地说，类型必须是可复制构造的和可赋值的'。基本类型满足这些要求; 只要类定义没有将复制构造函数和赋值运算符声明为私有或保
+     护的，则也满足这种要求
+
+3. 基本容器不能保证其元素都按特定的顺序存储, 也不能保证元素的顺序不变，但对概念进行改进后，则可以增加这样的保证。
 
 
+如果复杂度为编译时间，则操作将在编译时执行，执行时间为 0。固定复杂度意味着操作发生在运行阶段，但独立于对象中的元素数目。线性复杂度意味着时间与元素数目成正比。即如
+果 a 和 b 都是容器，则 a == b 具有线性复杂度，因为 == 操作必须用于容器中的每个元素。实际上，这是最糟糕的情况。如果两个容器的长度不同，则不需要作任何的单独比较。
+
+
+复杂度要求是 STL 特征, 虽然实现细节可以隐藏, 但性能规格应公开, 以便程序员能够知道完成特定操作的计算成本。
+
+
+// !! C++11 新增的容器要求
 
