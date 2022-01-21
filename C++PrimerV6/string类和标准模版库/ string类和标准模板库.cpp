@@ -1836,7 +1836,115 @@ cout << item.first << item.second << endl;
 equal_range() 用键作为参数，且返回两个迭代器，它们表示的区间与该键匹配。为返回两个值，该方法将它们封装在一个 pair 对象中，这里 pair 的两个模板参数都是迭代器。
 
 
+// !! 无序关联容器（C++11）
 
+'无序关联容器是对容器概念的另一种改进'。与关联容器一样，无序关联容器也将值与键关联起来，并使用键来查找值。但底层的差别在于:'关联容器是基于树结构的，而无序关联容器
+是基于数据结构哈希表的，这旨在提高添加和删除元素的速度以及查找算法的效率'。有 4 种无序关联容器，它们是 unordered_set、unordered_multiset、unordered_map
+和 unordered_multimap。
+
+
+
+// !! 函数对象
+
+很多 STL 算法都使用函数对象---也叫函数符(functor)。'函数符是可以以函数方式与 () 结合使用的任意对象'。
+
+这包括函数名、指向函数的指针和重载了()运算符的类对象(即定义了函数 operator()() 的类）。例如，可以像这样定义一个类:
+
+#ifndef A2178979_144D_44E6_93E6_A778A4BF6346
+#define A2178979_144D_44E6_93E6_A778A4BF6346
+
+class Linear
+{
+private:
+    double slope;
+    double y0;
+public:
+    Linear(double s1_ = 0, double y_ = 0):slope(s1_), y0(y_) {}
+    double operator()(double x) {return x*slope + y0;}
+};
+#endif /* A2178979_144D_44E6_93E6_A778A4BF6346 */
+
+
+这样，重载的 () 运算符将使得能够像函数那样使用 Linear 对象:
+
+Linear f1;
+Linear f2(2.5,10.0);
+double y1 = f1(12.5);
+double y2 = f2(0.4);
+
+
+其中 y1 将使用表达式 0 + 1 * 12.5 来计算，y2 将使用表达式 10.0 + 2.5 * 0.4 来计算。在表达式 y0 + slope * x 中，y0 和 slope 的值来自对象的构造函数，
+而 x 的值来自 operator()() 的参数。
+
+还记得函数 for_each 吗？ 它将指定的函数用于区间中的每个成员:
+
+for_each(books.begin(), books.end(),showReview);
+
+通常，第 3 个参数可以是常规函数，也可以是函数符。实际上，这提出了一个问题：如何声明第 3 个参数呢？不能把它声明为函数指针，因为函数指针指定了参数类型。
+
+由于容器可以包含任意类型，所以预先无法知道应使用哪种参数类型。STL 通过使用模板解决了这个问题。for_each 的原型看上去就像这样:
+
+template < class InputIterator, class Function>
+Function for_each(InputIterator first, InputIterator last, Function f);
+
+ShowReview() 的原型如下:
+
+void ShowReview(const Review &rr);
+
+这样，标识符 ShowReview 的类型将为 void(*)(const Review &)，这也是赋给模板参数 Function 的类型。'对于不同的函数调用， Function 参数可以表示具有重载的 
+() 运算符的类类型'。最终，for_each() 代码将具有一个使用 f() 的表达式。在 ShowReview() 示例中，f 是指向函数的指针，而 f() 调用该函数。如果最后的 for_each()
+参数是一个对象，则 f() 将是调用其重载的 () 运算符的对象。
+
+// !! 函数符概念
+
+正如 STL 定义了容器和迭代器的概念一样，它也定义了函数符概念。
+
+1. 生成器(generator)是不用参数就可以调用的函数符
+
+2. 一元函数(unary function)是用一个参数可以调用的函数符
+
+3. 二元函数(binary function)是用两个参数可以调用的函数符
+
+例如，提供给 for_each() 的函数符应当是一元函数，因为它每次用于一个容器元素。
+
+当然，这些概念都有相应的改进版：
+
+1. 返回 bool 值的一元函数是谓词(predicate)
+
+2. 返回 bool 值的二元函数是二元谓词(binary predicate)
+
+一些 STL 函数需要谓词参数或二元谓词参数。
+
+bool worseThan(const Review & r1, const Review & r2);
+sort(books.begin(), books.end(),worseThan);
+
+list 模板有一个将谓词作为参数的 remove_if() 成员，该函数将谓词应用于区间中的每个元素，如果谓词返回 true，则删除这些元素。
+
+例如，下面的代码删除链表 scores 中所有大于 100 的元素:
+
+bool tooBig(int n) { return n > 100; }
+list<int> scores;
+...
+scores.remove_if(tooBig);
+
+最后这个例子演示了类函数符适用的地方。假设要删除另一个链表中所有大于 200 的值。如果能将取舍值作为第二个参数传递给 tooBig()，则可以使用不同的值调用该函数，
+但谓词只能有一个参数。'如果设计一个 TooBig 类，则可以使用类成员而不是函数参数来传递额外的信息':
+
+#ifndef AA54AFB5_903A_4C1E_A3BC_82D053866997
+#define AA54AFB5_903A_4C1E_A3BC_82D053866997
+template <typename T>
+class TooBig
+{
+private:
+    T cutoff;
+public:
+    TooBig(const T &t) : cutoff(t){}
+    bool operator()(const T &v) {return v > cutoff;}
+};
+
+#endif /* AA54AFB5_903A_4C1E_A3BC_82D053866997 */
+
+这里，一个值(V)作为函数参数传递，而第二个参数 (cutoff)是由类构造函数设置的。
 
 
 
