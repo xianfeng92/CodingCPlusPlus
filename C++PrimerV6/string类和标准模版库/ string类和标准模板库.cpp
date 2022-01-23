@@ -2221,6 +2221,245 @@ void show(int v)
 'STL 是一个库，其组成部分协同工作。STL 组件是工具，但也是创建其他工具的基本部件'。
 
 
+假设要编写一个程序，让用户输入单词。希望最后得到一个按输入顺序排列的单词列表、一个按字母顺序排列的单词列表（忽略大小写），并记录每个单词被输入的次数。出于
+简化的目的，假设输入中不包含数字和标点符号。
+
+输入和保存单词列表很简单。
+
+vector<string> words;
+string input;
+while (cin >> input && input != "quit")
+{
+
+}
+
+如何得到按字母顺序排列的单词列表呢？
+
+可以使用 sort()，然后使用 unique()，但这种方法将覆盖原始数据，因为 sort() 是就地算法。
+
+有一种更简单的方法，可以避免这种问题：创建一个 set<string> 对象，然后将矢量中的单词复制(使用插入迭代器)到集合中。集合自动对其内容进行排序，因此无须调用
+sort()；集合只允许同一个键出现一次，因此无须调用 unique()。
+
+这里要求忽略大小写，处理这种情况的方法之一是使用 transform()而不是 copy()，将矢量中的数据复制到集合中。使用一个转换函数将字符串转换成小写形式。
+
+string & ToLower(string &str)
+{
+    transform(str.begin(), str.end(),str.begin(),tolower);
+    return str;
+}
+
+要获得每个单词在输入中出现的次数，可以使用 count() 函数。它将一个区间和一个值作为参数，并返回这个值在区间中出现的次数。
+
+可以使用 vector 对象来提供区间，并使用 set 对象来提供要计算其出现次数的单词列表。即对于集合中的每个词，都计算它在矢量中出现的次数。要将单词与其出现的次数
+关联起来，可将单词和计数作为 pair<const string, int> 对象存储在 map 对象中。单词将作为键（只出现一次），计数作为值。这可以通过一个循环来完成：
+
+map<string, int> wordmap;
+set<string>::iterator si;
+for(si = map.begin(); si != map.end(); si++)
+{
+    wordmap.insert(pair<string, int>(*si, count(words.begin(), words.end(), *si)));
+}
+
+
+map类有一个有趣的特征：可以用数组表示法（将键用作索引）来访问存储的值。例如，wordmap[“the”]表示与键“the”相关联的值，这里是字符串“the”出现的次数。因
+为wordset容器保存了wordmap使用的全部键，所以可以用下面的代码来存储结果，这是一种更具吸引力的方法:
+
+
+for(si = wordset.begin(); si != wordset.end(); ++si)
+{
+    wordmap[*si] = count(words.begin(), words.end(), *si);
+}
+
+
+因为 si 指向 wordset 容器中的一个字符串，所以 *si 是一个字符串，可以用作 wordmap 的键。
+
+
+
+这里的寓意在于，'使用 STL 时应尽可能减少要编写的代码。STL 通用、灵活的设计将节省大量工作'。另外，STL 设计者就是非常关心效率的算法人员，算法是经过仔细选
+择的，并且是内联的。
+
+
+// !! vector、valarray 和 array
+
+C++ 为何提供三个数组模板 vector、valarray 和 array。这些类是由不同的小组开发的，用于不同的目的。
+
+1. 'vector 模板类是一个容器类和算法系统的一部分'，它支持面向容器的操作，如排序、插入、重新排列、搜索、将数据转移到其他容器中等。
+
+2. valarray 类模板是面向数值计算的，不是 STL 的一部分。例如，它没有 push_back()和 insert()方法，但为很多数学运算提供了一个简单、直观的接口
+
+3. 'array 是为替代内置数组而设计的，它通过提供更好、更安全的接口，让数组更紧凑，效率更高'。Array 表示长度固定的数组，因此不支持 push_back() 和 
+    insert()，但提供了多个 STL 方法，包括 begin()、end()、rbegin()和rend()，这使得很容易将 STL 算法用于 array 对象。
+
+例如，假设有如下声明：
+
+vector<double> ved1(10), ved2(10), ved3(10)；
+array<double,10> vod1, vod2, vod3;
+valarray<double> vad1(10), vad2(10), vad3(10);
+
+
+同时，假设 ved1、ved2、vod1、vod2、vad1 和 vad2 都有合适的值。要将两个数组中第一个元素的和赋给第三个数组的第一个元素，使用 vector 类时，可以这样
+做：
+
+transform(ved1.begin(), ved1.end(),ved2.begin(),ved3.begin(),plus<double>());
+
+
+对于 array 类，也可以这样做:
+
+transform(vod1.begin(),vod1.end(),vod2.begin(),vod3.begin(),plus<double>());
+
+然而，'valarray 类重载了所有算术运算符，使其能够用于 valarray 对象'，因此您可以这样做:
+
+vad3 = val1 + vad2;// + overload
+
+同样，下面的语句将使 vad3 中每个元素都是 vad1 和 vad2 中相应元素的乘积：
+
+vad3 = vad1 * vad2;// * overload
+
+要将数组中每个元素的值扩大 2.5 倍，STL 方法如下:
+
+transform(vad3.begin(), vad3.end(), vad3.begin(),bind1st(multiplies<double>(),2.5));
+
+valarray 类重载了将 valarray 对象乘以一个值的运算符，还重载了各种组合赋值运算符，因此可以采取下列两种方法之一:
+
+vad3 = vad3 * 2.5; //
+vad3 *= 2.5; //
+
+
+假设您要计算数组中每个元素的自然对数，并将计算结果存储到另一个数组的相应元素中，STL 方法如下：
+
+transform(ved1.begin(),ved2.begin(),ved3.begin(),log);
+
+valarray 类重载了这种数学函数，使之接受一个valarray参数，并返回一个valarray对象，因此您可以这样做：
+
+ved3 = log(ved3);
+
+
+valarray 类还提供了方法 sum()（计算valarray对象中所有元素的和）、size()（返回元素数）、max()（返回最大的元素值）和 min()（返回最小的元素值）。
+
+
+正如您看到的，'对于数学运算而言，valarray 类提供了比 vector 更清晰的表示方式，但通用性更低'。
+
+valarray 的接口更简单是否意味着性能更高呢？
+
+在大多数情况下，答案是否定的。简单表示法通常是使用类似于您处理常规数组时使用的循环实现的。
+
+可以将 STL 功能用于 valarray 对象吗？
+
+通过回答这个问题，可以快速地复习一些 STL 原理。假设有一个包含 10 个元素的 valarray<double> 对象：
+
+valarray<double> vad(10);
+
+使用数字填充该数组后，能够将 STL sort() 函数用于该数组吗？
+
+valarray 类没有 begin() 和 end()方法，因此不能将它们用作指定区间的参数：
+
+sort(vad.begin(), vad.end());// No, no begin(), end()
+
+另外，vad 是一个对象，而不是指针，因此不能像处理常规数组那样，使用 vad 和 vad + 10 作为区间参数，即下面的代码不可行:
+
+sort(vad, vad + 10);// No,vad is object no address
+
+可以使用地址运算符：
+
+sort(&vad[0], &vad[10]);// Maybe ?
+
+'但 valarray 没有定义下标超过尾部一个元素的行为'。这并不一定意味着使用 &vadp[10] 不可行。事实上，使用 6 种编译器测试上述代码时，都是可行的；但这确实
+意味着可能不可行。为让上述代码不可行，需要一个不太可能出现的条件，如让数组与预留给堆的内存块相邻。然而，如果 3.85 亿元的交易命悬于您的代码，您可能不想冒
+代码出现问题的风险。
+
+为解决这种问题，C++11 提供了接受 valarray 对象作为参数的模板函数 begin() 和 end()。因此，您将使用 begin(vad) 而不是 vad.begin。这些函数返回的值
+满足 STL 区间需求:
+
+sort(begin(vad), end(vad));// C++ 11 fixed
+
+
+
+
+// !! 模板 initializer_list（C++11）
+
+模板 initializer_list 是 C++11 新增的。您可使用初始化列表语法将 STL 容器初始化为一系列值:
+
+
+std::vector<double> payments = {11.21,23.4,45.54,67.21};
+
+这将创建一个包含 4 个元素的容器，并使用列表中的 4 个值来初始化这些元素。这之所以可行，是因为容器类现在包含将 initializer_list<T> 作为参数的构造函数。
+
+
+例如，vector<double> 包含一个将 initializer_list<double> 作为参数的构造函数，因此上述声明与下面的代码等价:
+
+
+std::vector<double> payments({11.21,23.4,45.54,67.21});
+
+
+这里显式地将列表指定为构造函数参数。
+
+
+'除非类要用于处理长度不同的列表, 否则让它提供接受 initializer_list 作为参数的构造函数没有意义'。
+
+
+#ifndef B18834E3_5536_4B67_8898_500B7914710D
+#define B18834E3_5536_4B67_8898_500B7914710D
+
+class Position
+{
+private:
+    int x;
+    int y;
+    int z;
+public:
+    Position(int x, int y, int z)::x(x), y(y), z(z){ }
+    ...
+    // no initializer_list constructor
+};
+
+#endif /* B18834E3_5536_4B67_8898_500B7914710D */
+
+
+// !! 使用 initializer_list
+
+要在代码中使用 initializer_list 对象，必须包含头文件 initializer_list。这个模板类包含成员函数 begin()和end()，您可使用这些函数来访问列表元素
+它还包含成员函数 size()，该函数返回元素数。
+
+
+//!! 总结
+
+'C++ 提供了一组功能强大的库，这些库提供了很多常见编程问题的解决方案以及简化其他问题的工具'。
+
+
+1. string 类为将字符串作为对象来处理提供了一种方便的方法。string 类提供了自动内存管理功能以及众多处理字符串的方法和函数。例如，这些方法和函数让您能够
+   合并字符串，将一个字符串插入另一个字符串中，反转字符串，在字符串中搜索字符或子字符串，以及执行输入和输出操作。
+
+2. 诸如 auto_ptr 以及 C++11 新增的 shared_ptr 和 unique_ptr 等智能指针模板使得管理由 new 分配的内存更容易。如果使用这些智能指针(而不是常规指针)
+   来保存 new 返回的地址，则不必在以后使用删除运算符。'智能指针对象过期时，其析构函数将自动调用 delete 运算符'。
+
+3. STL 是一个容器类模板、迭代器类模板、函数对象模板和算法函数模板的集合，它们的设计是一致的，都是基于泛型编程原则的。算法通过使用模板，从而独立于所存储的
+   对象的类型；通过使用迭代器接口, 从而独立于容器的类型。'迭代器是广义指针'。
+
+4. STL 使用术语“概念”来描述一组要求。例如，正向迭代器的概念包含这样的要求，即正向迭代器能够被解除引用，以便读写，同时能够被递增。'概念真正的实现方式被称为
+   概念的“模型”'。例如，正向迭代器概念可以是常规指针或导航链表的对象。基于其他概念的概念叫作“改进”。例如，双向迭代器是正向迭代器概念的改进。
+
+诸如 vector 和 set 等容器类是容器概念(如容器、序列和关联容器)的模型。STL 定义了多种容器类模板——vector、deque、list、set、multiset、map、multimap
+和 bitset；'还定义了适配器类模板 queue、priority_queue 和 stack'; 这些类让底层容器类能够提供适配器类模板名称所建议的特性接口。
+'因此，stack 虽然在默认情况下是基于 vector 的，但仍只允许在栈顶进行插入和删除'。
+
+有些算法被表示为容器类方法，但大量算法都被表示为通用的、非成员函数，这是通过将迭代器作为容器和算法之间的接口得以实现的。这种方法的一个优点是：只需一个诸如
+for_each() 或 copy()这样的函数，而不必为每种容器提供一个版本；另一个优点是：STL 算法可用于非 STL 容器，如常规数组、string对象、array对象以及您设计
+的秉承 STL 迭代器和容器规则的任何类。
+
+
+5. '容器和算法都是由其提供或需要的迭代器类型表征的'。应当检查容器是否具备支持算法要求的迭代器概念。例如，for_each() 算法使用一个输入迭代器，所有的 STL 
+    容器类类型都满足其最低要求；而 sort() 则要求随机访问迭代器，并非所有的容器类都支持这种迭代器。
+
+
+6. STL 还提供了函数对象(函数符)，函数对象是重载了 () 运算符(即定义了 operator()() 方法) 的类。可以使用函数表示法来调用这种类的对象，同时可以携带额外
+   的信息。自适应函数符有 typedef 语句，这种语句标识了函数符的参数类型和返回类型。这些信息可供其他组件（如函数适配器）使用。
+
+
+'通过表示常用的容器类型，并提供各种使用高效算法实现的常用操作，STL 提供了一个非常好的可重用代码源。可以直接使用 STL 工具来解决编程问题，也可以把它们作为
+基本部件，来构建所需的解决方案'。
+
+
+模板类 complex 和 valarray 支持复数和数组的数值运算。
 
 
 
