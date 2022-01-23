@@ -1948,4 +1948,280 @@ public:
 
 
 
+// !! 预定义的函数符
+
+STL 定义了多个基本函数符，它们执行诸如将两个值相加、比较两个值是否相等操作。提供这些函数对象是为了支持将函数作为参数的 STL 函数。
+
+例如，考虑函数 transform()。它有两个版本。第一个版本接受 4 个参数，前两个参数是指定容器区间的迭代器，第 3 个参数是指定将结果复制到哪里的迭代器，最后一
+个参数是一个函数符，它被应用于区间中的每个元素，生成结果中的新元素。例如，请看下面的代码:
+
+const int LIM = 5;
+double arr[LIM] = {1,2,3,4,5};
+vector<double> gr8(arr,arr + LIM);
+ostream_iterator<double, char> out(cout, " ");
+transform(gr8.begin(), gr8.end(),out,sqrt);
+
+上述代码计算每个元素的平方根，并将结果发送到输出流。目标迭代器可以位于原始区间中。例如，将上述示例中的 out 替换为 gr8.begin() 后，新值将覆盖原来的值。
+很明显，使用的函数符必须是接受单个参数的函数符。
+
+第 2 种版本使用一个接受两个参数的函数，并将该函数用于两个区间中元素。它用另一个参数（即第 3 个）标识第二个区间的起始位置。例如，如果 m8 是另一个
+vector<double> 对象，mean（double，double）返回两个值的平均值，则下面的代码将输出来自 gr8 和 m8 的值的平均值:
+
+transform(gr8.begin(), gr8.end(),m8.begin(),out,mean);
+
+现在假设要将两个数组相加。不能将 +  作为参数，因为对于类型 double 来说，+ 是内置的运算符，而不是函数。可以定义一个将两个数相加的函数，然后使用它:
+
+double add(double x, double y)
+{
+    return x + y;
+}
+
+...
+transform(gr8.begin(), gr8.end(),m8.begin(),out,add);
+
+然而，这样必须为每种类型单独定义一个函数。
+
+更好的办法是定义一个模板(STL 已经有一个模板了，这样就不必定义)。'头文件 functional(以前为 function.h)定义了多个模板类函数对象，其中包括 plus< >()'。
+
+可以用 plus<> 类来完成常规的相加运算:
+
+#include<functional>
+
+plus<double> add;// create a plus<double> object
+double y = add(1.0,2.3);// using plus<double>::iterator()()
+
+它使得将函数对象作为参数很方便:
+
+transform(gr8.begin(), gr8.end(),m8.begin(),out,plus<double>());
+
+这里，代码没有创建命名的对象，而是用 plus<double> 构造函数构造了一个函数符，以完成相加运算(括号表示调用默认的构造函数，传递给 transform() 的是构造出来
+的函数对象)。
+
+
+'对于所有内置的算术运算符、关系运算符和逻辑运算符，STL 都提供了等价的函数符'。
+
+
+// !! 自适应函数符和函数适配器
+
+STL 提供了使用这些工具的函数适配器类。例如，假设要将矢量 gr8 的每个元素都增加 2.5 倍，则需要使用接受一个一元函数参数的 transform() 版本，就像前面的例子
+那样：
+
+transform(gr8.begin(), gr8.end(),m8.begin(),out,sqrt);
+
+multiplies() 函数符可以执行乘法运行，但它是二元函数。因此需要一个函数适配器，将接受两个参数的函数符转换为接受 1 个参数的函数符。
+
+来看 binder1st。假设有一个自适应二元函数对象 f2()，则可以创建一个 binder1st  对象，该对象与一个将被用作 f2()的第一个参数的特定值(val)相关联:
+
+binder1st(f2,val) f1;
+
+这样，使用单个参数调用 f1(x) 时，返回的值与将 val 作为第一参数、将 f1() 的参数作为第二参数调用 f2() 返回的值相同。'即 f1(x) 等价于 f2(val, x)，只是
+前者是一元函数，而不是二元函数'。f2() 函数被适配。同样，仅当 f2() 是一个自适应函数时，这才能实现。
+
+
+看上去有点麻烦。然而，STL 提供了函数 bind1st()，以简化 binder1st 类的使用。可以问其提供用于构建 binder1st 对象的函数名称和值，它将返回一个这种类型的
+对象。例如，要将二元函数 multiplies() 转换为将参数乘以 2.5 的一元函数，则可以这样做:
+
+bind1st(multiplies(),2.5);
+
+因此，将 gr8 中的每个元素与 2.5 相乘，并显示结果的代码如下:
+
+transform(gr8.begin(), gr8.end(),out, bind1st(multiplies(),2.5));
+
+
+binder2nd 类与此类似，只是将常数赋给第二个参数，而不是第一个参数。
+
+'C++11 提供了函数指针和函数符的替代品----lambda 表达式'
+
+
+// !! 算法
+
+STL 包含很多处理容器的非成员函数，前面已经介绍过其中的: sort()、copy()、find()、random_shuffle()、set_union()、set_intersection()、
+set_difference() 和 transform()。可能已经注意到，它们的总体设计是相同的，'都使用迭代器来标识要处理的数据区间和结果的放置位置'。有些函数还接受一
+个函数对象参数, 并使用它来处理数据。
+
+
+'对于算法函数设计，有两个主要的通用部分'。
+
+1. 首先，它们都'使用模板来提供泛型'
+
+2. 其次，它们都'使用迭代器来提供访问容器中数据的通用表示'
+
+因此，copy() 函数可用于将 double 值存储在数组中的容器、将 string 值存储在链表中的容器，也可用于将用户定义的对象存储在树结构中(如 set 所使用的)
+的容器。因为指针是一种特殊的迭代器，所以诸如 copy() 等 STL 函数可用于常规数组。
+
+'统一的容器设计使得不同类型的容器之间具有明显关系'。例如，可以使用 copy()将常规数组中的值复制到 vector 对象中，将 vector 对象中的值复制到 list 对象
+中，将 list 对象中的值复制到 set 对象中。可以用 == 来比较不同类型的容器，如 deque 和 vector。之所以能够这样做，是因为容器重载的 == 运算符使用迭代器
+来比较内容，因此如果 deque 对象和 vector 对象的内容相同，并且排列顺序也相同，则它们是相等的。
+
+
+// !!算法组
+
+STL 将算法库分成 4 组:
+
+1. 非修改式序列操作
+2. 修改式序列操作
+3. 排序和相关操作
+4. 通用数字运算
+
+前 3 组在头文件 algorithm 中描述，第 4 组是专用于数值数据的, 有自己的头文件，称为 numeric 。
+
+1. 非修改式序列操作对区间中的每个元素进行操作。这些操作不修改容器的内容。例如，find()和for_each()就属于这一类
+
+2. 修改式序列操作也对区间中的每个元素进行操作。然而，顾名思义，它们可以修改容器的内容。可以修改值，也可以修改值的排列顺序。transform()、
+   random_shuffle()和 copy()属于这一类
+
+3. 排序和相关操作包括多个排序函数（包括 sort()）和其他各种函数，包括集合操作
+
+4. 数字操作包括将区间的内容累积、计算两个容器的内部乘积、计算小计、计算相邻对象差的函数。通常，这些都是数组的操作特性，因此 vector 是最有可能使用这些操
+   作的容器。
+
+
+// !! 算法的通用特征
+
+STL 函数使用迭代器和迭代器区间, '从函数原型可知有关迭代器的假设'。例如，copy() 函数的原型如下:
+
+template<class InputIterator, class OutputIterator>
+OutputIterator copy(InputIterator first, InputIterator last, OutputIterator result);
+
+因为标识符 InputIterator 和 OutputIterator 都是模板参数，所以它们就像 T 和 U 一样。然而，'STL 文档使用模板参数名称来表示参数模型的概念'。因此上述
+声明告诉我们，区间参数必须是输入迭代器或更高级别的迭代器，而指示结果存储位置的迭代器必须是输出迭代器或更高级别的迭代器。
+
+'对算法进行分类的方式之一是按结果放置的位置进行分类'。
+
+有些算法就地完成工作, 有些则创建拷贝。
+
+1. sort() 函数完成时，结果被存放在原始数据的位置上，因此，sort() 是就地算法(in-place algorithm)
+
+2. copy() 函数将结果发送到另一个位置，所以它是复制算法(copying algorithm)
+
+transform() 函数可以以这两种方式完成工作。与 copy() 相似，它使用输出迭代器指示结果的存储位置；与 copy() 不同的是，transform() 允许输出迭代器指向
+输入区间，因此它可以用计算结果覆盖原来的值。
+
+有些算法有两个版本---就地版本和复制版本。STL 的约定是，复制版本的名称将以 _copy 结尾。复制版本将接受一个额外的输出迭代器参数，该参数指定结果的放置位置。
+例如，函数 replace() 的原型如下:
+
+template <class ForwardIterator, class T>
+void replace(ForwardIterator first, ForwardIterator last, const T& old_value, const T& new_value);
+
+
+它将所有的 old_value 替换为 new_value，这是就地发生的。由于这种算法同时读写容器元素，因此迭代器类型必须是 ForwardIterator 或更高级别的。复制版本的
+原型如下:
+
+template <class InputIterator, class OutputIterator, class T>
+OutputIterator replace_copy(InputIterator first, InputIterator last, OutputIterator result, const T& old_value, const T& new_value);
+
+在这里，结果被复制到 result 指定的新位置，因此对于指定区间而言，只读输入迭代器足够了。
+
+注意，replace_copy() 的返回类型为 OutputIterator。'对于复制算法，统一的约定是：返回一个迭代器，该迭代器指向复制的最后一个值后面的一个位置'。
+
+
+'有些函数有这样的版本，即根据将函数应用于容器元素得到的结果来执行操作'。这些版本的名称通常以 _if 结尾。例如，如果将函数用于旧值时，返回的值为 true，则 
+replace_if() 将把旧值替换为新的值。下面是该函数的原型:
+
+template <class ForwardIterator, class Predicate, class T>
+void replace_if(ForwardIterator first, ForwardIterator last, Predicate pred, const T& new_value);
+
+如前所述，谓词是返回 bool 值的一元函数。
+
+与 InputIterator 一样，Predicate 也是模板参数名称，可以为 T 或 U。'然而，STL 选择用 Predicate 来提醒用户，实参应模拟 Predicate 概念'。
+
+// !! STL 和 string 类
+
+string 类虽然不是 STL 的组成部分，但设计它时考虑到了 STL。例如，它包含 begin()、end()、rbegin() 和 rend()等成员，因此可以使用 STL 接口。
+next_permutation() 算法将区间内容转换为下一种排列方式。
+
+#include<iostream>
+#include<string>
+#include<algorithm>
+
+int main()
+{
+    using namespace std;
+    string letters;
+    cout << "Enter a letter grouping(quit to quit): ";
+    while (cin >> letters && letters != "quit")
+    {
+        cout << "premutations of " << letters << endl;
+        sort(letters.begin(), letters.end());
+        cout << letters << endl;
+        while(next_permutation(letters.begin(), letters.end))
+        {
+            cout << letters << endl;
+        }
+        cout << "Enter next sequence(quit to quit): ";
+    }
+    cout << "Done.\n";
+    return 0;
+}
+
+
+
+// !! 函数和容器方法
+
+有时可以选择使用 STL 方法或 STL 函数。'通常方法是更好的选择'。首先，它更适合于特定的容器；其次，作为成员函数，它可以使用模板类的内存管理工具，从而在需要
+时调整容器的长度。
+
+例如，假设有一个由数字组成的链表，并要删除链表中某个特定值（例如 4）的所有实例。如果 la 是一个 list<int> 对象，则可以使用链表的 remove() 方法:
+
+la.remove(4);
+
+调用该方法后，链表中所有值为 4 的元素都将被删除，同时链表的长度将被自动调整。
+
+还有一个名为 remove() 的STL算法，它不是由对象调用，而是接受区间参数。因此，如果 lb 是一个 list<int> 对象，则调用该函数的代码如下:
+
+remove(lb.begin(), lb.end(), 4);
+
+然而，由于该 remove() 函数不是成员，因此不能调整链表的长度。它将没被删除的元素放在链表的开始位置，并返回一个指向新的超尾值的迭代器。这样，便可以用该迭代
+器来修改容器的长度。例如，可以使用链表的 erase() 方法来删除一个区间，该区间描述了链表中不再需要的部分。
+
+#include<iostream>
+#include<list>
+#include<algorithm>
+
+void show(int);
+
+const int LIM = 10;
+
+int main()
+{
+    using namespace std;
+    int ar[LIM] = {1,2,3,4,5,6,7,8,9,10};
+    list<int> la(ar, ar + LIM);
+    list<int> lb(la);
+
+    cout << "Original list content:\n\t";
+    for_each(la.begin(), la.end(),show);
+    cout << endl;
+    la.remove(4);
+    cout << "After using remove method:\n\t";
+    for_each(la.begin(), la.end(),show);
+    cout << endl;
+    list<int>::iterator last;
+    last = remove(lb.begin(), lb.end(),4);
+    cout << "After using remove function:\n";
+    cout << "lb:\t";
+    for_each(lb.begin(), lb.end(),show);
+    cout << endl;
+    la.erase(last, lb.end());
+    cout << "After using erase method\n";
+    cout << "la\t";
+    for_each(la.begin(), la.end(),show);
+    cout << endl;
+    return 0;
+}
+
+void show(int v)
+{
+    std::cout << v << ' ';
+}
+
+
+// !! 使用 STL
+
+'STL 是一个库，其组成部分协同工作。STL 组件是工具，但也是创建其他工具的基本部件'。
+
+
+
+
+
 
