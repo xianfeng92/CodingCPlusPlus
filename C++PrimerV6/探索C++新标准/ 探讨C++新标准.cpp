@@ -271,7 +271,177 @@ double x = b;// not allowed
 x = double(b);// explicit conversion, allowed
 
 
-2. 类内成员初始化
+2. '类内成员初始化'
+
+很多首次使用 C++ 的用户都会问：“为何不能在类定义中初始化成员？”
+
+现在可以这样做了，其语法类似于下面这样:
+
+class Session
+{
+private:
+    int mem1 = 10;
+    double mem2{12321};
+    short mem3;
+public:
+    Session();
+    Session(short s):mem3(s) {}
+    Session(int n, double d, short s):mem1(n), mem2(d), mem3(s){}
+    ...
+};
+
+'使用类内初始化可避免在构造函数中编写重复的代码, 从而减少程序员的工作量、厌倦情绪和出错的机会'。如果构造函数在成员初始化列表中提供了相应的值，这些默认值
+将被覆盖, 因此第三个构造函数覆盖了'类内成员初始化'。
+
+// !! 模板和 STL 方面的修改
+
+为改善模板和标准模板库的可用性，C++11 做了多个改进; 有些是库本身，有些与易用性相关。
+
+1. 基于范围的 for 循环
+
+对于内置数组以及包含方法 begin() 和 end() 的类(如 std::string)和 STL 容器，'基于范围的 for 循环可简化为它们编写循环的工作'。
+
+这种循环对数组或容器中的每个元素执行指定的操作:
+
+double prices[5] = {0.0, 1.0, 2.0, 3.0,42.3};
+for(double x: prices)
+{
+    std::cout << x << std::endl;
+}
+
+其中，x 将依次为 prices 中每个元素的值。x 的类型应与数组元素的类型匹配。一种更容易、更安全的方式是，使用 auto 来声明 x，这样编译器将根据 prices 声明中
+的信息来推断 x 的类型:
+
+double prices[5] = {0.0, 1.0, 2.0, 3.0,42.3};
+for(auto x: prices)
+{
+    std::cout << x << std::endl;
+}
+
+如果要在循环中修改数组或容器的每个元素, 可使用引用类型:
+
+std::vector<int> vi(6);
+for(auto &x: vi)
+{
+    x = std::rand();
+}
+
+
+2. 新的 STL 容器
+
+C++11 新增了 STL 容器 forward_list、unordered_map、unordered_multimap、unordered_set 和 unordered_multiset。容器 forward_list 是一种单向
+链表，只能沿一个方向遍历；与双向链接的 list 容器相比，它更简单，在占用存储空间方面更经济。其他四种容器都是使用哈希表实现的。
+
+C++11 还新增了模板 array 。要实例化这种模板，可指定元素类型和固定的元素数：
+
+std::array<int,360> ar;// array of 360 ints
+
+这个模板类没有满足所有的常规模板需求。例如，由于长度固定，您不能使用任何修改容器大小的方法，如 put_back()。但 array 确实有方法 begin()和end()，这让您能
+够对 array 对象使用众多基于范围的 STL 算法。
+
+
+3. 新的 STL 方法
+
+C++11 新增了 STL 方法 cbegin()和cend()。与 begin()和 end()一样，这些新方法也返回一个迭代器，指向容器的第一个元素和最后一个元素的后面，因此可用于指定
+包含全部元素的区间。'另外，这些新方法将元素视为 const'。
+
+
+4. valarray 升级
+
+模板 valarray 独立于 STL 开发的，其最初的设计导致无法将基于范围的 STL 算法用于 valarray 对象。C++11 添加了两个函数（begin( )和end( )），它们都接受
+valarray 作为参数，并返回迭代器，这些迭代器分别指向 valarray 对象的第一个元素和最后一个元素后面。
+
+
+5. 摒弃 export
+
+C++98 新增了关键字 export，旨在提供一种途径，让程序员能够将模板定义放在接口文件和实现文件中，其中前者包含原型和模板声明，而后者包含模板函数和方法的定义。
+实践证明这不现实，因此 C++11 终止了这种用法，但仍保留了关键字 export，供以后使用。
+
+6. 尖括号
+
+为避免与运算符 >> 混淆，C++ 要求在声明嵌套模板时使用空格将尖括号分开:
+
+std::vector<std::list<int> > v1; // >> not ok
+
+C++11 不再这样要求：
+
+std::vector<std::list<int>> v1; // >> ok in C++ 11
+
+
+// !! 右值引用
+
+传统的 C++ 引用(现在称为左值引用)使得标识符关联到左值。左值是一个表示数据的表达式(如变量名或解除引用的指针)，程序可获取其地址。最初，左值可出现在赋值语句
+的左边，但修饰符 const 的出现使得可以声明这样的标识符，即不能给它赋值，但可获取其地址:
+
+int n;
+int *pt = new int;
+const int b = 101;
+int &rn = n;
+int &rt = *pt;
+const int &rb = b;
+
+'C++11 新增了右值引用，这是使用 && 表示的'。右值引用可关联到右值，即可出现在赋值表达式右边，但不能对其应用地址运算符的值。右值包括字面常量(C-风格字符串除
+外，它表示地址)、诸如 x + y 等表达式以及返回值的函数(条件是该函数返回的不是引用):
+
+int x = 10;
+int y = 23;
+int &&r1 = 13;
+int &&r2 = x + y;
+double &&r3 = std::sqrt(2.0);
+
+注意，r2 关联到的是当时计算 x + y 得到的结果。也就是说，r2 关联到的是 23，即使以后修改了 x 或 y，也不会影响到 r2。
+
+有趣的是，'将右值关联到右值引用导致该右值被存储到特定的位置，且可以获取该位置的地址'。也就是说，虽然不能将运算符 & 用于 13，但可将其用于 r1。通过将数据与
+特定的地址关联，使得可以通过右值引用来访问该数据。
+
+'引入右值引用的主要目的之一是实现移动语义'。
+
+
+// !! 移动语义和右值引用
+
+C++11 支持移动语义，这就提出了一些问题: 什么是移动语义？ C++11 如何支持它？ 为何需要移动语义？
+
+
+1. 为何需要移动语义
+
+先来看 C++11 之前的复制过程。假设有如下代码:
+
+vector<std::string> vstr;
+// build up a vector of 20000 strings, each of 10000 characters
+...
+vector<std::string> vstr_copy(vstr);// make vstr_copy a copy of vstr
+
+vector 和 string 类都使用动态内存分配，因此它们必须定义使用某种 new 版本的复制构造函数。为初始化对象 vstr_copy1，复制构造函数 vector<string> 将使用
+new 给 20000 个 string 对象分配内存，而每个 string 对象又将调用 string 的复制构造函数，该构造函数使用 new 为 1000 个字符分配内存。接下来，20000000
+个字符都将从 vstr 控制的内存中复制到 vstr_copy1 控制的内存中。这里的工作量很大，但只要妥当就行。
+
+但这确实妥当吗？有时候答案是否定的。例如，假设有一个函数，它返回一个 vector<string> 对象:
+
+vector<string> allcaps(const vector<string> &vs)
+{
+    vector<string> temp;
+    // code the store an all-uppercase version of vs in temp
+    return temp;
+}
+
+接下来，假设以下面这种方式使用它:
+
+vector<string> vstr;
+//  build up a vector of 20000 strings, each of 10000 characters 
+vector<string> vstr_copy1(vstr); // #1
+vector<string> vstr_copy2(allcaps(vstr)); // #2
+
+从表面上看，语句 #1 和 #2 类似，它们都使用一个现有的对象初始化一个 vector<string> 对象。
+
+这类似于在计算机中移动文件的情形: 实际文件还留在原来的地方，而只修改记录。这种方法被称为移动语义(move semantics)。有点悖论的是，移动语义实际上避免了移
+动原始数据，而只是修改了记录。
+
+'要实现移动语义，需要采取某种方式，让编译器知道什么时候需要复制，什么时候不需要'。
+
+这就是右值引用发挥作用的地方。可定义两个构造函数。其中一个是常规复制构造函数，它使用 const 左值引用作为参数，这个引用关联到左值实参，如语 句#1 中的vstr；
+另一个是移动构造函数，它使用右值引用作为参数，该引用关联到右值实参，如语句 #2 中 allcaps(vstr) 的返回值。'复制构造函数可执行深复制，而移动构造函数只调整
+记录'。在将所有权转移给新对象的过程中，移动构造函数可能修改其实参，这意味着右值引用参数不应是const。
+
 
 
 
