@@ -442,6 +442,375 @@ vector<string> vstr_copy2(allcaps(vstr)); // #2
 另一个是移动构造函数，它使用右值引用作为参数，该引用关联到右值实参，如语句 #2 中 allcaps(vstr) 的返回值。'复制构造函数可执行深复制，而移动构造函数只调整
 记录'。在将所有权转移给新对象的过程中，移动构造函数可能修改其实参，这意味着右值引用参数不应是const。
 
+其中最重要的是复制构造函数和移动构造函数的定义。
+
+首先来看复制构造函数:
+
+Useless::Useless(const Useless & f):n(f.n)
+{
+    ++ct;
+    cout "Copy constrctor called, number of objects " << ct << endl;
+    pc = new char[n];
+    for(int i = 0; i < n; i++)
+    {
+        pc[i] = f.pc[i];
+    }
+    showObject();
+}
+
+它执行深复制，是下面的语句将使用的构造函数:
+
+Useless two = one;// copy constructor
+
+引用 f 将指向左值对象 one。
+
+接下来看移动构造函数:
+
+Useless::Useless(Useless && f):n(f.n)
+{
+    ++ct;
+    cout << "Move constrctor called, number of objects" << ct << endl;
+    pc = f.pc;
+    f.pc = nullptr;
+    f.n = 0;
+    showObject();
+}
+
+'它让 pc 指向现有的数据，以获取这些数据的所有权'。此时，pc 和 f.pc 指向相同的数据，调用析构函数时这将带来麻烦，因为程序不能对同一个地址调用 delete [] 
+两次。为避免这种问题，该构造函数随后将原来的指针设置为空指针，因为对空指针执行 delete[] 没有问题。这种夺取所有权的方式常被称为窃取(pilfering)。
+
+在下面的语句中，将使用这个构造函数：
+
+Useless four(one + three);// move constructor
+
+表达式 one + three 调用 Useless::operator+()，而右值引用 f 将关联到该方法返回的临时对象。
+
+
+// !! 移动构造函数解析
+
+虽然使用右值引用可支持移动语义, 但这并不会神奇地发生。要让移动语义发生，需要两个步骤。
+
+1. 首先，右值引用让编译器知道何时可使用移动语义:
+
+Useless two = one;// match Useless(const Useless &f);
+Useless four(one + three);//match Useless(Useless &&f);
+
+对象 one 是左值，与左值引用匹配，而表达式 one + three 是右值，与右值引用匹配。因此，'右值引用让编译器使用移动构造函数来初始化对象 four'。
+
+2. 实现移动语义的第二步是，编写移动构造函数, 使其提供所需的行为。
+
+总之，通过提供一个使用左值引用的构造函数和一个使用右值引用的构造函数, 将初始化分成了两组。'使用左值对象初始化对象时，将使用复制构造函数，而使用右值对象初始
+化对象时，将使用移动构造函数'。程序员可根据需要赋予这些构造函数不同的行为。
+
+在 C++98 中，下面的语句将调用复制构造函数:
+
+Useless four(one + three);
+
+但左值引用不能指向右值。结果将如何呢？ 如果实参为右值，const 引用形参将指向一个临时变量:
+
+int twice(const &rv)
+{
+    return 2 * rv;
+}
+
+...
+
+int main()
+{
+    int m = 6;
+    // below, rv refers to m
+    int n = twice(m);
+
+    // below, rv refers to a temporary variable initialized 21
+    int k = twice(21);
+    return 0;
+}
+
+就 Useless 而言，形参 f 将被初始化一个临时对象，而该临时对象被初始化为 operator+() 返回的值。
+
+
+// !! 赋值
+
+'适用于构造函数的移动语义考虑也适用于赋值运算符'。例如，下面演示了如何给 Useless 类编写复制赋值运算符和移动赋值运算符:
+
+
+// !! 强制移动
+
+移动构造函数和移动赋值运算符使用右值。如果要让它们使用左值，该如何办呢？ 
+
+例如，程序可能分析一个包含候选对象的数组，选择其中一个对象供以后使用，并丢弃数组。如果可以使用移动构造函数或移动赋值运算符来保留选定的对象，那该多好啊！然
+而，假设您试图像下面这样做:
+
+Useless choices[10];
+Useless best;
+int pick;
+...// select one object, set pick to index
+best = choices[pick];
+
+由于 choices[pick] 是左值，因此上述赋值语句将使用复制赋值运算符，而不是移动赋值运算符。但如果能让 choices[pick] 看起来像右值，便将使用移动赋值运算符。
+为此，可使用运算符 static_cast<> 将对象的类型强制转换为 Useless &&，'C++11 提供了一种更简单的方式—使用头文件 utility 中声明的函数 std::move()'。
+
+'对大多数程序员来说, 右值引用带来的主要好处并非让他们能够编写使用右值引用的代码，而是能够使用利用右值引用实现移动语义的库代码'。。例如，STL 类现在都有复制
+构造函数、移动构造函数、复制赋值运算符和移动赋值运算符。
+
+
+// !! 新的类功能
+
+// !! 特殊的成员函数
+
+在原有 4 个特殊成员函数(默认构造函数、复制构造函数、复制赋值运算符和析构函数)的基础上，'C++11 新增了移动构造函数和移动赋值运算符'。这些成员函数是编译器在
+各种情况下自动提供的。'在没有提供任何参数的情况下，将调用默认构造函数'。如果您没有给类定义任何构造函数，编译器将提供一个默认构造函数。这种版本的默认构造函数
+被称为默认的默认构造函数。对于使用内置类型的成员，默认的默认构造函数不对其进行初始化; 对于属于类对象的成员，则调用其默认构造函数。另外，'如果您没有提供复制构
+造函数, 而代码又需要使用它，编译器将提供一个默认的复制构造函数'; 如果您没有提供移动构造函数，而代码又需要使用它，编译器将提供一个默认的移动构造函数。
+
+
+假定类名为 Someclass，这两个默认的构造函数的原型如下:
+
+Someclass::Someclass(const SameClass& f);// copy constructor
+Someclass::Someclass(SameClass &&f);// move constructor
+
+在类似的情况下，编译器将提供默认的复制运算符和默认的移动运算符，它们的原型如下:
+
+Someclass & SameClass::operator=(const Someclass &f);//copy assignment
+SameClass & SameClass::operator=(SameClass &&f);// move assignment
+
+最后，如果您没有提供析构函数，编译器将提供一个。
+
+如果您提供了析构函数、复制构造函数或复制赋值运算符，编译器将不会自动提供移动构造函数和移动赋值运算符；如果您提供了移动构造函数或移动赋值运算符，编译器将不会
+自动提供复制构造函数和复制赋值运算符。
+
+'默认的移动构造函数和移动赋值运算符的工作方式与复制版本类似: 执行逐成员初始化并复制内置类型'。如果成员是类对象，将使用相应类的构造函数和赋值运算符，就像
+参数为右值一样。如果定义了移动构造函数和移动赋值运算符，这将调用它们; 否则，将调用复制构造函数和复制赋值运算符。
+
+
+// !!  默认的方法和禁用的方法
+
+'C++11 让您能够更好地控制要使用的方法'。假定您要使用某个默认的函数，而这个函数由于某种原因不会自动创建。例如，'您提供了移动构造函数，因此编译器不会自动创
+建默认的构造函数、复制构造函数和复制赋值构造函数'。在这些情况下，您可'使用关键字 default 显式地声明这些方法的默认版本':
+
+class SameClass
+{
+public:
+    Someclass(SameClass &&f);
+    SameClass() = default;
+    SameClass(const SameClass &other) = default;
+    SameClass &operator=(const SameClass &other) = default;
+    ...
+};
+
+编译器将创建在您没有提供移动构造函数的情况下将自动提供的构造函数。
+
+另一方面，'关键字 delete 可用于禁止编译器使用特定方法'。
+
+例如，要禁止复制对象，可禁用复制构造函数和复制赋值运算符:
+
+    SameClass(const SameClass &other) = delete;
+    SameClass &operator=(const SameClass &other) = delete;
+
+'要禁止复制，可将复制构造函数和赋值运算符放在类定义的 private 部分，但使用 delete 也能达到这个目的，且更不容易犯错、更容易理解'。
+
+如果在启用移动方法的同时禁用复制方法，结果将如何呢？ 前面说过，移动操作使用的右值引用只能关联到右值表达式，这意味着:
+
+Someclass one;
+Someclass two;
+Someclass three(one);// not allowed, one is left value
+Someclass four(one + two);// allowed, expression is right value
+
+
+关键字 default 只能用于 6 个特殊成员函数，但 delete 可用于任何成员函数。delete 的一种可能用法是禁止特定的转换。
+
+例如，假设 Someclass 类有一个接受 double 参数的方法：
+
+class SameClass
+{
+public:
+    void redo(double);
+    ...
+};
+
+再假设有如下代码：
+
+Someclass sc;
+sc.redo(5);
+
+int 值 5 将被提升为 5.0，进而执行方法 redo()。
+
+
+现在假设将 Someclass 类的定义改成了下面这样：
+
+class SameClass
+{
+public:
+    void redo(double);
+    void redo(int) = delete;
+    ...
+};
+
+在这种情况下，方法调用 sc.redo(5) 与原型 redo(int) 匹配。编译器检测到这一点以及 redo(int) 被禁用后，将这种调用视为编译错误。这说明了禁用函数的重要一
+点: 它们只用于查找匹配函数，使用它们将导致编译错误。
+
+
+// !! 委托构造函数
+
+如果给类提供了多个构造函数，您可能重复编写相同的代码。也就是说，有些构造函数可能需要包含其他构造函数中已有的代码。为让编码工作更简单、更可靠，'C++11 允许您
+在一个构造函数的定义中使用另一个构造函数'。这被称为委托，因为构造函数暂时将创建对象的工作委托给另一个构造函数。
+
+委托使用成员初始化列表语法的变种:
+
+#ifndef B323BD72_50BE_472D_B615_EA0753E70E77
+#define B323BD72_50BE_472D_B615_EA0753E70E77
+
+class Notes
+{
+private:
+    int k;
+    double x;
+    std::string st;
+public:
+    Notes();
+    Notes(int);
+    Notes(int,double);
+    Notes(int,double,std::string);
+};
+
+Notes::Notes(int kk,double xx, std::string st):k(k),xx(xx),st(st)
+{
+
+}
+
+Notes::Notes():Notes(0,0.01,"Ah")
+{
+
+}
+
+Notes::Notes(int kk):NOtes(kk,0.01,"oh")
+{
+
+}
+
+Notes::Notes(int kk, double x):NOtes(kk,x,"Uh")
+{
+
+}
+
+#endif /* B323BD72_50BE_472D_B615_EA0753E70E77 */
+
+
+// !! 继承构造函数
+
+'为进一步简化编码工作，C++11 提供了一种让派生类能够继承基类构造函数的机制'。C++98 提供了一种让名称空间中函数可用的语法:
+
+
+namespace Box
+{
+    int void fn(int x)
+    {
+
+    }
+
+    int fn(double x)
+    {
+
+    }
+
+    int fn(const char *p)
+    {
+
+    }
+};
+
+
+using Box::fn;
+
+'这让函数 fn 的所有重载版本都可用'。
+
+也可使用这种方法让基类的所有非特殊成员函数对派生类可用。例如，请看下面的代码:
+
+
+class C1
+{
+    ...
+public:
+    ...
+    int fn(int j);
+    double fn(double w);
+    void fn(const char *);
+};
+
+
+class C2: public C1
+{
+    ...
+public:
+    ...
+    using C1::fn;
+    double fn(double w)
+    {
+
+    }
+};
+
+
+......
+
+C2 c2;
+int k = c2.fn(3);// using C1::fn(int)
+double z = c2.fn(2.4);// using C2::fn(double)
+
+C2 中的 using 声明让 C2 对象可使用 C1 的三个 fn() 方法，但将选择 C2 而不是 C1 定义的方法 fn(double)。
+
+
+C++11 将这种方法用于构造函数。这让派生类继承基类的所有构造函数(默认构造函数、复制构造函数和移动构造函数除外)，但不会使用与派生类构造函数的特征标匹配的
+构造函数:
+
+#ifndef ADC2C2FB_4806_4E01_9BAA_FE2E384944F4
+#define ADC2C2FB_4806_4E01_9BAA_FE2E384944F4
+
+class BS
+{
+private:
+    int q;
+    double w;
+public:
+    BS():q(0), w(0){}
+    BS(int k):q(k), w(0){}
+    BS(double x):q(0),w(x){}
+    BS(int k, double x):q(k),w(x){}
+    void show() const {std::cout << q << ", " << w << '\n';}
+};
+
+
+class DR: public BS
+{
+private:
+    short j;
+public:
+    using BS::BS;
+    DR():j(-100){}
+    DR(double x):BS(2*x),j(int(x)){}
+    DR(int i):j(-2),BS(i, 0.5 * i){}
+    void show() const {std::cout << j << ", "; BS.show();}
+
+};
+
+
+int main()
+{
+    DR o1;// using DR();
+    DR o2(18.76);// use DR(double x)
+    DR o3(10,1.8);// use BS(int, double)
+    ...
+}
+#endif /* ADC2C2FB_4806_4E01_9BAA_FE2E384944F4 */
+
+
+由于没有构造函数 DR(int, double)，因此创建 DR 对象 o3 时，将使用继承而来的 BS(int, double)。请注意，继承的基类构造函数只初始化基类成员；如果还要
+初始化派生类成员。
+
+
+// !! 管理虚方法：override 和 final
+
+
 
 
 
