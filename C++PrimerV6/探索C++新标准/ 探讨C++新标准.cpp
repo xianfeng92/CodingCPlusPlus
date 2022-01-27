@@ -810,10 +810,326 @@ int main()
 
 // !! 管理虚方法：override 和 final
 
+'虚方法对实现多态类层次结构很重要，让基类引用或指针能够根据指向的对象类型调用相应的方法，但虚方法也带来了一些编程陷阱'。例如，假设基类声明了一个虚方法，而您
+决定在派生类中提供不同的版本，这将覆盖旧版本。如果特征标不匹配，将隐藏而不是覆盖旧版本:
+
+class Action
+{
+private:
+    int a;
+public:
+    Action(int i = 0) : a(i){}
+    int val() const {return a;}
+    virtual void f(char ch)const {std::cout << val() <<ch << "\n";}
+};
+
+class Bingo: public Action
+{
+public:
+    Bingo(int i = 0) : Action(i){}
+    virtual void f(char * ch)const {std::cout << val() << ch << "!\n";}
+};
+
+由于类 Bingo 定义的是 f(char * ch) 而不是 f(char ch)，将对 Bingo 对象隐藏 f(char ch)，这导致程序不能使用类似于下面的代码:
+
+Bingo b(10);
+b.f('@');// works for Action object, fail for Bingo object
+
+
+在 C++11 中，可使用虚说明符 override 指出您要覆盖一个虚函数：将其放在参数列表后面。如果声明与基类方法不匹配，编译器将视为错误。
+
+
+说明符 final 解决了另一个问题。您可能想禁止派生类覆盖特定的虚方法，为此可在参数列表后面加上 final。
+
+
+// !! lambda 函数
+
+见到术语 lambda 函数(也叫 lambda 表达式，常简称为 lambda)时，您可能怀疑 C++11 添加这项新功能旨在帮助编程新手。看到下面的 lambda 函数示例后，您可能坚
+定了自己的怀疑:
+
+[&count](int x){count += (x % 13 ==0);}
+
+但 lambda 函数并不像看起来那么晦涩难懂，它们提供了一种有用的服务，对使用函数谓词的 STL 算法来说尤其如此。
+
+
+// !! 比较函数指针、函数符和lambda函数
+
+来看一个示例，它使用函数指针、函数符和 lambda 函数给 STL 算法传递信息。出于方便的考虑，将这三种形式通称为函数对象，以免不断地重复“函数指针、函数符或 
+lambda”。
+
+假设您要生成一个随机整数列表，并判断其中多少个整数可被3整除，多少个整数可被13整除。
+
+生成这样的列表很简单。一种方案是，使用 vector<int> 存储数字，并使用 STL 算法 generate() 在其中填充随机数:
+
+#include<vector>
+#include<algorithm>
+#include<cmath>
+
+
+std::vector<int> numbers(1000);
+std::generate(numbers.begin(), numbers.end(),std::rand);
+
+函数 generate()接受一个区间(由前两个参数指定)，并将每个元素设置为第三个参数返回的值，而第三个参数是一个不接受任何参数的函数对象。在上述示例中，该函数对象
+是一个指向标准函数 rand() 的指针。
+
+通过使用算法 count_if()，很容易计算出有多少个元素可被 3 整除。与函数 generate()一样，前两个参数应指定区间，而第三个参数应是一个返回 true 或 false 的
+函数对象。函数 count_if()计算这样的元素数，即它使得指定的函数对象返回 true。为判断元素能否被 3 整除，可使用下面的函数定义:
+
+bool f3(int x)
+{
+    return x % 3 == 0;
+}
+
+同样，为判断元素能否被 13 整除，可使用下面的函数定义:
+
+bool f13(int x)
+{
+    return x % 13 == 0;
+}
+
+下面复习一下如何使用函数符来完成这个任务。'函数符是一个类对象，并非只能像函数名那样使用它，这要归功于类方法 operator()()'。就这个示例而言，函数符的优点之
+一是，可使用同一个函数符来完成这两项计数任务。下面是一种可能的定义:
+
+
+class f_mod
+{
+private:
+    int dv;
+public:
+    f_mod(int d = 1) : dv(d){}
+    bool operator()(int x){ return x % dv == 0; }
+};
+
+这为何可行呢？因为可使用构造函数创建存储特定整数值的 f_mod 对象:
+
+f_mod obj(3);
+
+而这个对象可使用方法 operator() 来返回一个 bool 值：
+
+bool is_div_7 = obj(7);// same as obj.operator(7)
+
+构造函数本身可用作诸如 count_if() 等函数的参数:
+
+count3 = count_if(numbers.begin(), numbers.end(),f_mod(3));
+
+参数 f_mod(3) 创建一个对象，它存储了值 3；而 count_if() 使用该对象来调用 operator()()，并将参数 x 设置为 numbers 的一个元素。
+
+名称 lambda 来自 lambda calculus（λ演算）—一种定义和应用函数的数学系统。这个系统让您能够使用匿名函数—即无需给函数命名。'在 C++11 中，对于接受函数指针
+或函数符的函数, 可使用匿名函数定义（lambda）作为其参数'。与前述函数 f3() 对应的 lambda 表达式如下:
+
+[](int x){return x % 3 == 0;}
+
+这与 f3() 的函数定义很像：
+
+bool f3(int x){return x % 3 == 0;}
+
+差别有两个: 使用 [] 替代了函数名（这就是匿名的由来）；没有声明返回类型。返回类型相当于使用 decltyp 根据返回值推断得到的，这里为 bool。如果 lambda 表达式
+不包含返回语句，推断出的返回类型将为 void。就这个示例而言，您将以如下方式使用该 lambda 表达式:
+
+count3 = count_if(numbers.begin(), numbers.end(),[](int x) { return x % 3 == 0;});
+
+也就是说，使用使用整个 lambad 表达式替换函数指针或函数符构造函数。
+
+
+仅当 lambad 表达式完全由一条返回语句组成时，自动类型推断才管用；否则，需要使用新增的返回类型后置语法:
+
+[](double x){int y = x; return x - y;};
+
+
+// !! 为何使用 lambda 表达式
+
+您可能会问，除那些表达式狂热爱好者，谁会使用 lambda 表达式呢？
+
+下面从 4 个方面探讨这个问题: 距离、简洁、效率和功能。
+
+1. '很多程序员认为，让定义位于使用的地方附近很有用'。这样，就无需翻阅多页的源代码，以了解函数调用 count_if() 的第三个参数了。另外，如果需要修改代码，涉及
+    的内容都将在附近；而剪切并粘贴代码以便在其他地方使用时，涉及的内容也在一起。从这种角度看，lambda 表达式是理想的选择，因为其定义和使用是在同一个地方进
+    行的；而函数是最糟糕的选择, 因为不能在函数内部定义其他函数，所以函数的定义可能离使用它的地方很远。函数符是不错的选择，因为可在函数内部定义类（包含函数
+    符类）, 因此定义离使用地点可以很近。
+
+
+2. '从简洁的角度看，函数符的代码比函数和 lambda 表达式的代码更繁琐'。函数和 lambda 表达式的简洁程度相当，一个显而易见的例外是，需要使用同一个 lambda 表
+    达式两次:
+
+    count1 = count_if(numbers.begin(), numbers.end(),[](int x) { return x % 3 == 0;})
+    count2 = count_if(numbers2.begin(), numbers2.end(),[](int x) {return x % 3 == 0;}
+
+    但并非必须编写 lambda 表达式两次，而可给 lambda 表达式指定一个名称，并使用该名称两次:
+
+    auto mod3 = [](int x) {return x % 3 == 0;}
+    count1 = count_if(numbers.begin(), numbers.end(),mod3);
+    count2 = count_if(numbers2.begin(), numbers2.end(),mod3);
+
+
+    您甚至可以像使用常规函数那样使用有名称的 lambda 表达式：
+
+    bool result = mod3(10);
+
+    然而，不同于常规函数，可在函数内部定义有名称的 lambda 表达式。mod3 的实际类型随实现而异，它取决于编译器使用什么类型来跟踪 lambda 表达式。
+
+3. '这三种方法的相对效率取决于编译器内联那些东西'。函数指针方法阻止了内联, 因为编译器传统上不会内联其地址被获取的函数，因为函数地址的概念意味着非内联函数。
+    而函数符和 lambda 表达式通常不会阻止内联。
+
+
+4. 最后，lambda 表达式有一些额外的功能。具体地说，lambad 表达式可访问作用域内的任何动态变量；要捕获要使用的变量，可将其名称放在中括号内。如果只指定了变量
+   名，如[z]，将按值访问变量；如果在名称前加上&，如[&count]，将按引用访问变量。[&]让您能够按引用访问所有动态变量，而[=]让您能够按值访问所有动态变量。
+
+    int count13;
+
+    ...
+    count13 = count_if(numbers.begin(), numbers.end(),[](int x ) { return x % 13 == 0;})
+
+    替换为如下代码:
+
+    int count13 = 0;
+    ...
+    for_each(numbers.begin(), numbers.end(),[&count](int x ) { count13 += x % 13 == 0;})
+
+    [&count13] 让 lambda 表达式能够在其代码中使用 count13。由于 count13 是按引用捕获的，因此在 lambda 表达式对 count13 所做的任何修改都将影响原
+    始 count13。
+
+    利用这种技术，可使用一个 lambda 表达式计算可被 3 整除的元素数和可被 13 整除的元素数:
+
+    int count3 = 0;
+    int count13 = 0;
+
+    std::for_each(numbers.begin(), numbers.end(),[&count3,&count13](int x ) { count3 += x %3 == 0; count13 += x % 13 == 0;})
+
+
+'在 C++ 中引入 lambda 表达式的主要目的是, 让您能够将类似于函数的表达式用作接受函数指针或函数符的函数的参数'。因此，典型的 lambda 表达式是测试表达式或
+比较表达式，可编写为一条返回语句。这使得 lambda 表达式简洁而易于理解，且可自动推断返回类型。然而，有创意的 C++ 程序员可能开发出其他用法。
 
 
 
+// !! 包装器
 
+'C++ 提供了多个包装器(wrapper，也叫适配器[adapter])。这些对象用于给其他编程接口提供更一致或更合适的接口'。
+
+
+bind1st 和 bind2ed，它们让接受两个参数的函数能够与这样的 STL 算法匹配，即它要求将接受一个参数的函数作为参数。C++11 提供了其他的包装器，包括模板
+bind、men_fn 和 reference_wrapper 以及包装器 function。模板 bind 可替代 bind1st 和 bind2nd，但更灵活；模板 mem_fn 让您能够将成员函数作为常
+规函数进行传递；模板 reference_wrapper 让您能够创建行为像引用但可被复制的对象；而'包装器 function 让您能够以统一的方式处理多种类似于函数的形式'。
+
+
+
+// !! 包装器 function 及模板的低效性
+
+
+请看下面的代码行:
+
+answer = ef(q);
+
+ef 是什么呢？
+
+它可以是函数名、函数指针、函数对象或有名称的 lambda 表达式。所有这些都是可调用的类型(callable type)。'可调用的类型如此丰富可能导致模板的效率极低'。
+
+为明白这一点，来看一个简单的案例。
+
+#include<iostream>
+
+template<typename T, typename F>
+T use_f(T v, F f)
+{
+    static int count = 0;
+    count++;
+    std::cout << "use_f count =" << count << "&count = " << &count << std::endl;
+    return f(v);
+}
+
+class Fp
+{
+private:
+    double z_;
+public:
+    Fp(double z = 1.0) : z_(z)
+    {
+
+    }
+    double operator()(double p){ return p * z_; }
+};
+
+class Fq
+{
+private:
+    double z_;
+public:
+    Fq(double z = 1.0) : z_(z){}
+    double operator()(double q) { return z_ + q; }
+};
+
+模板 use_f 使用参数 f 表示调用类型：
+
+return f(v);
+
+
+#include"somedefs.h"
+#include<iostream>
+
+double dub(double x) { return 2.0 *x;}
+double square(double x) { return x * x; }
+
+int main()
+{
+    using std::cout;
+    using std::endl;
+
+    double y = 1.21;
+    cout << "Function point dub:\n";
+    cout << " " << use_f(y, dub) << endl;
+
+    cout << "Function point square:\n";
+    cout << " " << use_f(y, square) << endl;
+
+    cout << "Function Object fp:\n";
+    cout << " " << use_f(y,Fp(5.0)) << endl;
+    cout << "Function Object fq:\n";
+    cout << " " << use_f(y,Fq(5.0)) << endl;
+
+    cout >> "Lambda expression 1: \n";
+    cout << " " << use_f(y,[](int x){return x *2.0;});
+
+    cout >> "Lambda expression 2: \n";
+    cout << " " << use_f(y,[](int x){return x * x;});
+    return 0;
+}
+
+
+在每次调用中，模板参数 T 都被设置为类型 double。模板参数 F 呢？每次调用时，F 都接受一个 double 值并返回一个 double 值，因此在 6 次 use_of()
+调用中，好像 F 的类型都相同，因此只会实例化模板一次。但正如下面的输出表明的，这种想法太天真了:
+
+模板函数 use_f() 有一个静态成员 count，可根据它的地址确定模板实例化了多少次。有 5 个不同的地址，这表明模板 use_f() 有 5 个不同的实例化。
+
+为了解其中的原因，请考虑编译器如何判断模板参数F的类型。首先，来看下面的调用:
+
+use_f(y,dub);
+
+其中的 dub 是一个函数的名称，该函数接受一个 double 参数并返回一个 double 值。'函数名是指针，因此参数 F 的类型为 double(*) (double)'：一个指向这样
+的函数的指针，即它接受一个 double 参数并返回一个 double 值。
+
+下一个调用如下:
+
+use_f(y, square);
+
+第二个参数的类型也是 double(*) (double)，因此该调用使用的 use_f() 实例化与第一个调用相同。
+
+在接下来的两个 use_f() 调用中，第二个参数为对象，F 的类型分别为 Fp 和 Fq，因为将为这些 F 值实例化 use_f()模板两次。最后，最后两个调用将 F 的类型设置
+为编译器为 lambda 表达式使用的类型。
+
+
+// !! 修复问题
+
+包装器 function 让您能够重写上述程序，使其只使用 use_f() 的一个实例而不是 5 个。
+
+注意，callable.cpp 中的函数指针、函数对象和 lambda 表达式有一个相同的地方，它们都接受一个 double 参数并返回一个 double 值。可以说它们的调用特征标
+(call signature)相同。'调用特征标是有返回类型以及用括号括起并用头号分隔的参数类型列表定义的'，因此，这 6 个实例的调用特征标都是 double (double)。
+
+
+'模板 function 是在头文件 functional 中声明的, 它从调用特征标的角度定义了一个对象'，可用于包装调用特征标相同的函数指针、函数对象或 lambda 表达式。
+例如，下面的声明创建一个名为 fdci 的 function 对象，它接受一个 char 参数和一个 int 参数，并返回一个 double 值:
+
+std::function<double(char, int)> fdci;
+
+可以将接受一个 char 参数和一个 int 参数，并返回一个 double 值的任何函数指针、函数对象或 lambda 表达式赋给它。
 
 
 
