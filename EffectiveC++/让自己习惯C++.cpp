@@ -171,5 +171,137 @@ class GamePlayer
 
 // !! 条款03：尽可能使用 const
 
+'const 的一件奇妙事情是，它允许你指定一个语义约束(也就是指定一个"不该被改动"的对象)，而编译器会强制实施这项约束'。它允许你告诉编译器和其他程序员某值应该
+保持不变。只要这(某值保持不变)是事实，你就该确实说出来，因为说出来可以获得编译器的帮助，确保这条约束不被违反。
+
+
+关键字 const 多才多艺。你可以用它在 classes 外部修饰 global 或 namespace 作用域中的常量，或修饰文件、函数、或区块作用域(block scope)中被声明
+为 static 的对象。你也可以用它修饰 classes 内部的 static 和 non-static 成员变量。
+
+'面对指针，你也可以指出指针自身、指针所指物，或两者都(或都不)是 const':
+
+char[] greeting = "Hello";
+char *p  = greeting;// non const pointer, non const data
+const char* p1 = greeting;//  non const pointer, const data
+char* const p2 = greeting;// const pointer, non const data
+const char* const p3 = greeting;// const pointer, const data
+
+const 语法虽然变化多端，但并不莫测高深。如果关键字 const 出现在星号左边，表示被指物是常量; 如果出现在星号右边，表示指针自身是常量;如果出现在星号两边，表示被指物和指针两者都是常量。
+
+
+'STL 迭代器是以指针为根据塑模出来，所以迭代器的作用就像个 T* 指针'。'声明迭代器为 const 就像声明指针为 const 一样(即声明一个 T* const 指针)，表示这个迭代器不得指向不同的东西，但它所指的东西的值是可以改动的'。如果你希望迭代器所指的东西不可被改动(即希望 STL 模拟一个 const T* 指针），你需要的是const_iterator:
+
+std::vector<int> vec;
+...
+const std::vector<int>::iterator iter = vec.begin();// iter 的作用像个 T * const
+*iter = 100；// ok,改变 item 所指的物
+++iter;// 错误，item 是个 const
+
+std::vector<int>::const_iterator citer = vec.cbegin();
+*citer = 100;// 错误，*citer 是个 const
+++citer;// ok
+
+'const 最具威力的用法是面对函数声明时的应用'。
+
+在一个函数声明式内，const 可以和函数返回值、各参数、函数自身(如果是成员函数)产生关联。'令函数返回一个常量值，往往可以降低因客户错误而造成的意外，而又不至于放弃安全性和高效性'。
+
+至于 const 参数，没有什么特别新颖的观念，它们不过就像 local const 对象一样，你应该在必要使用它们的时候使用它们。除非你有需要改动参数或 local 对象，否则请将它们声明为 const。只不过多打 6 个字符，却可以省下恼人的错误，像是“想要键入'=='却意外键成'='”的错误，一如稍早所述。
+
+
+// !! const 成员函数
+
+将 const 实施于成员函数的目的，是为了确认该成员函数可作用于 const 对象身上。
+
+这一类成员函数之所以重要，基于两个理由:
+
+1. 第一，它们使 class 接口比较容易被理解。这是因为，得知哪个函数可以改动对象内容而哪个函数不行，很是重要。
+
+2. 第二，它们使"操作 const 对象"成为可能
+
+这对编写高效代码是个关键，改善 C++ 程序效率的一个根本办法是以 pass by reference-to-const 方式传递对象，而此技术可行的前提是，我们有 const 成员函数可用来处
+理取得(并经修饰而成)的 const 对象。
+
+
+// !! 成员函数如果是 const 意味什么？
+
+这有两个流行概念: bitwise constness(又称 physical constness) 和 logical constness。
+
+'bitwise const 阵营的人相信，成员函数只有在不更改对象之任何成员变量( static 除外)时才可以说是 const'。也就是说它不更改对象内的任何一个 bit。这种论点的好处是
+很容易侦测违反点: 编译器只需寻找成员变量的赋值动作即可。bitwise constness 正是 C++ 对常量性(constness)的定义，因此 const 成员函数不可以更改对象内任何 non
+-static 成员变量。
+
+
+不幸的是许多成员函数虽然不十足具备 const 性质却能通过 bitwise 测试。更具体地说，一个更改了“指针所指物”的成员函数虽然不能算是 const，但如果只有指针（而非其所指
+物）隶属于对象，那么称此函数为 bitwise const 不会引发编译器异议。这导致反直观结果。假设我们有一个 TextBlock-like class，它将数据存储为 char* 而不是 string，
+因为它需要和一个不认识 string 对象的 C API 沟通:
+
+class CTextBook
+{
+public:
+    ...
+    char & operator[](std::size_t position) const// bitwise const 声明
+    {
+        return pText[position];
+    }
+private:
+    char *pText;
+};
+
+
+这个 class 不适当地将其 operator[] 声明为 const 成员函数，而该函数却返回一个 reference 指向对象内部值。假设暂时不管这个事实，请注意，operator[] 实现代
+码并不更改 pText。于是编译器很开心地为 operator[] 产出目标码。它是 bitwise const，所有编译器都这么认定。但是看看它允许发生什么事:
+
+
+const CTextBook cctb("hello");// 声明一个常量对象
+char *pc = &cctb[0];// 调用 const operator()[] 取得一个指针，指向 cctb 的数据
+*pc = 'J';// cctb 现在的内容为 “Jello”
+
+这其中当然不该有任何错误：你创建一个常量对象并设以某值，而且只对它调用 const 成员函数。但你终究还是改变了它的值。
+
+这种情况导出所谓的 logical constness。这一派拥护者主张，一个 const 成员函数可以修改它所处理的对象内的某些 bits，但只有在客户端侦测不出的情况下才得如此。例如
+你的 CTextBlock class 有可能高速缓存（cache）文本区块的长度以便应付询问：
+
+class CTextBook
+{
+public:
+    ...
+    char & operator[](std::size_t position) const// bitwise const 声明
+    {
+        return pText[position];
+    }
+private:
+    char *pText;
+    std::size_t textLength;
+    bool lengthIsValid;
+};
+
+std::size_t CTextBook::length() const
+{
+    if(!lengthIsValid)
+    {
+        textLength = std::strlen(pText);
+        lengthIsValid = true;
+    }
+    return textLength;
+}
+
+
+length  的实现当然不是  bitwise const，因为 textLength 和 lengthIsValid 都可能被修改。这两笔数据被修改对 const CTextBlock 对象而言虽然可接受，但编译
+器不同意。它们坚持 bitwise constness。怎么办？
+
+解决办法很简单：利用 C++ 的一个与 const 相关的摆动场：mutable（可变的）。mutable 释放掉 non-static 成员变量的 bitwise constness 约束:
+
+// !! 请记住
+
+■ 将某些东西声明为 const 可帮助编译器侦测出错误用法。const  可被施加于任何作用域内的对象、函数参数、函数返回类型、成员函数本体
+
+■ 编译器强制实施 bitwise constness，但你编写程序时应该使用“概念上的常量性”（conceptual constness
+
+■ 当 const 和 non-const 成员函数有着实质等价的实现时，令 non-const 版本调用 const 版本可避免代码重复
+
+
+// !! 条款04：确定对象被使用前已先被初始化
+
+
 
 
