@@ -480,21 +480,18 @@ Directory& tempDir()
 
 '为避免在对象初始化之前过早地使用它们，你需要做三件事':
 
-1. 第一，手工初始化内置型 non-member 对象。
+1. 第一手工初始化内置型 non-member 对象。
 
-2. 第二，使用成员初值列表（member initialization lists）对付对象的所有成分
+2. 第二使用成员初值列表（member initialization lists）对付对象的所有成分
 
-3. 最后，在"初始化次序不确定性"(这对不同编译单元所定义的 non-local static 对象是一种折磨)氛围下加强你的设计
+3. 最后在"初始化次序不确定性"(这对不同编译单元所定义的 non-local static 对象是一种折磨)氛围下加强你的设计
 
 
 请记住
 
-■ 为内置型对象进行手工初始化，因为C++不保证初始化它们
+■ 为内置型对象进行手工初始化, 因为 C++ 不保证初始化它们
 
-■ 构造函数最好使用成员初值列表(member initialization list)，而不要在构造函数本体内使用赋值操作(assignment)。初值列表列出的成员变量，其排列次序应该和它
-  们在 class 中的声明次序相同。
+■ 构造函数最好使用成员初值列表(member initialization list), 而不要在构造函数本体内使用赋值操作(assignment)。初值列表列出的成员变量, 其排列次
+  序应该和它们在 class 中的声明次序相同。
 
-■ 为免除"跨编译单元之初始化次序"问题，请以 local static 对象替换 non-local static 对象
-
-
-
+■ 为免除"跨编译单元之初始化次序"问题, 请以 local static 对象替换 non-local static 对象
