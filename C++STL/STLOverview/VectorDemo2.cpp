@@ -86,7 +86,7 @@ void test2()
 void test3()
 {
     vector<Person> persons;
-    persons.reserve(10);
+    persons.reverse(10);
     
     cout << "Prepare person Data" << endl;
     
