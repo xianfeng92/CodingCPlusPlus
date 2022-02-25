@@ -1,4 +1,4 @@
-#include<cstring>
+#include <cstring>
 #include <iostream>
 #include <string>
 
@@ -28,6 +28,7 @@ int main()
     
     // s.push_back('\0');
 
+    cout << "hello world" << endl;
 
     return 0;
 }

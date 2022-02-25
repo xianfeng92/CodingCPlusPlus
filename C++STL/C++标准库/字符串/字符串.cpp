@@ -564,6 +564,343 @@ string foo()
 }
 
 
-// !! I/O操作符
+// !! I/O 操作符
+
+string 定义了常用的 I/O 操作符:
+
+1. operator>> 从 input stream 读取一个 string
+
+2. operator<< 把一个 string 写到 output stream 中
+
+这些操作符的用法和面对一般 C-string 时相同。更明确地说, operator>> 的执行方式如下:
 
 
+1.如果设立了 skipws flag, 则跳过开头空格
+
+2.持续读取所有字符, 直到发生以下情形之一:
+
+  -下个字符为空白字符(whitespace)
+  -Stream 不再处于 good 状态
+  -Stream 的 width() 结果大于 0, 而目前已读出 width() 个字符
+  -已读取 max_size() 个字符
+  -Stream width() 被设为 0
+
+
+// !! getline()
+
+string class 还提供一种用于逐行读取的特殊函数: std::getline()。该函数读取所有字符, 包括开头的空白字符, 直到遭遇分行符或 end-of-file。分行符
+会被读取出来但是不会被附加到结果上。'默认情况下分行符是 newline 字符', 但你也可以把自己喜欢的分行符作为实参传给 getline(), 这样就可以指定任意符
+号作为分界读取一个个的语汇单元(token)了:
+
+std::string s;
+while (getline(std::cin, s))// for each line read from cin
+{
+
+}
+
+while (getline(std::cin, s,':'))// for each token separate by ':'
+{
+
+}
+
+注意, 如果你是逐一读取语汇单元(token), 那么 newline 字符不被视为特殊字符。因此语汇单元也可能包含 newline 字符。
+
+还要注意, 自 C++11 开始, getline() 被重载为两个版本, 分别针对 lvalue 和 rvalue stream reference, 因此允许你使用临时(temporary)
+string stream:
+
+void process(const std::string&& filecontents)
+{
+    std::string firstline;
+    std::getline(std::stringstream(filecontents), firstline);// ok, since from C++ 11
+}
+
+
+
+
+
+// !! 搜索和查找（Searching and Finding）
+
+C++ 标准库的 string 提供了许多用于搜索和查找字符及子字符串的函数:
+
+使用成员函数, 你可以:
+
+1. 查找单一字符、字符序列(substring)或某个字符组(set of characters)
+
+2. 前向(forward)查找和回头(backward)查找
+
+3. 从 string 的起点或内部任何位置开始查找
+
+4. 使用 regex 程序库, 你可以查找更复杂的字符序列样式(pattern of character sequence)
+
+5. 使用 STL 算法, 你也可以搜索单一字符, 或指定之字符序列。注意, 这些算法允许你使用你自己提供的比较准则
+
+
+// !! “搜索和查找”成员函数
+
+'所有查找函数的名字中都有 find 这个字眼, 它们试图找到"与传入之实参值相等"的字符的位置'。实际查找方式则取决于究竟哪一个 find 函数。
+
+find()  --- 查找第一个与 value 相等的字符
+rfind() --- 查找最后一个与 value 相等的字符
+find_first_of() ---查找第一个与 "value 中某值"相等的字符
+find_first_not_of() ---查找第一个一个与 "value 中某值"不相等的字符
+find_last_not_of() ---查找最后一个与 "value 中某值"不相等的字符
+
+'所有查找函数都返回字符序列中"符合查找条件"的第一个字符的索引'。如果查找不成功(没找到目标)则返回 npos。
+
+这些查找函数都采用下面的实参体系:
+
+1. 第一实参永远是被查找的对象
+
+2. 第二实参(可有可无)指出 string 内的查找起点(索引)
+
+3. 第三实参(可有可无)指出欲查找的字符个数(也就是查找范围, 或说查找长度)
+
+#include <cstring>
+#include <iostream>
+#include <string>
+
+using namespace std;
+
+int main() {
+  std::string str("HI, bill. I am ill, please pay the bill!");
+
+  string::size_type pos1 = str.find("il");
+  cout << "pos1: " << (int)pos1 << endl;
+  string::size_type pos2 = str.find("il", 10);
+  cout << "pos2: " << (int)pos2 << endl;
+  string::size_type pos3 = str.rfind("il");
+  cout << "pos3: " << (int)pos3 << endl;
+  string::size_type pos4 = str.find_first_of("il");
+  cout << "pos4: " << (int)pos4 << endl;
+  string::size_type pos5 = str.find_last_of("il");
+  cout << "pos5: " << (int)pos5 << endl;
+  string::size_type pos6 = str.find_first_not_of("il");
+  cout << "pos6: " << (int)pos6 << endl;
+  string::size_type pos7 = str.find_last_not_of("il");
+  cout << "pos7: " << (int)pos7 << endl;
+  string::size_type pos8 = str.find("hi");
+  cout << "pos8: " << (int)pos8 << endl;
+  return 0;
+}
+
+
+ » g++ --std=c++11 stringdemo5.cpp
+--------------------------------------------------------------------------------
+ » ./a.out
+pos1: 5
+pos2: 15
+pos3: 36
+pos4: 5
+pos5: 38
+pos6: 0
+pos7: 39
+pos8: -1
+
+
+// !! npos 的意义
+
+如果查找函数失败, 会返回 string:: npos。
+
+使用 string 的 npos 值及其类型时要格外小心: 若要检查函数返回值, 一定要使用类型 string::size_type, 不能以 int 或 unsigned 作为返回值类型; 
+否则返回值与 string::npos 之间的比较可能无法正确执行。这是因为 npos 被设计为-1:
+
+namespace std
+{
+    template<typename charT, typename traits = char_traits<charT>,
+    typename Allocator = allocator<charT>>
+    class basic_string
+    {
+        public:
+            typedef typename Allocator::size_type size_type;
+            ...
+            static const size_type npos = -1;
+            ...
+    };
+}
+
+
+不幸的是 size_type (由 string 的分配器定义出) 必须是个无正负号整数类型, 因为 default 分配器乃是以类型 size_t 作为 size_type)。于是 -1 被转
+换为无正负号整数类型, 'npos 也就成了该类型的最大无正负号值'。然而实际值取决于类型 size_type 的真实定义。不幸的是这些最大值都不相同。事实上
+(unsigned long) -1和(unsigned short) -1 不同(如果两个类型的大小不同)。因此, 对于以下表达式:
+
+idx = string::npos;
+
+如果 idx 的值为-1, 由于 idx 和字符串 string::npos 类型不同, 比较结果可能会是 false:
+
+避免这种错误的办法之一就是直接检验查找是否失败:
+
+if(s.find("il") == string::npos)
+
+
+但由于我们常常需要用到匹配的(查找到的)字符的位置索引, 所以另一个简单的解决方法是自行定义对应于 npos 的带正负号数值:
+
+const int NPOS = -1;
+
+前述的比较式必须略加修改, 但方便多了
+
+if(idx == NPOS)
+{
+    ...
+}
+
+如果你希望你的代码有高度移植性, 你应该对 string 的任何索引都采用 string::size_type。
+
+
+// !! 数值转换（Numeric Conversion）
+
+'自 C++11 开始, C++ 标准库提供了一些便捷函数, 用来将 string 转换为数值(numeric value) 或是反向转换'。然而请注意, 这些转换只可用于类型
+string和wstring, 不适用于 u16string 和 u32string。
+#include <string>
+#include <iostream>
+#include <limits>
+#include <exception>
+
+using namespace std;
+
+int main()
+{
+    try 
+    {
+        // convert to numeric type
+        cout << "stoi(  777) result is " << stoi("  777") << endl;
+        cout << "stod(  777) result is " << stod(" 77.77") << endl;
+        cout << "stoi(-0x77) result is " <<stoi("-0x77") << endl;
+
+        std::size_t idx;
+        cout << stoi(" 42 is the truth", &idx) << endl;
+        cout << "idx of first unprocessed char " << idx << endl;
+
+        // convert number to string
+        string s = to_string(999);
+        cout << "s = " << s << endl;
+        cout << stoi(s) << endl;
+    }catch(exception e)
+    {
+
+    }
+    return 0;
+}
+
+ » g++ --std=c++11 stringnumconversion.cpp
+--------------------------------------------------------------------------------
+ » ./a.out
+stoi(  777) result is 777
+stod(  777) result is 77.77
+stoi(-0x77) result is 0
+42
+idx of first unprocessed char 3
+s = 999
+999
+
+
+// !! String 对迭代器的支持
+
+'string 是字符的有序集合(ordered collection)。所以 C++ 标准库为 string 提供了相应接口让你把 string 当作 STL 容器使用'。
+
+更具体地说, 你可以调用惯用的那些成员函数, 取得"能够遍历 string 内所有字符"的 iterator。如果对 iterator 不熟悉, 可以把它们看作是指向
+string 内部单个字符的东西, 就像寻常的 pointer 之于 C-string。有了 iterator 你便可以调用 C++ 标准库(或用户自定义的)算法遍历 string
+内的所有字符。是的, 你于是可以对 string 内的字符排序、反向重排、找出最大字符等。
+ 
+'string 拥有的是 random-access iterator。也就是说, 它支持随机访问, 所以可被任何一个 STL 算法接受'。一如往常, string 的 iterator type
+(iterator、const_iterator等) 由 string class 自己定义。'虽然确切类型由实现定义, 但往往被简单定义为寻常的 pointer'。"以 pointer 实现"和 
+"以 class 实现"的 iterator 之间有着难对付的差别。
+
+对 iterator 而言, 如果发生重分配(reallocation), 或其所指向的值发生某种变化, iterator 会失效。
+
+// !! String 的 Iterator 相关函数
+
+'通常 beg 和 end 规范的区间包含 beg 但不包含 end, 是个半开区间, 常写作 [beg, end)'
+
+为了支持 back inserter, string 定义了 push_back()
+
+
+// !! String Iterator 的使用实例
+
+String iterator 可以做一件非常有用的事情: 通过一个简单的语句把 string 内的所有字符都转为大写或小写。例如:
+
+#include <string>
+#include <iostream>
+#include <algorithm>
+#include <cctype>
+#include <regex>
+
+using namespace std;
+
+int main()
+{
+    string s("The zip code of Braunschweig is Germany is 38100");
+    cout << "original: " << s << endl;
+
+    transform(s.cbegin(), s.cend(), s.begin(), [](char c)
+    {
+        return tolower(c);
+    });
+
+    cout << "lowed is " << s << endl;
+
+    transform(s.cbegin(), s.cend(), s.begin(), [](char c)
+    {
+        return toupper(c);
+    });
+    cout << "upper is " << s << endl;
+
+    string g("Germany");
+    string::const_iterator pos;
+    pos = search(s.cbegin(), s.cend(),g.cbegin(), g.cend(),
+    [](char c1, char c2){
+        return toupper(c1) == toupper(c2);
+    });
+
+    if(pos != s.cend())
+    {
+        cout << "substring " << g << " find at index " << pos - s.cbegin() << endl;
+    }
+    return 0;
+}
+
+ » g++ --std=c++11 stringiter1.cpp
+--------------------------------------------------------------------------------
+ » ./a.out
+original: The zip code of Braunschweig is Germany is 38100
+lowed is the zip code of braunschweig is germany is 38100
+upper is THE ZIP CODE OF BRAUNSCHWEIG IS GERMANY IS 38100
+substring Germany find at index 32
+
+
+在这里, 我们两次把 cbegin()、cend() 和 begin() 返回的 iterator 传给算法 transform(), 后者将输入区间内的所有元素"变换"至某个给定的目标
+区间, "变换准则" 乃是作为第四实参传入。
+
+本例的"变换准则"被设定为一个 lambda, 用来把 string 的元素(也就是字符)转换为小写或大写。
+
+注意, tolower() 和 toupper() 都是旧式 C 函数, 使用全局性 locale。如果你的程序拥有不同的 locale 或一个以上的 locale, 你应该使用新式的
+tolower() 和 toupper() 。 
+
+最后, 我们使用查找算法, 以我们自己给定的"查找准则"寻找一个 substring。这个查找准则又是一个 lambda, 以不分大小写的方式比较字符。
+
+
+// !! 效率（Performance）
+
+'C++ standard 并未规定如何实现 string class, 只是定义了其接口'。
+
+'由于理念和侧重点各有不同, 不同的实现可能在速度和内存耗用方面存在显著的差异'。
+
+注意, 自 C++11 开始, 不再允许使用 reference counted 实现手法, 原因是"让 string 的内部缓冲区被共享"在多线程环境(multithreaded context)
+中是行不通的。
+
+
+// !! String 和 Vector
+
+string 和 vector 很相似, 这不奇怪, 因为它们都是容器, 而且都被典型地实现为 dynamic array(动态数组)。因此, 你可以把 string 视为一种"以字符为
+元素" 的特定 vector。事实上你可以把 string 当作 STL 容器使用。但由于 string 和 vector 之间还是有许多本质上的不同, 把 string 当作一种特殊的
+vector 还是存在一定危险。
+
+最重要的差异在于两者的主要目标:
+
+1. 'vector 的首要目标是处理和操作容器内的元素, 而非容器整体'。因此实现时通常会考虑"容器元素的操作行为"的最优化
+
+2. string 主要是把整个容器视为整体来处理和操作, 因此实现时通常会考虑"整个容器的赋值和传递" 的最优化
+
+'不同的目标往往导致完全不同的实现手法'。例如 string 常会采用 reference counting(引用计数)手法, vector 则绝不会如此。然而你也可以把
+vector 当作寻常的 C-string 使用。
+
+// !! 细究 string class
