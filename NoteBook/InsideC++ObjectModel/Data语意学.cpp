@@ -941,6 +941,157 @@ derived class object 之中。这就解决了"固定存取时间"的问题, 虽�
 由于对 virtual base class 的支持带来额外的负担以及高度的复杂性, 每一种实现模型多少有点不同, 而且我想还会随着时间而进化。
 
 
+经由一个非多态的 class object 来存取一个继承而来的 virtual base class 的 member, 像这样:
+
+Point3d origin;
+...
+origin.x_ = 10;
+
+
+'可以被优化为一个直接存取操作, 就好像一个经由对象调用的 virtual function 调用操作, 可以在编译时期被决议(resolved)完成一样'。在这次存取以及下一次存
+取之间, 对象的类型不可以改变, 所以 virtual base class subobjects 的位置会变化的问题在此情况下就不再存在了。
+
+
+// !! 一般而言, virtual base class 最有效的一种运用形式就是: 一个抽象的 virtual base class, 没有任何 data members。
+
+
+// !! 对象成员的效率（Object Member Efficiency）
+
+
+下面几个测试, 旨在测试聚合(aggregation)、封装(encapsulation)以及继承(inheritance)所引发的额外负荷的程度。
+
+
+所有测试都是以个别局部变量的加法、减法、赋值(assign)等操作的存取成本为依据。下面就是个别的局部变量:
+
+float pA_x = 0.321, pA_y = 0.12232, pA_z = 0.1231;
+float pB_x = 12.31, pB_y = 31.312, pB_z 23.23123;
+
+每个表达式需执行 1000 万次, 如下所示:
+
+for(int i = 0; i < 10000000; i++)
+{
+    pB_x = pA_x - pB_z;
+    pB_y = pA_y + pB_z;
+    pB_z = pA_z + pB_y;
+}
+
+
+我们首先针对三个 float 元素所组成的局部数组进行测试:
+
+enum fussy{x,y,z};
+float pB[3] = {12.21,23,43,31.312};
+float pA[3] = {12.12,0.213,0.12099};
+for(int i = 0; i < 10000000; i++)
+{
+    pB[x] = pA[x] - pB[z];
+    pB[y] = pA[y]+ pB[z];
+    pB[z] = pA[z] + pB[y];
+}
+
+第二个测试是把同质的数组元素转换为一个 C struct 数据抽象类型, 其中的成员皆为 float, 成员名称是 x、y、z:
+
+struct PP{
+    float x;
+    float y;
+    float z;
+};
+
+PP pA;
+PP pB;
+
+for(int i = 0; i < 10000000; i++)
+{
+    pB.x = pA.x - pB.z;
+    pB.y = pA.y+ pB.z;
+    pB.z = pA.z + pB.y;
+}
+
+
+更深一层的抽象化, 是做出数据封装, 并使用 inline 函数。坐标点现在以一个独立的 Point3d class 来表示。我尝试两种不同形式的存取函数。第一, 我定义一
+个 inline 函数, 传回一个 reference, 允许它出现在 assignment 运算符的两端:
+
+
+class Point3d
+{
+public:
+    Point3d(float x = 0.0f, float y = 0.0f, float z = 0.0f):x_(x), y_(y), z_(z){}
+
+    float& x() {return x_;}
+    float& y() {return y_;}
+    float& z() {return z_;}
+
+private:
+    float x_;
+    float y_;
+    float z_;
+};
+
+
+那么真正对每一个坐标元素的存取操作应该像这样:
+
+Point3d pA;
+Point3d pB;
+
+for(int i = 0; i < 10000000; i++)
+{
+    pB.x() = pA.x() - pB.z();
+    pB.y() = pA.y()+ pB.z();
+    pB.z() = pA.z() + pB.y();
+}
+
+
+我所定义的第二种存取函数形式是, 提供一对 get/set 函数:
+
+float x() { return x_; }
+void x(float x) { x_ = x; }
+
+于是对每一个坐标值的存取操作应该像这样:
+
+pB.x(pA.x() - pB.z());
+
+这里所显示的重点在于, 如果把优化开关打开, "封装" 就不会带来执行期的效率成本。使用 inline 存取函数亦然。
+
+
+// !! 指向Data Members的指针（Pointer to Data Members）
+
+考虑下面的 Point3d 声明。其中有一个 virtual function, 一个static data member, 以及三个坐标值:
+
+#include <iostream>
+
+using namespace std;
+
+class Point3d {
+ public:
+  Point3d(float x = 0.0f, float y = 0.0f, float z = 0.0f)
+      : x_(x), y_(y), z_(z) {}
+  virtual ~Point3d();
+  //...
+ private:
+  static Point3d origin;
+  float x_, y_, z_;
+};
+
+每一个 Point3d class object 含有三个坐标值, 依序为 x、y、z, 以及一个 vptr。至于 static data member origin, 则将被放在 class object
+之外。唯一可能因编译器不同而不同的是 vptr 的位置。C++Standard 允许 vptr 被放在对象中的任何位置: 在起始处, 在尾端, 或是在各个 members 之间。
+然而实际上, 所有编译器不是把 vptr 放在对象的头, 就是放在对象的尾。
+
+
+那么, 取某个坐标成员的地址, 代表什么意思 ? 例如, 以下操作所得到的值代表什么:
+
+&Point3d::z_;
+
+上述操作将得到 z 坐标在 class object 中的偏移位置(offset)。
+
+
+最低限度其值将是 x 和 y 的大小总和, 因为 C++ 语言要求同一个 access level 中的 members 的排列顺序应该和其声明顺序相同。
+
+// !! 取一个 nonstatic data member 的地址, 将会得到它在 class 中的 offset
+// !! 取一个绑定于真正 class object 身上的 data member 的地址，将会得到该 member 在内存中的真正地址
+
+
+// !! 指向 Members 的指针的效率问题
+
+
 
 
 
