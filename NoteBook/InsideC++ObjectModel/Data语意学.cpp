@@ -937,6 +937,8 @@ derived class object 之中。这就解决了"固定存取时间"的问题, 虽�
 
 2. 第二个解决方法, 是在 virtual function table 中放置 virtual base class 的 offset(而不是地址)
 
+上述每一种方法都是一种实现模型, 而不是一种标准。每一种模型都是用来解决存取 shared subobject 内的数据(其位置会因每次派生操作而有变化) 所引发的问题。
+由于对 virtual base class 的支持带来额外的负担以及高度的复杂性, 每一种实现模型多少有点不同, 而且我想还会随着时间而进化。
 
 
 
