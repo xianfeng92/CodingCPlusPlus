@@ -1,0 +1,3 @@
+/home/parallels/Stan/xforg/CodingCPlusPlus/Coding/JsonCppUsing/build/CMakeFiles/rebuild_cache.dir
+/home/parallels/Stan/xforg/CodingCPlusPlus/Coding/JsonCppUsing/build/CMakeFiles/edit_cache.dir
+/home/parallels/Stan/xforg/CodingCPlusPlus/Coding/JsonCppUsing/build/CMakeFiles/jsondemo.dir
