@@ -353,3 +353,275 @@ if(foo().object_count() > 1){}
 if(Point3d::object_count() > 1){}
 
 
+
+一个 static member function, 当然会被提出于 class 声明之外, 并给予一个经过 "mangled" 的适当名称。例如:
+
+unsigned int 
+Point3d::object_count()
+{
+    return _object_count;
+}
+
+
+会被 cfront 转化为:
+
+unsigned int 
+object_count_5Point3dSFv()
+{
+    return object_count_5Point3d;
+}
+
+
+其中 SFv 表示它是一个 static member function, 拥有一个空白(void)的参数链表(argument list)
+
+如果取一个 static member function 的地址, 获得的将是其在内存中的位置, 也就是其地址。由于 static member function 没有 this 指针, 所以其地址的类
+型并不是一个"指向 class member function 的指针", 而是一个"nonmember 函数指针"。也就是说:
+
+&Point3d::object_count();
+
+会得到一个数值, 类型是:
+
+unsigned int(Point3d::*)();
+
+
+'Static member function 由于缺乏 this 指针, 因此差不多等同于 nonmember function。它提供了一个意想不到的好处: 成为一个 callback 函数', 使我们
+得以将 C++ 和 C-based X Window 系统结合。
+
+
+
+// !! 4.2 Virtual Member Functions（虚拟成员函数）
+
+virtual function 的一般实现模型: 每一个 class 有一个 virtual table, 内含该 class 之中有作用的 virtual function 的地址, 然后每个 object 有一个
+vptr, 指向 virtual table 的所在。
+
+
+为了支持 virtual function 机制, 必须首先能够对于多态对象有某种形式的"执行期类型判断法(runtime type resolution)"。也就是说以下的调用操作将需要 ptr 
+在执行期的某些相关信息, 
+
+ptr->z();
+
+如此一来才能够找到并调用 z() 的适当实例。
+
+
+或许最直截了当但是成本最高的解决方法就是把必要的信息加在 ptr 身上。在这样的策略之下, 一个指针(或是一个 reference )持有两项信息:
+
+1.它所参考到的对象的地址(也就是目前它所持有的东西)
+
+2.对象类型的某种编码, 或是某个结构(内含某些信息,用以正确决议出 z() 函数实例)的地址
+
+
+这个方法带来两个问题:第一,它明显增加了空间负担, 即使程序并不使用多态(polymorphism); 第二, 它打断了与 C 程序间的链接兼容性
+
+如果这份额外信息不能够和指针放在一起, 下一个可以考虑的地方就是把它放在对象本身。但是哪一个对象真正需要这些信息呢? 我们应该把这些信息放进可能被继承的每一个集
+合体身上吗? 或许吧~ 但请考虑一下这样的 C struct 声明:
+
+struct data{
+    int m, d, y;
+};
+
+严格地说, 这符合上述规范。然而事实上它并不需要那些信息。加上那些信息将使 C struct 膨胀并且打破链接兼容性, 却没有带来任何明显的补偿利益。
+
+"好吧,"你说,"只有面对那些显式使用了 class 关键词的声明, 才应该加上额外的执行期信息"。这么做就可以保留语言的兼容性了, 不过仍然不是一个够聪明的政策。
+举个例子, 下面的 class 符合新规范:
+
+class data{
+public:
+    int m, d, y;
+};
+
+
+但实际上它并不需要那份信息。下面的 class 声明虽然不符合新规范, 却需要那份信息:
+
+struct geom{
+public:
+    ~geom() {}
+};
+
+噢, 是的, 我们需要一个更好的规范, 一个"以 class 的使用为基础, 而不在乎关键词是 class 或 struct"的规范。如果 class 真正需要那份信息,它就会存在; 如果
+不需要, 它就不存在。
+
+那么, 到底何时才需要这份信息? 很明显是在必须支持某种形式之"执行期多态(runtime polymorphism)" 的时候。
+
+
+在 C++ 中. 多态(polymorphism)表示 " 以一个 public base class 的指针(或 reference), 寻址出一个 derived class object" 的意思。
+
+
+例如下面的声明:
+
+Point *ptr;
+
+我们可以指定 ptr 以寻址出一个 Point2d 对象:
+
+ptr = new Point2d();
+
+
+或是一个 Point3d 对象:
+
+ptr = new Point3d();
+
+
+'ptr 的多态机能主要扮演一个输送机制(transport mechanism)的角色', 经由它, 我们可以在程序的任何地方采用一组 public derived 类型。这种多态形式被称为
+是消极的(passive), 可以在编译时期完成——virtual base class 的情况除外。
+
+'当被指出的对象真正被使用时, 多态也就变成积极的(active)了'。下面对于 virtual function 的调用, 就是一例:
+
+ptr->z();
+
+在 runtime type identification(RTTI) 性质于 1993 年被引入 C++ 语言之前, C++ 对"积极多态(active polymorphism)"的唯一支持, 就是对于
+virtual function call 的决议(resolution)操作。'有了 RTTI, 就能够在执行期查询一个多态的 pointer 或多态的 reference了'。
+
+
+if(Point3d *p3d = dynamic_cast<Point*3d>(ptr))
+{
+    p3d->z();
+}
+
+所以, 问题已经被区分出来, 那就是:'欲鉴定哪些 classes 展现多态特性, 我们需要额外的执行期信息'。一如我所说, 关键词 class 和 struct 并不能能够帮助我们。
+由于没有导入像是 polymorphic 之类的新关键词, 因此'识别一个 class 是否支持多态, 唯一适当的方法就是看看它是否有任何 virtual function'。'只要 class 
+拥有一个 virtual function, 它就需要这份额外的执行期信息'。
+
+
+下一个明显的问题是, 什么样的额外信息是我们需要存储起来的 ? 也就是说, 如果我有这样的调用:
+
+ptr->z();
+
+其中 z() 是一个 virtual function, 那么什么信息才能让我们在执行期调用正确的 z() 实例? 我需要知道:
+
+
+1. ptr 所指对象的真实类型。这可使我们选择正确的 z() 实例
+
+2. z() 实例的位置, 以便我能够调用它
+
+
+在实现上, 首先我可以在每一个多态的 class object 身上增加两个 members: 
+
+
+1. 一个字符串或数字, 表示 class 的类型
+
+2. 一个指针, 指向某表格, 表格中持有程序的 virtual functions 的执行期地址
+
+表格中的 virtual functions 地址如何被建构起来?
+
+在 C++ 中, virtual functions (可经由其 class object 被调用) 可以在编译时期获知。此外, 这一组地址是固定不变的, 执行期不可能新增或替换之。
+由于程序执行时, 表格的大小和内容都不会改变, 所以其建构和存取皆可以由编译器完全掌控, 不需要执行期的任何介入。
+
+然而, 执行期备妥那些函数地址, 只是解答的一半而已。另一半解答是找到那些地址。两个步骤可以完成这项任务:
+
+1. 为了找到表格, 每一个 class object 被安插了一个由编译器内部产生的指针 vptr,指向该表格
+
+2. 为了找到函数地址, 每一个 virtual function 被指派一个表格索引值
+
+'这些工作都由编译器完成。执行期要做的', 只是在特定的 virtual table slot(记录着 virtual function 的地址)中激活 virtual function。
+
+一个 class 只会有一个 virtual table。每一个 table 内含其对应之 class object 中所有 active virtual functions 函数实例的地址。这些 
+active virtual functions 包括:
+
+1.  这一 class 所定义的函数实例。它会改写(overriding) 一个可能存在的 base class virtual function 函数实例
+
+2.  继承自 base class 的函数实例。这是在 derived class 决定不改写 virtual function 时才会出现的情况
+
+3.  一个 pure_virtual_called() 函数实例, 它既可以扮演 pure virtual function 的空间保卫者角色, 也可以当做执行期异常处理函数(有时候会用到)
+
+每一个 virtual function 都被指派一个固定的索引值, 这个索引在整个继承体系中保持与特定的 virtual function 的关系。例如在我们的 Point class 体系中:
+
+
+class Point
+{
+public:
+    virtual ~Point();
+    virtual Point multi(float) = 0;
+    float x() const { return x_}
+    virtual float y(){return 0;}
+    virtual float z(){return 0;}
+private:
+    float x_;
+    Point(float x = 0.0f);
+};
+
+
+virtual destructor 被指派slot 1, 而 mult() 被指派 slot 2。此例并没有 mult() 的函数定义(因为它是一个 pure virtual function), 所以
+pure_virtual_called() 的函数地址会被放在 slot 2 中。如果该函数意外地被调用, 通常的操作是结束掉这个程序。y() 被指派 slot 3 而 z() 被指派 slot 4。
+x() 的 slot 是多少? 答案是没有, 因为 x() 并非 virtual function。
+
+
+当一个 class 派生自 Point 时, 会发生什么事 ? 例如 class Point2d: 
+
+class Point2d : public Point
+{
+public:
+    Point2d(float x = 0.0f, float y = 0.0f) : Point(x), y_(y){}
+    ~Point2d();
+    Point2d& multi(float);
+
+    float y() const { return y_};
+
+private:
+    float y_;
+};
+
+
+一共有三种可能性:
+
+1. 它可以继承 base class 所声明的 virtual functions 的函数实例。'正确地说是, 该函数实例的地址会被拷贝到 derived class 的 virtual table
+   的相对应 slot 之中'
+
+2. 它可以使用自己的函数实例。这表示它自己的函数实例地址必须放在对应的 slot 之中
+
+3. 它可以加入一个新的 virtual function, 这时候 virtual table 的尺寸会增大一个 slot, 而新的函数实例地址会被放进该 slot 之中
+
+Point2d 的 virtual table 在 slot 1 中指出 destructor, 而在 slot 2 中指出 mult()(取代 pure virtual function )。它自己的 y() 函数实例地址放
+在 slot 3 中, 继承自 Point 的 z() 函数实例地址则放在 slot 4 中。
+
+
+
+类似的情况, Point3d 派生自 Point2d, 如下:
+
+
+class Point3d : public Point2d
+{
+public:
+    Point3d(float x = 0.0f, float y = 0.0f, float z = 0.0f): Point2d(x, y), z_(z){}
+
+    ~Point3d();
+    Point3d& multi(float);
+
+protected:
+    float z_;
+};
+
+
+其 virtual table 中的 slot 1 放置 Point3d 的 destructor, slot 2 放置 Point3d::mult() 函数地址, slot 3 放置继承自 Point2d 的 y() 函数地址
+, slot 4 放置自己的 z() 函数地址。
+
+
+现在, 如果我有这样的式子:
+
+ptr->z();
+
+我如何有足够的知识在编译时期设定 virtual function 的调用呢?
+
+1. 一般而言, 在每次调用 z() 时, 我并不知道 ptr 所指对象的真正类型。然而我知道, 经由 ptr 可以存取到该对象的 virtual table。
+
+2. 虽然我不知道哪一个 z() 函数实例会被调用, 但我知道每一个 z() 函数地址都被放在 slot 4 中
+
+
+这些信息使得编译器可以将该调用转化为:
+
+(*ptr->vptr[4])(ptr);
+
+在这一转化中, vptr 表示编译器所安插的指针, 指向 virtual table; 4 表示 z() 被指派的 slot 编号(关系到 Point 体系的 virtual table)。唯一一个在执行
+期才能知道的东西是: slot 4 所指的到底是哪一个 z() 函数实例?
+
+在一个单一继承体系中, virtual function 机制的行为十分良好, 不但有效率而且很容易塑造出模型来。但是在多重继承和虚拟继承之中, 对 virtual functions 的
+支持就没有那么美好了。
+
+
+
+// !! 多重继承下的 Virtual Functions
+
+
+
+
+
+
+

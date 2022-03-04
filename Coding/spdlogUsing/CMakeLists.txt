@@ -1,4 +1,4 @@
-project(jsondemo)
+project(spdlogDemo)
 cmake_minimum_required(VERSION 2.8)
 # this is required
 SET(CMAKE_SYSTEM_NAME Linux)
@@ -35,12 +35,12 @@ else ()
 endif ()
 
 include_directories(
-        ${PROJECT_SOURCE_DIR}/include/json
+        ${PROJECT_SOURCE_DIR}/include/
         ${PROJECT_SOURCE_DIR}/lib
 )
 
 link_directories(
-        ${PROJECT_SOURCE_DIR}/include/json
+        ${PROJECT_SOURCE_DIR}/include/
         ${PROJECT_SOURCE_DIR}/lib
 )
 
@@ -50,6 +50,6 @@ file(GLOB_RECURSE SOURCE_FILES
 
 message(STATUS "source file:${SOURCE_FILES}")
 
-add_executable(jsondemo ${SOURCE_FILES})
+add_executable(spdlogDemo ${SOURCE_FILES})
 
-target_link_libraries(jsondemo)
+target_link_libraries(spdlogDemo)

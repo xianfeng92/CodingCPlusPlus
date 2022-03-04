@@ -1,0 +1,2 @@
+[2022-03-04 15:48:19.148] [some_logger_name] [error] error
+[2022-03-04 15:48:19.148] [some_logger_name] [info] a = 100, b = 200, a/b = 0, a%b = 100

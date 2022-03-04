@@ -1,4 +1,4 @@
-project(jsondemo)
+project(fmtdemo)
 cmake_minimum_required(VERSION 2.8)
 # this is required
 SET(CMAKE_SYSTEM_NAME Linux)
@@ -6,7 +6,7 @@ add_definitions(-DWIN_INTERFACE_CUSTOM)
 add_definitions(-DDEBUG)
 
 
- SET(CMAKE_CXX_COMPILER  "g++")
+SET(CMAKE_CXX_COMPILER  "g++")
 
 
 if (NOT CMAKE_BUILD_TYPE)
@@ -19,6 +19,7 @@ option(BUILD_LOCAL "Compile with local header files or resources" OFF)
 set(NO_WARN "-Wno-sign-compare -Wno-write-strings -Wno-unused-result -Wno-unused-function -Wno-unused-variable -Wno-deprecated-declarations -Wno-unused-but-set-variable")
 
 SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${NO_WARN}")
+SET(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} ${NO_WARN}")
 
 if (CMAKE_BUILD_TYPE MATCHES "Debug" OR CMAKE_BUILD_TYPE MATCHES "None")
     MESSAGE(STATUS "CMAKE_BUILD_TYPE is Debug")
@@ -35,13 +36,13 @@ else ()
 endif ()
 
 include_directories(
-        ${PROJECT_SOURCE_DIR}/include/json
-        ${PROJECT_SOURCE_DIR}/lib
+        ${PROJECT_SOURCE_DIR}/include/
+        ${PROJECT_SOURCE_DIR}/include/lib/
 )
 
 link_directories(
-        ${PROJECT_SOURCE_DIR}/include/json
-        ${PROJECT_SOURCE_DIR}/lib
+        ${PROJECT_SOURCE_DIR}/include/
+        ${PROJECT_SOURCE_DIR}/include/lib/
 )
 
 file(GLOB_RECURSE SOURCE_FILES
@@ -50,6 +51,5 @@ file(GLOB_RECURSE SOURCE_FILES
 
 message(STATUS "source file:${SOURCE_FILES}")
 
-add_executable(jsondemo ${SOURCE_FILES})
-
-target_link_libraries(jsondemo)
+add_executable(fmtdemo ${SOURCE_FILES})
+target_link_libraries(fmtdemo fmt)
