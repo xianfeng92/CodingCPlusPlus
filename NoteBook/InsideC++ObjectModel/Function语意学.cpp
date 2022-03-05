@@ -594,6 +594,7 @@ protected:
 , slot 4 放置自己的 z() 函数地址。
 
 
+
 现在, 如果我有这样的式子:
 
 ptr->z();
@@ -619,6 +620,335 @@ ptr->z();
 
 // !! 多重继承下的 Virtual Functions
 
+
+// !! 虚拟继承下的 Virtual Functions
+
+考虑下面的 virtual base class 派生体系, 从 Point2d 派生出 Point3d:
+
+class Point2d
+{
+public:
+    Point2d(float x = 0.0f, float y = 0.0f): x_(x), y_(y) {}
+    virtual ~Point2d();
+
+    virtual void mumble();
+    void float z();
+    //...
+protected:
+    float x_;
+    float y_;
+};
+
+class Point3d : public virtual Point2d
+{
+public:
+    Point3d(float x = 0.0f, float y = 0.0f, float z = 0.0f);
+    ~Point3d();
+    float z();
+private:
+    float z_;
+};
+
+
+虽然 Point3d 有唯一一个(同时也是最左边的) base class, 也就是 Point2d, 但 Point3d 和 Point2d 的起始部分并不像"非虚拟的单一继承"情况那样一致。
+由于 Point2d 和 Point3d 的对象不再相符, 两者之间的转换也就需要调整 this 指针。至于在虚拟继承的情况下要消除 thunks, 一般而言已经被证明是一项高难
+度技术。
+
+
+// !! 函数的效能
+
+在下面这组测试中, 我在不同的编译器上计算两个 3D 点, 其中用到一个 nonmember friend function, 一个 member function, 以及一个 virtual member 
+function, 并且 Virtual member function 分别在单一、虚拟、多重继承三种情况下执行。下面就是 nonmember function:
+
+'nonmember、static member或 nonstatic member 函数都被转化为完全相同的形式。所以我们毫不惊讶地看到三者的效率完全相同'。
+
+
+但是我们很惊讶地发现, 未优化的 inline 函数提高了 25% 左右的效率。而其优化版本的表现简直是奇迹。怎么回事?
+
+这项惊人的结果归功于编译器将"被视为不变的表达式(expressions)" 提到了循环之外, 因此只计算一次。此例显示, 'inline 函数不只能够节省一般函数调用所带来的额
+外负担, 也提供了程序优化的额外机会'。
+
+
+我对 virtual function 的调用, 是通过一个 reference, 而不是通过一个对象, 借此我就可以确定调用操作经过了虚拟机制。效率的降低程度从 4% 到 11% 不等, 其
+中的一部分反映出 Point3d constructor 对于 vptr 1000 万次的设定操作。
+
+
+当我在单一继承情况下执行这项测试时, 我也困惑地发现, '每多一层继承, virtual function 的执行时间就有明显的增加'。一开始我无法想象其间发生了什么事。然而
+当我成为这些程序代码的"最佳男主角"够久了之后, 我终于渐悟了。
+
+
+不管单一继承的深度如何, 主循环中用以调用函数的代码事实上是完全相同的; 同样的道理, 对于坐标值的处理也是完全相同的。其间的不同, 同时也是稍早前我没有考虑到的
+,就是 cross_product() 中出现的局部性 Point3d class object pC。于是 default Point3d constructor 被调用了 1000 万次。'增加继承深度, 就多增加执
+行成本, 这一事实上反映出 pC 身上的 constructor 的复杂度'。这也能够解释为什么多重继承的调用另有一些额外负担。
+
+
+导入 virtual function 之后, class constructor 将获得参数以设定 virtual table 指针。
+
+
+// !!  指向 Member Function 的指针(Pointer-to-Member Functions)
+
+
+取一个 nonstatic data member 的地址, 得到的结果是该 member 在 class 布局中的 bytes 位置(再加 1)。'你可以想象它是一个不完整的值, 它需要被绑定于某
+个 class object 的地址上, 才能够被存取'。
+
+
+'取一个 nonstatic member function 的地址, 如果该函数是 nonvirtual, 得到的结果是它在内存中真正的地址'。然而这个值也是不完全的。它也需要被绑定于某
+个 class object 的地址上, 才能够通过它调用该函数。
+
+
+所有的 nonstatic member functions 都需要对象的地址(以参数 this 指出)
+
+
+回顾一下, 一个指向 member function 的指针, 其声明语法如下:
+
+double // return type
+(Point::* // class the function is member
+pmf)// name of pointer to member
+();// argument list
+
+然后我们可以这样定义并初始化该指针:
+
+double (Point::* coord)() = &Point::x;
+
+也可以这样指定其值:
+
+coord =  &Point::x;
+
+
+欲调用它, 可以这么做:
+
+origin.*coord();
+
+或
+
+ptr->*coord();
+
+
+指向 member function 的指针的声明语法, 以及指向"member selection 运算符"的指针, 其作用是作为 this 指针的空间保留者。
+
+这也就是为什么 static member functions(没有 this 指针)的类型是"函数指针", 而不是"指向 member function 的指针"之故。
+
+使用一个"member function 指针", 如果并不用于 virtual function、多重继承、virtual base class 等情况的话, 并不会比使用一个"nonmember function
+指针"的成本更高。
+
+
+
+// !! 支持指向 Virtual Member Functions 的指针
+
+
+考虑下面的程序片段:
+
+float (Point::* pmf)() = &Point::z;
+float *ptr = new Point3d();
+
+pmf, 一个指向 member function 的指针, 被设值为 Point::z() (一个 virtual function) 的地址。
+
+ptr 则被指定以一个 Point3d 对象。如果我们直接经由 ptr 调用 z():
+
+ptr->z();
+
+
+被调用的是 Point3d::()。但如果我们从 pmf 间接调用 z() 呢?
+
+(ptr->*pmf)();
+
+仍然是 Point3d::z() 被调用吗? 也就是说, '虚拟机制仍然能够在使用"指向 member function 之指针'的情况下运行吗?答案是 yes, 问题是如何实现呢?
+
+
+在前一小节中, 我们看到了, '对一个 nonstatic member function 取其地址, 将获得该函数在内存中的地址'。然而'面对一个 virtual function, 其地址在编译时
+期是未知的, 所能知道的仅是 virtual function 在其相关之 virtual table 中的索引值'。也就是说, 对一个 virtual member function 取其地址, 所能获得的
+只是一个索引值。
+
+
+例如, 假设我们有以下的 Point 声明:
+
+class Point
+{
+public:
+    virtual ~Point();
+    float x();
+    float y();
+    virtual float z();
+private:
+
+};
+
+然后取 destructor 的地址:
+
+&Point::~Point;
+
+得到的结果是 1。取 x() 或 y() 的地址:
+
+&Point::x;
+&Point::y;
+
+到的则是函数在内存中的地址, 因为它们不是 virtual。
+
+取 z() 的地址:
+
+&Point::z;
+
+得到的结果是 2。
+
+'通过 pmf 来调用 z(), 会被内部转化为一个编译时期的式子', 一般形式如下:
+
+(*ptr->vptr[(int)pmf])(ptr);
+
+
+对一个 "指向 member function 的指针"评估求值(evaluated), 会因为该值有两种意义而复杂化; 其调用操作也将有别于常规调用操作。pmf 的内部定
+义, 也就是:
+
+float(Point::*pmf)();
+
+必须允许此函数能够寻址出 nonvirtual x() 和 virtual z() 两个 member functions, 而那两个函数有着相同的原型:
+
+float Point()::x() { return x_;}
+
+float Point::z() {return 0;}
+
+
+只不过其中一个代表内存地址(一长串), 另一个代表 virtual table 中的索引值(一小段)。因此, 编译器必须定义 pmf, 使它能够
+
+
+1. 持有两种数值
+
+2. 更重要的是其数值可以被区别代表内存地址还是 Virtual table 中的索引值
+
+
+// !! 4.5 Inline Functions
+
+下面是 Point class 的一个加法运算符的可能实现内容:
+
+class Point
+{
+    friend Point operator+(const Point& p1, const Point& p2);
+};
+
+
+Point operator+(const Point&p1, const Point& p2)
+{
+    Point new_p;
+    new_p.x_ = p1.x_ + p2.x_;
+    new_p.y_ = p1.y_ + p2.y_;
+    return new_p;
+}
+
+
+理论上, 一个比较"干净"的做法是使用 inline 函数来完成 set 和 get 函数:
+
+new_p.x(p1.x() + p2.());
+
+
+由于我们受限只能在上述两个函数中对 x_ 直接存取, 因此也就将稍后可能发生的 data members 的改变(例如在继承体系中上移或下移)所带来的冲击最小化了。
+
+'如果把这些存取函数声明为 inline, 我们就可以继续保持直接存取 members 的那种高效率---虽然我们亦兼顾了函数的封装性'。
+
+实际上我们并不能够强迫将任何函数都变成 inline。'关键词 inline (或者 class declaration 中的 member function 或 friend function 的定义)
+只是一项请求'。如果这项请求被接受, 编译器就必须认为它可以用一个表达式 (expression) 合理地将这个函数扩展开来。
+
+
+当我说 " 编译器相信它可以合理地扩展一个 inline 函数"时, 我的意思是'在某个层次上,其执行成本比一般的函数调用及返回机制所带来的负荷低'。
+
+cfront 有一套复杂的测试法,通常是用来计算 assignments、function calls、virtual function calls 等操作的次数。'每个表达式(expression)种类有
+一个权值, 而 inline 函数的复杂度就以这些操作的总和来决定'。
+
+
+一般而言, 处理一个 inline 函数, 有两个阶段:
+
+1. 分析函数定义, 以决定函数的 "intrinsic inline ability"(本质的 inline 能力)
+
+   如果函数因其复杂度, 或因其建构问题, 被判断不可成为 inline, 它会被转为一个 static 函数, 并在"被编译模块"内产生对应的函数定义。在一个支持"模块个别编译"
+   的环境中, 编译器几乎没有什么权宜之计。理想情况下, 链接器会将被产生出来的重复东西清理掉。然而一般来说, 目前市面上的链接器并不会将"随此调用而被产生出来的
+   重复调试信息"清理掉。
+
+2. 真正的 inline 函数扩展操作是在调用的那一点上。这会带来参数的求值操作(evaluation)以及临时性对象的管理
+
+
+
+// !! 形式参数（Formal Arguments）
+
+在 inline 扩展期间, 到底真正发生了什么事情? 噢,是的, 每一个形式参数都会被对应的实际参数取代。
+
+
+如果说有什么副作用, 那就是不可以只是简单地一一封塞程序中出现的每一个形式参数, 因为这将导致对于实际参数的多次求值操作(evaluations)。一般而言, 面对
+"会带来副作用的实际参数", 通常都需要引入临时性对象。换句话说, 如果实际参数是一个常量表达式(constant expression),我们可以在替换之前先完成其求值操
+作(evaluations); 后继的 inline 替换, 就可以把常量直接"绑"上去。如果既不是个常量表达式, 也不是个带有副作用的表达式, 那么就直接代换之。
+
+举个例子, 假设我们有以下的简单 inline 函数:
+
+inline int min(int i, int j)
+{
+    return i < j ? i : j;
+}
+
+下面是三个调用操作:
+
+
+inline int bar()
+{
+    int minVal;
+    int v1 = 1021;
+    int v2 = 987;
+
+    minVal = min(v1, v2);// 1
+    minVal = min(1021,987);// 2
+    minVal = min(foo(), bar());// 3
+
+    return minVal;
+}
+
+
+
+标示为(1) 的那一行会被扩展为:
+
+minVal = v1 < v2 ? v1 : v2;
+
+标示为(2) 的那一行直接拥抱常量:
+
+minVal = 987;
+
+标示为 (3) 的那一行则引发参数的副作用。它需要导入一个临时性对象, 以避免重复求值(multiple evaluations):
+
+int t1;
+int t2;
+t1 = foo();
+t2 = bar();
+
+minVal = t1 < t2 ? t1 : t2;
+
+
+// !! 局部变量（Local Variables）
+
+
+如果我们轻微地改变定义, 在 inline 定义中加入一个局部变量, 会怎样?
+
+
+inline int minVal(int i, int j){
+    int minVal = i < j ? i : j;
+    return minVal;
+}
+
+
+这个局部变量需要什么额外的支持或处理吗? 如果我们有以下的调用操作:
+
+
+{
+    int local_var;
+    int minVal;
+    //...
+    minVal = min(v1, v2);
+}
+
+inline 被扩展开来后, 为了维护其局部变量, 可能会成为这个样子(理论上这个例子中的局部变量可以被优化, 其值可以直接在 minval 中计算):
+
+{
+    int local_var;
+    int minVal;
+
+    int _min_lv_minvalue;
+
+    minVal = (_min_lv_minvalue = v1 < v2 ? v1 : v2,_min_lv_minvalue);
+}
 
 
 

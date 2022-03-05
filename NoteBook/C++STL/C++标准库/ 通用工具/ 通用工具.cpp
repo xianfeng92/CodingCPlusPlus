@@ -1032,6 +1032,28 @@ public:
     ....
 };
 
+只需使用 unique_ptr, 就可以避免上述可能的资源泄漏:
+
+class ClassB
+{
+private:
+
+    std::unique_ptr<ClassA> ptr1;
+    std::unique_ptr<ClassA> ptr2;
+
+public:
+
+    ClassB(int val1, int val2): ptr1(new ClassA(val1)), ptr2(new ClassA(val2)){}
+
+    ClassB(const ClassB &x) : ptr1(new ClassA(x.ptr1)), ptr2(new ClassA(x.ptr2)){}
+
+    const ClassB& operator=(const ClassB& x)
+    {
+        *ptr1 = *x.ptr1;
+        *ptr2 = *x.ptr2;
+        return *this;
+    }
+};
 
 
 
