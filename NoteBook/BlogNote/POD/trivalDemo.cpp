@@ -28,4 +28,3 @@ int main()
     cout << "C is trivial is " << std::is_trivial<C>::value << endl;
     return 0;
 }
-
