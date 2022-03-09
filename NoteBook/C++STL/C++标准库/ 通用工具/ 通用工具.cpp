@@ -1056,8 +1056,445 @@ public:
 };
 
 
+首先请注意, 现在你可以略而不写析构函数, 因为 unique_ptr 为你做了该做的事。你还是必须写出 copy 构造函数和 assignment 操作符; 此二者的默认版本会拷贝
+或赋值成员, 而在此那是不可能的。如果你没有自行提供它们, ClassB 将只提供 move 语义。
+
+
+// !! 对付 Array
+
+默认情况下 unique_ptr 如果失去拥有权(也许因为被销毁, 或因为被赋予新值, 或因为变成empty), 会为其所拥有的对象调用 delete。不幸的是基于 C 语言以来的规
+则, C++ 无法区分 pointer 是"指向单对象"或"指向 array"。
+
+
+而 C++ 语言又规定, 对于 array 应该使用 delete[] 而不是 delete, 所以下面的语句是错误的:
+
+std::unique_ptr<std::string> up(new std::string[10]);// runtime Error
+
+现在, 你可能会想, 如果采用 class shared_ptr, 你必须定义自己的 deleter 才能处理 array。其实不必。
+
+很幸运地, C++ 标准库为 class unique_ptr 提供了一个偏特化版本(partial specialization) 用来处理 array, 这个版本会在遗失其所指对象的拥有权时, 对该
+对象调用 delete[]。你只需这么声明:
+
+std::unique_ptr<std::string[]> up(new std::string[10]);
+
+然而请注意, 这个偏特化版本提供的接口稍有不同。它不再提供操作符 * 和 ->, 改而提供操作符 [], 用以访问其所指向的 array 中的某一个对象。
+
+
+std::unique_ptr<std::string[]> up(new std::string[10]);
+...
+std::cout << *up << std::endl;// Error, * not define for array string
+std::cout <<up[0] << std::endl;// ok
+
+'一如既往, 确保索引合法是程序员的责任, 不合法的索引会导致不确定行为'。
+
+也请注意, 这个 class 不接受一个"派生类型"的 array 作为初值。这带来的影响是: 在朴素直率的(plain) array 身上起不了多态作用(polymorphism)。
 
 
 
+// !! Class default_delete<> 
+
+让我们把目光移近 class unique_ptr 的声明式。概念上, 这个 class 被声明如下:
+
+namespace std
+{
+    template <typename T, typename D = default_delete<>>
+    class unique_ptr
+    {
+        public:
+        ...
+        T& operator*() const;
+        T* operator->() noexcept;
+        class unique_ptr<T[],D>
+        {
+            public:
+                ...
+                T& operator[](size_t i) const;
+        };
+    };
+}
+
+
+可以看出, 其中有个特殊版本负责处理 array。该版本提供操作符 [] 而非 * 和 ->, 用以处理 array 而非单一对象。
+
+二者都使用 class std::default_delete<> 作为 deleter, 那又被特化使得面对 array 时调用 delete[] 而非 delete:
+
+namespace std
+{
+    template <typename T>
+    class default_delete{
+        public:
+            void operator()(T *p) const;// call delete p
+
+    };
+
+    template<typename T>
+    class default_delete<T[]>
+    {
+        void operator()(T *p) const;// call delete[] p;
+    };
+}
+
+注意, 默认的 template 实参也会自动施行于偏特化版本上。
+
+
+// !! 其他相应资源的 Deleter
+
+当你所指向的对象要求的不只是调用 delete 或 delete[], 你就只好(必须)具体指定自己的 deleter。然而此处 deleter 的定义方式略略不同于 shared_ptr。
+你必须具体指明 deleter 的类型作为第二个 template 实参。该类型可以是个 reference to function, 或是个 function pointer 或 function object
+。如果是个 function object, 其 function 'call 操作符' () 应该接受一个"指向对象"的 pointer。
+
+举个例子, 以下代码在 delete 对象之前先打印一份额外信息:
+
+class ClassADeleter{
+    public:
+    void operator()(ClassA *p)
+    {
+        cout << "delete ClassA" << endl;
+        delete p;
+    }
+};
+
+...
+
+std::unique_ptr<ClassA, ClassADeleter> up(new ClassA());
+
+如果你给的是个函数或 lambda, 你必须声明 deleter 的类型为 void(*)(T *) 或 std::function<void (T *)>, 要不就使用 decltype。例如, 若要为一个
+array of int 指定自己的 deleter, 并以 lambda 形式呈现, 应该写:
+
+std::unique_ptr<int, void(*)(int *)> up(new int[10],
+    [](int *p)
+    {
+        delete[] p;
+    }
+);
+
+或者
+
+std::unique_ptr<int, std::function<void(int *)>> up(new int[10],
+    [](int *p)
+    {
+        delete[] p;
+    }
+);
+
+或者
+
+auto delete = [](int *p){delete[] p;};
+
+std::unique_ptr<int, decltype(delete>) up(new int[10], delete);
+
+
+为了避免 "传递 function pointer 或 lambda 时必须指明 deleter 的类型", 你可以使用所谓的 alias template, 这是自 C++11 起提供的语言特性:
+
+
+template <typename T>
+using uniquePtr = std::unique_ptr<T, void(*)(T *)>// alias template
+...
+uniquePtr<int> up(new int[10], [](int *p)// use here
+{
+    delete[] p;
+}
+);
+
+下面的例子完整示范了使用自己的 deleter:
+
+#include <iostream>
+#include <string>
+#include <memory>// for unique_ptr
+#include <cstring>// for strerror
+#include <cerrno> // for errno
+
+using namespace std;
+
+
+class DirClose{
+public:
+    void operator()(DIR *dir){
+        if(closedir(dir) != 0)
+        {
+            std::cerr << "OOPS: closedir() failed" << std::endl;
+        }
+    }
+};
+
+
+int main(int argc, char *argv[])
+{
+    unique_ptr<DIR, DirClose> pDir(opendir('.'));
+
+    struct dirent *dp;
+    while ((dp = readdir(pDir.get())) != nullptr){
+        string filename(dp->d_name);
+        cout << "processing " << filename << std::endl;
+        ...
+    }
+}
+
+
+本例在 main() 内处理当前文件目录下的所有条目, 使用标准 POSIX 接口: opendir()、readdir() 和 closedir()。为确保任何情况下被开启的目录都会被
+closedir() 关闭, 我们定义一个 unique_ptr, 造成只要"指向被开启目录" 的那个 handle 被销毁, DirCloser 就被调用。'就像 shared pointer 一样, 
+unique pointer 的 deleter 不可抛出异常, 因此这儿我们只打印一个报错信息'。
+
+
+使用 unique_ptr 另一个好处是, 不可能存在拷贝(copy)。注意 readdir() 并非无状态(stateless), 所以下面是个好主意: 使用 handle 处理目录时确保该
+handle 的拷贝不得改动其状态(state)。
+
+如果你并不想处理 closedir() 的返回值, 那么也可以直接传递 closedir() 成为一个 function pointer, 并明确指出 deleter 是个 function pointer。但
+是务必知晓, 下面这个经常被推荐的声明式:
+
+
+unique_ptr<DIR, void(*)(DIR *dir)> pDir(opendir('.'), closedir);// ok
+
+
+并不保证可移植, 因为 closedir 具备 extern "C" linkage, 所以在 C++ 代码中它不保证能被转换为 int(*)(DIR*)。如果要求可移植性, 你需要一个中介的类
+型定义式如下:
+
+extern "C" typedef int(*DIRDELETER)(DIR *);
+unique_ptr<DIR,DIRDELETER> pDir(opendir('.'), closedir);//okay
+
+
+注意 closedir() 返回int, 所以我们必须明确指出 deleter 的类型为 int(*)(DIR *)。然而请注意, 经由 function pointer 执行的调用, 是个间接调用,
+较难被优化。
+
+
+
+// !! 细究 Class unique_ptr
+
+class unique_ptr 提供了一个"带有独占拥有权的 smart pointer 语义"的概念。一旦某个 unique pointer 有了独占控制权, 你将无法创造出"多个 pointer 拥
+有该相应对象"的形势。主要目的是确保在那个 pointer 寿命结束时, 相应对象被删除(或是资源被清理干净)。这特别有助于提供异常安全性。'相比于 shared pointer, 
+这个 class 关注的是最小量的空间开销和时间开销'。
+
+
+Class unique_ptr<> 被模板化, 其参数是原始 pointer 所指对象的类型, 以及 deleter 的类型:
+
+
+namespace std
+{
+    template <typename T, typename D = default_delete<>>
+    class unique_ptr{
+    public:
+        typedef ...pointer;
+        typedef T element_type;
+        typedef D deleter_type;
+    };
+}
+
+
+它有一个针对 array 的偏特化版本(注意,根据语言规则,它有相同的 default deleter, 也就是 default_delete<T[]>):
+
+namespace std
+{
+    template <typename T, typename D>
+    class unique_ptr<T[], D>{
+        public:
+            typedef ...pointer;
+            typedef T element_type;
+            typedef D deleter_type;
+            ...
+    };
+}
+
+元素类型 T 可以是 void, 意味着 unique pointer 拥有的对象其类型不明确, 就像 void* 那样。
+
+注意 class 内定义了一个 pointer 类型, 它并非一定得是 T*。如果 deleter D 也有一个 pointer typedef, 被使用的将会是这个类型。这种情况下 template 
+参数 T 就只具备类型标签(type tag)效果,因为 class unique_ptr<> 内无任何成员与 T 有关; 每一样东西都取决于 pointer。这么做的好处是, unique_ptr 可
+因而持有(hold)其他 smart pointer。
+
+
+'如果一个 unique_ptr 是空的 (empty), 表示未拥有对象, 那么get() 会返回 nullptr'。
+
+
+unique pointer 提供的一些操作:
+
+unique_ptr<...> up; // Default 构造函数,建立一个 empty unique pointer, 使用 Default Deleter 类型的一个实体作为 deleter
+
+unique_ptr<T> up(nullptr);// 建立一个 empty unique pointer, 使用 Default Deleter 类型的一个实体作为 deleter
+
+unique_ptr<...> up(ptr);// 建立一个 unique pointer, 拥有 *ptr, 使用 Default Deleter 类型的一个实体作为 deleter
+
+unique_ptr<...> up(ptr, del);// 建立一个 unique pointer, 拥有 *ptr, 使用 del 作为 deleter
+
+unique_ptr<T> up(move(up2));// 建立一个 unique pointer, 拥有先前被 up2 所有用的对象（此后 up2 为空）,使用 Default Deleter 类型的一个实体作为 deleter
+
+up.~unique_ptr();// 析构函数，为一个被拥有的对象调用 deleter
+
+up = move(up2);// Move 赋值（up2 移交拥有权给 up）
+
+swap(up,up2);// 置换 up 和 up2 的 pointer 和  deleter
+
+up = nullptr; // 对一个被拥有物调用 deleter, 并令为空(等价于 up.reset())
+
+up.reset(ptr);// 对一个被拥有物调用 deleter, 并重新初始化 shared pointer 使它拥有 *ptr
+
+up.release();// 放弃拥有权, 将拥有权交给调用者
+
+up.get();// 返回被存储的 pointer
+
+*up;// 只作用于单对象,返回被拥有物
+
+up->;//  只作用于单对象,为被拥有物提供成员访问
+
+up1 == up2; // 为被存储的 pointer 调用 ==
+
+up1 != up2 ;// 为被存储的 pointer 调用 !=
+
+up1 > up2; // 为被存储的 pointer 调用 >
+
+
+
+构造函数接受一个 pointer 和一个 deleter 作为实参, 并有多个重载版本, 所以下面的行为都正确:
+
+D d;
+unique_ptr<int,D> p1(new int(),D());
+
+unique_ptr<int,D> p2(new int(), d);
+
+unique_ptr<int,D&> p3(new int(),d);
+
+对于单一对象, move 构造函数和 assignment 操作符都是 member template, 允许类型转换。所有比较操作符(comparison operator) 都针对不同的元素类型
+和 deleter 类型被模板化。
+
+所有比较操作符所比较的都是 shared pointer 内部那个 raw pointer (相当于针对 get() 返回值调用同一个操作符)。
+
+
+针对 array 而发展的特化版本, 与针对单一对象的泛化版本有着以下不同:
+
+1. 不再提供操作符 * 和 ->, 改提供操作符 []
+
+2. 不支持不同类型之间的转换。特别值得注意的是, 不允许指向派生元素类型
+
+注意其 deleter 接口与 class shared_ptr 的不同。和shared pointer 相同的是, 其 deleter 也不该抛出异常。
+
+
+// !! Smart Pointer 结语
+
+一如我们所见, C++11 提供了 smart pointer 两个概念:
+
+1. shared_ptr 用来共享拥有权
+
+2. unique_ptr 用来独占拥有权
+
+后者取代陈旧的 C++98 auto_ptr, 这个 class 如今已被声明为不合时宜。
+
+
+
+// !! 关于效能(Performance)
+
+也许你会奇怪, 为什么 C++ 标准库不是只提供一个带有"分享拥有权"语义的 smart pointer class, 因为这也可以避免资源泄漏或拥有权转移。答案是因为 
+shared pointer 带来的效能冲击。
+
+Class shared_ptr 是以一种非直观(非侵入式)做法完成的, 意味着被此 class 管理的对象不需服从任何特定条件, 就像 common base class 那样。这么做的一大
+好处是, 此一概念可被作用于任何类型, 包括基础数据类型。'代价则是 shared_ptr 对象内部需要多个成员: 一个寻常 pointer 用来指向对象, 一个引用计数器
+(由"指向同一对象"的所有 shared pointer 共享')。
+
+
+Unique pointer 完全不需要这样的额外开销。它们的智能建立在"特殊的构造函数和析构函数"及"copy 语义的消除"上。如果给予它的 deleter 是 stateless (无
+状态,也就是无数据栏)或 empty, 它消费的内存应该和 native pointer 相同, 而和"使用 native pointer 并手动 delete"相比, 也应该不会有运行期额外开销
+(runtime overhead)。然而, 为了避免带来非必要开销, 你应该使用 function object(包括 lambda)作为 deleter, 以便成就最佳优化, 甚至理想中的零开销。
+
+
+// !! Type Trait 和 Type Utility
+
+C++ 标准库中几乎每样东西都以 template 为根基。为了更多地支持 template 编程(metaprogramming), 标准库提供了 template 通用工具, 协助应用程序开发
+人员和程序库作者。
+
+'Type trait, 由 TR1 引入而在 C++11 中大幅扩展的一项机制, 定义出因 type 而异的行为。它们可被用来针对 type 优化代码, 以便提供特别能力'。
+
+
+// !! Type Trait 的目的
+
+'所谓 type trait, 提供一种用来处理 type 属性(property of a type) 的办法'。它是个 template, 可在编译期根据一或多个 template 实参(通常也是 type)
+产出一个 type 或 value。
+
+请看以下例子:
+
+template<typename T>
+void foo(const T& val)
+{
+    if(std::is_pointer<T>::value){
+        std::cout << "foo call for a pointer" << std::endl;
+    }else{
+        std::cout << "foo call for a value" << std::endl;
+    }
+}
+
+这里的 trait std::is_pointer 定义于 <type_traits>, 用来检查 T 是否是个 pointer type。
+
+
+// !! 头文件 <cstddef>、<cstdlib> 和 <cstring>
+
+'头文件 <cstddef>、<cstdlib> 和 <cstring> 与其 C 对应版本兼容, 在 C++ 程序中经常用到。它们是 C 头文件<stddef.h>、<stdlib.h> 和 <string.h>
+的较新版本, 定义了一些常用的常量、宏、类型和函数'。
+
+
+// !! <cstddef> 内的各项定义
+
+NULL;// 指针值, 用来表示 未定义 或者 无值
+
+nullopt_t;// nullptr 类型(since C++ 11)
+
+size_t;// 一种无正负号类型, 用来表示大小(例如元素个数)
+
+ptrdiff_t;// 一种带正负号的类型, 用来表示指针之间的距离
+
+offsetof(type, mem);// 表示成员 mem 在 struct 或者 union 中的偏移量
+
+在 C++11 之前, NULL 通常用来表示一个不指向任何对象的 pointer。自 C++11 起改以 nullptr 表示这个语义。
+
+
+// !! <cstdlib> 内的各种定义
+
+EXIT_SUCCESS;// 程序正常结束
+EXIT_FAILURE;// 程序不正常结束
+
+exit(int status);// 退出（离开）程序,并清理 static 对象
+
+quick_exit();// 退出程序时,以 at_quick_exit() 清理，since c++11
+
+abort();// 退出程序(在某些系统上可能导致崩溃)
+
+atexit(void(*func)());// 退出程序时调用 func
+
+at_quick_exit(void(*func)());// 在 quick_exit() 上调用 func
+
+
+1. 常量 EXIT_SUCCESS 和 EXIT_FAILURE 用作 exit() 的实参, 也可以当作 main() 的返回值
+
+2. 经由 atexit() 注册的函数, 在程序正常退出时会依注册的相反次序被一一调用
+
+3. 函数 exit() 和 abort() 可用来在任意地点终止程序运行, 不会再返回 main()
+
+   1. exit() 会销毁所有 static 对象, 清空所有缓冲区, 关闭所有 I/O 通道(channel), 然后终止程序, 终止前会先调用经由 atexit() 注册的函数。
+      如果 atexit() 注册的函数抛出异常, 就会调用 terminate()
+
+   2. abort() 会立刻终止函数, 不做任何清理(cleanup)工作
+
+   这两个函数都不会销毁局部对象(local object), 因为 stack unwinding 不会被执行起来。如果你希望确保所有局部对象的析构函数被调用, 应该运用异常(exception)
+   或正常返回机制, 然后从 main() 退出程序。
+
+
+4. 自 C++11 起 quick_exit() 不再摧毁对象, 而是调用先前曾被 at_quick_exit() 注册过的函数, 然后调用 _Exit() 结束程序, 不带任何析构或清理动作。
+   这意味着 quick_exit() 和 _Exit() 都不会清空(flush)标准文件缓冲区(标准输出区和错误输出区)
+
+
+5. C++ 程序的中止(abort)--一种意外结束而非"意料内的结束加上发出一个错误代码"---通常做法是调用 std::terminate(), 后者默认调用 abort()
+
+
+
+// !! <cstring> 中的定义式
+
+
+'<cstring> 头文件中最重要的定义式: 用以设定、拷贝、搬移(set, copy, move)内存的低层函数'。
+
+
+memcpy(void *toPtr, const void *fromPtr, size_t len);// 将 fromPtr 所指向的前 len 个 byte 复制到 toPtr 所指向的内存位置
+
+memset(void *ptr, int c, size_t len);// 将 ptr 所指的前 len 个 byte 赋值为字符 c
+
+memmove(void *toPtr, void *fromPtr, size_t len);// 将 fromPtr 所指向的前 len 个 byte 复制至 toPtr（区域可重叠）
+
+memcmp(const void *ptr1, const void *ptr2, size_t len);// 比较 ptr1 和 ptr2 所指的前 len 个 byte
+
+memchr(const void *ptr, int c, size_t len);// 在 ptr 所指向的前 len 个字符中找出字符 c
 
 
