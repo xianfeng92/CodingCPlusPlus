@@ -6,5 +6,5 @@ CXX_FLAGS =  -Wno-sign-compare -Wno-write-strings -Wno-unused-result -Wno-unused
 
 CXX_DEFINES = -DDEBUG -DWIN_INTERFACE_CUSTOM
 
-CXX_INCLUDES = -I/home/parallels/Stan/xforg/CodingCPlusPlus/Coding/spdlogUsing/include -I/home/parallels/Stan/xforg/CodingCPlusPlus/Coding/spdlogUsing/lib 
+CXX_INCLUDES = -I/home/parallels/Stan/xforg/CodingCPlusPlus/Coding/spdlogUsing/include 
 
