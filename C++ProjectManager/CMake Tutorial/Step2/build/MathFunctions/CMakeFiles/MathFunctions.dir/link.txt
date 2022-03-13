@@ -1,0 +1,2 @@
+/usr/bin/ar qc libMathFunctions.a  CMakeFiles/MathFunctions.dir/mysqrt.cpp.o
+/usr/bin/ranlib libMathFunctions.a
