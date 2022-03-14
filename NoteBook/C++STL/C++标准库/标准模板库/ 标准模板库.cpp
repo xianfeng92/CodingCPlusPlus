@@ -666,3 +666,303 @@ Queue 对元素采取 FIFO 管理策略。也就是说, 它是个寻常的缓冲
 
 
 // !! 迭代器 (Iterator)
+
+自 C++11 起, 我们可以使用一个 range-based for 循环来处理所有元素, 然而如果只是要找出某元素, 并不需要处理所有元素。我们应该迭代所有元素,
+直到找到目标。
+
+此外, 我们或许希望将这个(被找到的元素的)位置存放在某处, 以便稍后能够继续迭代或进行其他处理。
+
+// !! 因此我们需要这样的概念: 以一个对象表现出容器元素的位置。
+
+这样的概念的确存在。实践这个概念的对象就是所谓的迭代器(iterator)。事实上我们将会看到, range-based for 循环其实就是此概念的一个便捷接口,
+也就是说, 其内部使用迭代器对象迭代(遍历)所有元素。
+
+迭代器是一个 "可遍历STL容器全部或部分元素" 的对象。"迭代器用来表现容器中的某一个位置"。基本操作如下":
+
+1. Operator* 返回当前位置上的元素值。如果该元素拥有成员, 你可以通过迭代器直接以操作符 -> 取用它们
+
+2. Operator++ 令迭代器前进至下一元素。大多数迭代器还可使用  operator-- 退至前一元素
+
+3. Operators == 和 != 判断两个迭代器是否指向同一位置
+
+4. Operator= 对迭代器赋值(也就是指明迭代器所指向的元素的位置)
+
+// !! 这些操作和 C/C++  运用 pointer 操作寻常的 array 元素时的接口一致。
+
+差别在于, 迭代器是所谓的 smart pointer, 具有遍历复杂数据结构的能力,其内部运作机制取决于其所遍历的数据结构。因此, 每一种容器都必须提供自己
+的迭代器。事实上每一种容器的确都将其迭代器以嵌套 (nested) 方式定义于 class 内部
+
+// !! 因此各种迭代器的接口虽然相同, 类型却各自不同。
+
+这直接引出了泛型程序设计的概念: 所有操作都使用相同接口, 纵使类型不同。因此, 你可以使用 template 将泛型操作公式化, 使之得以顺利运作那些能够
+满足接口需求的任何类型。
+
+// !! 所有容器类都提供一些基本的成员函数,使我们得以取得迭代器并以之遍历所有元素。这些函数中最重要的是:
+
+1. begin() 返回一个迭代器, 指向容器起点, 也就是第一元素(如果有的话)的位置
+
+2. end() 返回一个迭代器, 指向容器终点。终点位于最末元素的下一位置, 这样的迭代器又称作 past-the-end 迭代器
+
+
+于是, begin() 和 end() 形成了一个半开区间(half-open range), 从第一元素开始, 到最末元素的下一位置结束。半开区间有两个优点:
+
+1. "遍历元素时的 loop 结束时机" 提供一个简单的判断依据。只要尚未到达 end(), loop 就可以继续进行
+
+2. 必对空区间 (empty range) 采取特殊处理手法。空区间的 begin() 就等于 end()
+
+下面这个例子示范了迭代器的用法, 将 list 容器的所有元素打印出来:
+
+#include <list>
+#include <iostream>
+
+using namespace std;
+
+int main(int argc, char **argv)
+{
+    list<char> coll;
+
+    for(char c = 'a'; c <= 'z'; c++)
+    {
+        coll.push_back(c);
+    }
+
+    list<char>::const_iterator pos;
+    for(pos = coll.begin(); pos != coll.end(); pos++)
+    {
+        cout << *&pos << endl;
+    }
+    return 0;
+}
+
+首先创建一个 list, 然后填入字符 'a' 到 'z', 然后打印出所有元素。但这这次不是使用 range-base for循环:
+
+for(auto ele: coll)
+{
+    cout << ele << endl;
+}
+
+
+所有元素是被一个寻常的 for 循环打印, 使用迭代器走遍容器内的每一个元素:
+
+
+list<char>::const_iterator pos;
+for(pos = coll.begin(); pos != coll.end(); pos++)
+{
+    cout << *pos << endl;
+}
+
+迭代器 pos 被声明于循环之前, 其类型是"指向容器内的常量元素"的迭代器:
+
+list<char>::const_iterator pos;
+
+任何容器都定义有两种迭代器类型:
+
+1.container::iterator 以读/写模式遍历元素
+
+2.container::const_iterator 以只读模式遍历元素
+
+例如在 class list 中, 它们的定义可能如下:
+
+namespace std{
+    template<typename T>
+    class list{
+        public:
+            typedef ... iterator;
+            typedef ... const_iterator;
+    };
+}
+
+至于其中 iterator 和 const_iterator 的确切类型, 则由 implementation 定义之。
+
+
+你不能改变元素内容, 因为 pos 是个 const_iterator, 从这样一个迭代器的观点看, 元素是常量, 不能更改。不过如果你采用非常量 (nonconstant)
+迭代器, 而且元素本身的类型也是非常量(nonconstant), 就可以通过迭代器来改变元素值:
+
+list<char>::iterator pos;
+
+for(pos = list.begin(); pos != list.end(); ++pos)
+{
+    *pos = toupper(*pos);
+}
+
+
+如果我们使用迭代器遍历 (unordered) map和 multimap 的元素, pos 会指向 key/value pair。那么表达式:
+
+pos->second;
+
+将取得 key/value pair 的第二成分, 也就是元素的 value, 而表达式:
+
+pos->first;
+
+会取得其 (constant) key。
+
+
+// !! ++pos vs  pos++
+
+这里使用前置式递增 (preincrement) ,因为它比后置式递增 (postincrement) 效率高。后者内部需要一个临时对象, 因为它必须存放迭代器的原
+本位置并返回之, 所以一般情况下最好使用 ++pos, 不要用 pos++。
+
+也就是说, 你应该避免这么写:
+
+for(pos = cout.begin(); pos != cout.end(); pos++)
+{
+    cout << *pos << endl;
+}
+
+'这种效率改善几乎总是无关紧要的。所以, 不要把这里的推荐解读为"你应该竭尽所能不计代价地做任何事情, 只为了如此微小的效率损失"'。
+
+// !! 程序的可读性, 以及可维护性, 远比效率优化重要。
+
+
+// !! cbegin() 和 cend() 
+
+自 C++11 开始, 我们可以使用关键字 auto 代替迭代器的精确类型 (前提是你在迭代器声明期间就初始化,使其类型可以取决于初值)。因此如果我们直接以
+begin() 初始化迭代器, 就可以使用 auto 声明其类型:
+
+
+for(auto pos = cbegin(); pos != cend(); ++pos)
+{
+    cout << *pos << endl;
+}
+
+
+如你所见, '使用 auto 的优点之一就是, 程序比较浓缩精简'。
+
+如果没有 auto, 在循环内声明迭代器的动作应该如下:
+
+for(list<char>::iterator pos = begin(); pos != end(); ++pos)
+{
+    cout << *pos << endl;
+}
+
+
+另一个优点是, '采用这种循环写法, 万一容器类型有所改变,程序整体仍能保持较佳的强壮性'。
+
+然而其缺点是, 迭代器丧失常量性 (constness), 可能引发"计划外的赋值"风险。因为
+
+
+auto pos = coll.begin();
+
+会使 pos 成为一个非常量迭代器, 此乃因为 begin() 返回的是个类型为 cont::iterator 的对象。
+
+// !! 为确保仍可使用常量迭代器, 自 C++11 起容器提供 cbegin() 和 cend(), 它们返回一个类型为 cont::const_iterator 的对象
+
+现在我来总结改善方案。自 C++11 起, 一个允许"迭代容器内所有元素"的循环如果不使用 range-based for 循环, 看起来应如下:
+
+for(auto pos = coll.cbegin(); pos != coll.cend(); ++pos)
+{
+    ...
+}
+
+
+// !! Range-Based for 循环 vs 迭代器
+
+介绍过迭代器之后, 我们可以解释 range-based for 循环的精确行为了。对容器而言, range-based for 循环其实不过是个便捷接口, 用来迭代它"所接
+收到的集合区间" 内的每一个元素。在循环体内, 真实元素被"当前迭代器所指向的 value"初始化。
+
+
+for(type elem : coll)
+{
+    ...
+}
+
+被解释为:
+
+for(auto pos = coll.cbegin; pos != coll.cend(); ++pos)
+{
+    ...
+}
+
+现在我们可以了解为什么声明 elem 为一个 constant reference 可以避免非必要复制了。
+
+
+
+// !!  关联式（Associative）及无序（Unordered）容器的更多实例
+
+
+// !! 使用 C++11 之前的 Set
+
+#include <set>
+#include <iostream>
+#include <string>
+
+using namespace std;
+
+int main(int argc, char **argv)
+{
+    typedef set<int> Intset;
+
+    Intset coll;
+
+    coll.insert(1);
+    coll.insert(2);
+    coll.insert(3);
+    coll.insert(4);
+    coll.insert(5);
+    coll.insert(6);
+    coll.insert(7);
+    coll.insert(8);
+
+    Intset::const_iterator pos;
+    for(pos = coll.begin(); pos != coll.end(); ++pos)
+    {
+        cout << *pos << '\n';
+    }
+
+    cout << '\n';
+
+    return 0;
+}
+
+一如以往, include 指示符定义了 set 的所有必要类型和操作:
+
+#include <set>
+
+既然容器的类型要用到好几次, 不妨先定义一个短一点的名字:
+
+typedef set<int> Intset;
+
+'所有关联式容器都提供了 insert() 成员函数, 用来安插新元素':
+
+coll.insert(1);
+coll.insert(2);
+coll.insert(3);
+coll.insert(4);
+coll.insert(5);
+
+C++11 允许我们这么写:
+
+coll.insert({1,2,3,4,5});
+
+每一个被安插的元素就会根据排序准则自动被放到正确位置。
+
+'不可使用序列式容器才会有的 push_back() 或 push_front(), 它们在这里毫无意义, 因为 set 不允许你指定新元素的位置'。
+
+
+所有元素 (不论以任何次序) 安插完毕后, 元素以排序后 (sorted) 的状态存放于内部 tree 结构中。'任何元素(节点)的左子树的所有元素都小于右子树的
+所有元素'(此处"小于" 是指就当前排序准则而言)。
+
+
+
+// !! 使用无序的 Multiset
+
+让我们仔细观察另一个例子,遍历一个无序(unordered) multiset 的所有元素时会发生什么事:
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
