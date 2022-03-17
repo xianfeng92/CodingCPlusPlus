@@ -948,6 +948,566 @@ coll.insert({1,2,3,4,5});
 
 让我们仔细观察另一个例子,遍历一个无序(unordered) multiset 的所有元素时会发生什么事:
 
+'这些元素的顺序是不明确的, 取决于 hash table 的内部布局, 也取决于 hashing 函数'。甚至即使元素先被排序后才被安插,它们在容器内还是有着不
+明确的顺序。
+
+如你所见, 这样的次序实在是杂乱无规则可言, 而且在你的平台上执行这个程序可能获得又不一样的次序。就算只添加一个元素, 也可能全盘改变次序。'唯一
+保证的是, 内容(value) 相同的元素会相邻'。
+
+'再一次, for 循环内的迭代器 pos 拥有一个由容器提供的类型, 所以它"知道"如何逐一遍历所有元素'。
+
+
+// !! 迭代器种类 (Iterator Category)
+
+除了基本操作, 迭代器还有其他能力。'这些能力取决于容器的内部结构'。STL 总是只提供效率比较出色的操作, 因此如果容器允许随机访问(例如 vector 
+或 deque), 它们的迭代器也必定能进行随机操作(例如直接让迭代器指向第5元素)。
+
+
+根据能力的不同, 迭代器被划分为五种不同类别。STL 预先定义好的所有容器, 其迭代器均属于以下三种分类:
+
+1. '前向迭代器' (Forward iterator) 只能够以累加操作符 (increment operator) 向前迭代。Class forward_list的迭代器就属此类。其他容器如 
+    unordered_set、unordered_multiset、unordered_map 和 unordered_multimap 也都至少是此类别(但标准库其实为它们提供的是双向迭代器)。 
+
+2. 双向迭代器(Bidirectional iterator) 顾名思义它可以双向行进: 以递增 (increment) 运算前进或以递减 (decrement) 运算后退。list、set、
+   multiset、map 和 multimap 提供的迭代器都属此类。
+
+3. "随机访问迭代器" (Random-access iterator) 它不但具备双向迭代器的所有属性, 还具备随机访问能力。。更明确地说, 它们提供了迭代器算术运算的必要操作
+   符(和寻常指针的算术运算完全对应)。你可以对迭代器增加或减少一个偏移量、计算两迭代器间的距离, 或使用 < 和 > 之类的 relational(相对关系)操作符进行
+   比较。'vector、deque、array 和string 提供的迭代器都属此类'。
+
+除此之外, STL 还定义了两个类别:
+
+4. 输入型迭代器 (Input iterator) 向前迭代时能够读取/处理 value。Input stream 迭代器就是这样一个例子
+
+5. 输出型迭代器 (Output iterator) 向前迭代时能够涂写 value
+
+
+'为了写出尽可能与容器类型无关的泛型代码, 你最好不要使用 random-access iterator 的特有操作'。例如, 以下动作可在任何容器上运作:
+
+
+for(auto it = coll.begin(); it != coll.end(); ++it)
+{
+
+}
+
+但下面这样的代码就不是所有容器都适用了:
+
+for(auto it = coll.begin(); it < coll.end(); ++it)
+{
+
+}
+
+
+
+
+// !! 算法（Algorithm）
+
+'为了处理容器内的元素, STL 提供了一些标准算法, 包括查找、排序、拷贝、重新排序、修改、数值运算等基本而普遍的算法'。
+
+算法并非容器类的成员函数, 而是一种搭配迭代器使用的全局函数。这么做有一个重要优势: 所有算法只需实现一份, 就可以对所有容器运作, 不必为每一种容器量身定制。
+算法甚至可以操作不同 type 之容器内的元素, 也可以与用户自定义的容器搭配。这个概念大幅降低了代码量, 提高了程序库的能力和弹性。
+
+
+注意, 这里所阐述的并非面向对象思维 (OOP paradigm), 而是泛型函数编程思维 (generic functional programming paradigm)。'在 OOP 概念里, 数据与操
+作合为一体, 在这里则被明确划分开来, 再通过特定的接口彼此互动'。
+
+当然这需要付出代价:首先是用法有失直观, 其次某些数据结构和算法之间并不兼容。更有甚者, 某些容器和算法虽然勉强兼容却毫无用处(也许导致很糟的效率)。'因此,深
+入学习 STL 概念并了解其缺陷,显得十分重要,唯其如此方能取其利而避其害'。
+
+
+#include <iostream>
+#include <algorithm>
+#include <vector>
+
+using namespace std;
+
+int main(int argc, char** argv)
+{
+    vector<int> coll = {21,1,2,4,3,6,10,9,8};
+
+    auto mini_pos = std::min_element(coll.begin(), coll.end());
+    cout << "mini_pos is " << *mini_pos << endl;
+
+    auto max_pos = std::max_element(coll.begin(), coll.end());
+    cout << "max_pos is " << *max_pos << endl;
+
+    std::sort(coll.begin(), coll.end());
+
+    auto pos3 = std::find(coll.begin(), coll.end(),3);
+
+    std::reverse(pos3, coll.end());
+
+    for(auto elem : coll)
+    {
+        cout << "elem " << elem << endl;
+    }
+    cout << endl;
+    return 0;
+}
+
+
+为了能够调用算法, 首先必须包含头文件 <algorithm> (某些算法需要特别的头文件):
+
+#include <algorithm>
+
+最先出现的算法是 min_element() 和 max_element() 。'调用它们时必须传入两个实参, 定义出欲处理的元素范围'。如果想处理容器内所有元素, 可使用 
+cbegin() 和 cend(), 或 begin() 和 end()。两个算法都返回一个迭代器, 分别指向最小或最大元素。因此, 语句:
+
+auto mini_pos = std::min_element(coll.begin(), coll.end());
+
+中, 算法 min_element() 返回最小元素的位置。
+
+
+接下来出现的算法是 sort()。顾名思义, 它将"由两个实参指出来"的区间内的所有元素加以排序。你可以(选择性地)传入一个排序准则, 默认使用 operator<。
+
+std::sort(coll.begin(), coll.end());
+
+注意, 这里不可使用 cbegin() 和 cend(), 因为 sort() 会改动元素的 value, 但 const_iterator 不允许如此。
+
+再来便是算法 find()。它在给定范围内查找某值。
+
+auto pos3 = std::find(coll.begin(), coll.end(),3);
+
+'如果 find() 成功, 返回一个迭代器指向目标元素。如果失败, 返回第二实参所指示的区间末端', 本例是 coll 的逾尾 past-the-end 迭代器。
+
+本例所展示的最后一个算法是 reverse(), 将区间内的元素反转放置:
+
+std::reverse(pos3, coll.end());
+
+这个动作会将第三元素至最末元素的排列次序逆转。由于这是一种改动, 我们必须使用一个非常量迭代器, 这就是为什么我调用 find() 并传入 begin() 和 end()
+
+
+// !! 区间（Range）
+
+
+所有算法都是用来处理一或多个区间内的元素。这样的区间可以(但非必须)涵盖容器内的全部元素。为了操作容器元素的某个子集, 我们必须将区间首尾当作两个实参
+argument 传给算法, 而不是一口气把整个容器传递进去。
+
+这样的接口灵活又危险。调用者必须确保经由两实参定义出来的区间是有效的 valid。所谓有效就是, 从起点出发, 逐一前进, 能够到达终点。也就是说, 程序员自己必须
+确保两个迭代器隶属同一容器, 而且前后的放置是正确的, 否则结果难料, 可能引起无穷循环, 也可能访问到内存禁区。就此而言,迭代器就像寻常指针一样危险。不过请
+注意,所谓"结果难料"(或说行为不明确 undefined behavior) 意味着任何 STL 实现均可自由选择合适的方式来处理此类错误。稍后你会发现,确保区间有效并不像听起
+来那么简单。
+
+
+'所有算法处理的都是半开区间 (half-open range)---包括起始元素的位置但不包括末尾元素的位置'。
+
+
+#include <iostream>
+#include <algorithm>
+#include <list>
+
+using namespace std;
+
+int main(int argc, char** argv)
+{
+    list<int> coll;
+    for(int i = 20; i <= 40 ; i++)
+    {
+        coll.push_back(i);
+    }
+
+    auto pos3 = std::find(coll.begin(), coll.end(),3);
+
+    std::reverse(pos3, coll.end());
+
+    auto pos25 = std::find(coll.begin(), coll.end(),25);
+
+    auto pos35 = std::find(coll.begin(), coll.end(),35);
+
+
+    cout << *max_element(coll.begin(), coll.end()) << endl;
+    cout << *min_element(coll.begin(), coll.end()) << endl;
+
+    return 0;
+}
+
+本例首先以 20 至 40 的整数作为容器初值。查找元素值 3 的任务失败后, find() 返回区间的结束位置 (本例为 coll.end()) 并赋值给 pos3。以此作为稍后调用
+reverse() 时的区间起点, 纯粹是空摆架子, 因为其结果相当于:
+
+std::reverse(coll.begin(), coll.end());
+
+
+这其实就是反转一个空区间, 当然毫无效果了。
+
+
+如果使用 find() 获取某个子集的第一和最后元素, 你必须考虑一点: 半开区间并不包含最后一个元素。
+
+所以上述例子中首次调用 max_element():
+
+std::max_element(pos25, pos35);
+
+
+找到的是 34, 而不是 35。
+
+
+为了处理最后一个元素, 你必须把该元素的下一位置传给算法:
+
+std::max_element(pos25, ++pos35);
+
+这样才能得到正确的结果 35。
+
+注意, 本例用的是 list 容器, 所以你只能以 ++ 取得 pos35 的下一个位置。如果面对的是 vector 或 deque 的随机访问迭代器(random-access iterator),
+你可以写 pos35+1。这是因为随机访问迭代器允许迭代器算术运算。
+
+
+
+// !! 处理多重区间(Multiple Ranges)
+
+'有数个算法可以(或说需要)同时处理多重区间。通常你必须设定第一个区间的起点和终点, 至于其他区间, 只需设定起点即可, 终点通常可由第一区间的元素数量推导出
+来'。例如以下程序片段中, equal() 从头开始逐一比较 coll1 和 coll2 的所有元素:
+
+if(std::equal(coll1.begin(), coll1.end(), coll2.begin()))
+{
+    ...
+}
+
+于是, coll2 之中参与比较的元素数量, 间接取决于 coll1 内的元素数量。
+
+这使我们收获一个重要心得: '如果某个算法用来处理多重区间, 那么当你调用它时, 务必确保第二(以及其他)区间所拥有的元素个数至少和第一区间内的元素个数相同'。
+特别是执行涂写动作时, 务必确保目标区间 destination range 够大。
+
+
+#include <iostream>
+#include <algorithm>
+#include <list>
+#include <vector>
+
+using namespace std;
+
+
+int main(int argc, char** argv)
+{
+    list<int> coll1 = {1,2,32,1,2,3,4,5};
+
+    vector<int> coll2;
+
+    // Runtime error
+    std::copy(coll1.begin(), coll1.end(),coll2.begin());
+    return 0;
+}
+
+这里调用了 copy() 算法, 将第一区间内的全部元素拷贝至目标区间。如上所述, 第一区间的起点和终点都已指定, 第二区间只指出起点。然而, 由于该算法执行的是
+覆写动作(overwrite)而非安插动作(insert), 所以目标区间必须拥有足够的元素被覆写, 否则就会像这个例子一样,导致不明确行为。
+
+'如果目标区间内没有足够的元素供覆写, 通常意味着你会覆写 coll2.end() 之后的任何东西, 幸运的话程序立即崩溃——这起码还能让你知道出错了'。
+
+想要避免上述错误,你可以(1):确认目标区间内有足够的元素空间, 或是(2):采用insert iterator。
+
+我首先解释如何修改目标区间使它拥有足够空间。
+
+为了让目标区间够大, 你要不一开始就给它一个正确大小, 要不就显式变更其大小。这两个办法都只适用于序列式容器(vector、deque、list 和 forward_list)。
+关联式容器根本不会有此问题, 因为关联式容器不可能被当作覆写式算法 (overwriting algorithm) 的操作目标。
+
+以下例子展示了如何扩充容器大小:
+
+#include <algorithm>
+#include <vector>
+#include <list>
+#include <deque>
+
+using namespace std;
+
+int main(int argc, char** argv)
+{
+    list<int> coll1 = {1,3,2,6,5,8,6};
+    vector<int> coll2;
+
+    coll2.resize(coll1.size());
+
+    std::copy(coll1.begin(),coll1.end(),coll2.begin());
+
+    deque<int> coll3(coll2.size());
+
+    std::copy(coll2.begin(),coll2.end(),coll3.begin());
+    return 0;
+}
+
+在这里, resize() 的作用是改变 coll2 的元素个数:
+
+coll2.resize(coll1.size());
+
+coll3 则是在初始化时就指明要有足够空间, 以容纳 coll1 中的全部元素:
+
+deque<int> coll3(coll2.size());
+
+注意, 这两种方法都会产出新元素并赋予初值。这些元素由 default 构造函数初始化, 没有任何实参。你可以传递额外的实参给构造函数和 resize(), 这样就可以按
+你的意愿将新元素初始化。
+
+
+// !! 迭代器之适配器 (Iterator Adapter)
+
+'迭代器 (Iterator) 是一个纯抽象概念: 任何东西, 只要其行为类似迭代器, 它就是一个迭代器'。
+
+C++ 标准库提供了数个预定义的特殊迭代器,亦即所谓迭代器适配器 (iterator adapter)。它们不仅是辅助性质而已,它们赋予整个迭代器抽象概念更强大的威力。
+
+
+// !! 用户自定义的泛型函数 (User-Defined GenericFunction)
+
+'STL 是一个可扩充框架。它的意思是你可以写你自己的函数和算法, 用以处理集合内的元素'。
+
+当然这些操作函数也可以是泛化的(generic)。然而, 若要在这些操作函数内声明一个合法的迭代器,必须与容器类型相应, 因为不同的容器有不同的迭代器。为了协助写
+出泛型函数, 每一个容器类型都提供有若干内部的类型定义。考虑以下例子:
+
+
+#include<iostream>
+#include<string>
+
+template<typename T>
+inline void PRINT_ELEMENT(const T& coll, const std::string& str = ""){
+    std::cout << str;
+    for(const auto& elem : coll)
+    {
+        std::cout << elem << " ";
+    }
+    std::cout << std::endl;
+}
+
+这个例子定义了一个泛型函数, 打印出一个可有可无的 string, 后面紧接着是给定的容器的全部元素。
+
+
+在 C++11 之前, 一个 "遍历所有元素" 的循环看起来如下:
+
+typenname T::const_iterator pos;
+for(pos = coll.begin(); pos != coll.end(); ++ pos)
+{
+    ...
+}
+
+这里声明 pos 为拥有 "被传入的容器" 的类型内的某个迭代器类型。
+
+
+在 PRINT_ELEMENTS 函数中, 可有可无的第二实参是个 string, 用作被写出的每一个元素的前缀(prefix)。因此, 使用 PRINT_ELEMENTS(), 你可以像这样注释
+或介绍你的输出:
+
+PRINT_ELEMENTS(coll, "all elements:");
+
+
+// !! 更易型算法（Manipulating Algorithm）
+
+
+到目前为止, 已经介绍了 STL 作为框架 framework 的整个概念: '容器表述"管理集合数据"的种种不同概念, 算法在这些集合内执行读取和涂写操作,迭代器则是容器
+和算法之间的黏合剂, 由容器提供, 允许你迭代所有元素, 也允许你选择不同的方向, 或采用特殊模式'。
+
+然而现在, 是说明 STL 框架的 BUT 的时候了: 现实中存在某些限制和某些需要避开的事物, 这都是应该让你知道的, 其中许多和容器/元素的改动(modification)相
+伴相生。
+
+有些算法(更明确地说是那些可能移除元素的算法)会改动标的区间。如果这种情况发生, 特殊规定会起作用, 本节将解释它们。
+
+// !! 移除（Removing）元素
+
+算法 remove() 某个区间删除元素。然而如果你用它来删除容器内的所有元素, 其行为肯定会让你吃惊。例如:
+
+#include <algorithm>
+#include <iterator>
+#include <list>
+#include <iostream>
+
+using namespace std;
+
+int main(int argc, char** argv)
+{
+    list<int> coll;
+    for(int i = 0; i < 6; i++)
+    {
+        coll.push_front(i);
+        coll.push_back(i);
+    }
+
+    cout << "pre:";
+    copy(coll.begin(), coll.end(),ostream_iterator<int>(cout, " "));
+    cout << endl;
+
+    std::remove(coll.begin(), coll.end(), 3);
+
+    cout << "post: " << endl;
+    copy(coll.begin(), coll.end(),ostream_iterator<int>(cout, " "));
+    cout << endl;
+    return 0;
+}
+
+对 STL 缺乏深层认识的人, 看了这个程序, 必然认为所有数值为 3 的元素都会从集合中被移除。然而, 程序的输出却如下:
+
+pre: 6 5 4 3 2 1 1 2 3 4 5 6
+post:6 5 4 2 1 1 2 4 5 6 5 6
+
+remove() 并没有改变集合中的元素数量。
+
+cend() 返回的是当初那个终点, size() 返回的还是当初那个大小。不过某些事情还是有了变化: 元素的次序改变了, 有些元素被删除了。数值为 3 的元素被其后的元
+素覆盖了。'至于集合尾端那些未被覆盖的元素, 原封不动——但从逻辑角度来说, 那些元素已经不属于这个集合了'。
+
+
+'事实上, 这个算法返回了一个新终点。你可以利用该终点获得新区间、缩减后的容器大小, 或是获得被删除元素的个数'。
+
+看看下面这个改进版本:                      
+
+#include <algorithm>
+#include <iterator>
+#include <list>
+#include <iostream>
+
+using namespace std;
+
+int main(int argc, char** argv)
+{
+    list<int> coll;
+    for(int i = 0; i < 6; i++)
+    {
+        coll.push_front(i);
+        coll.push_back(i);
+    }
+
+    cout << "pre:";
+    copy(coll.begin(), coll.end(),ostream_iterator<int>(cout, " "));
+    cout << endl;
+
+    list<int>::iterator end = std::remove(coll.begin(), coll.end(), 3);
+
+    cout << "post: " << endl;
+    copy(coll.begin(), end,ostream_iterator<int>(cout, " "));
+
+    cout << "number of remove elements: " << std::distance(end, coll.end()) << endl;
+
+    std::erase(endl, coll.end());
+
+    std::copy(coll.begin(), coll.end(),ostream_iterator<int>(cout, ""));
+    cout << endl;
+    return 0;
+}
+
+
+在这个版本中, remove() 的返回值被赋予迭代器 end。
+
+list<int>::iterator end = std::remove(coll.begin(), coll.end(), 3);
+
+这个 end 正是 "被修改集合" 经过元素移除动作后的新逻辑终点。
+
+
+接下来你便可以拿它当作新终点使用:
+
+copy(coll.begin(), end, ostream_iterator<int>(cout, " "));
+
+另一种可能用法是, 借由测定集合之逻辑终点和实际终点之间的距离, 获得"被删除元素"的数量:
+
+std::distance(end, coll.end());
+
+'在这里, 原本为了迭代器而设计的辅助函数 distance() 发挥了作用, 它的功用是返回两个迭代器之间的距离'。如果这两个迭代器都是随机访问迭代器 (
+random-access iterator) , 你可以使用 operator- 直接计算其距离。不过本例所用的容器是 list, 只提供双向迭代器。
+
+'如果真想把那些被删除的元素斩草除根, 你必须调用该容器的相应成员函数'。容器所提供的成员函数 erase() 正适用于此目的。erase() 可以删除"实参所指示的区
+间"内的全部元素:
+
+coll.erase(end, coll.end());
+
+如果你需要以单一语句来删除元素, 可以这么做:
+
+coll.erase(std::remove(coll.begin(), coll.end(),3), coll.end());
+
+为何算法不自己调用 erase() 呢 ? '这个问题正好点出 STL 为获取弹性而付出的代价'。
+
+通过"以迭代器为接口", STL 将数据结构和算法分离开来。然而迭代器只不过是"容器内部某一位置"的抽象概念而已。一般说来, 迭代器对自己所属的容器一无所知。
+任何"以迭代器访问容器"的算法, 都不得(无法) 通过迭代器调用容器类所提供的任何成员函数。
+
+
+这个设计导致一个重要结果:算法的操作对象不一定得是"容器内的全部元素"所形成的区间, 而可以是那些元素的子集。甚至算法可作用于一个"并未提供成员函数 erase()"
+的容器身上 (array 就是个例子)。'所以, 为了达成算法的最大弹性, 不强求"迭代器必须了解其容器细节"还是很有道理的'。
+
+注意, 通常并无必要删除那些"已被移除"的元素。'以逻辑终点取代容器的实际终点, 通常就足以应对现实情况'。你可以拿这个逻辑终点搭配任何算法演出。
+
+
+// !! 更易 Associative（关联式）和 Unordered（无序）容器
+
+更易型算法(指那些会移除 remove、重排 reorder、修改 modify 元素的算法) 若用于关联式容器或无序容器, 会出问题。'关联式和无序容器不能被当作操作目标, 
+原因很简单: 如果更易型算法用于关联式和无序容器身上, 会改变某位置上的值, 进而破坏容器本身对次序的维护'(对关联式容器而言是其已排序 sorted 特性, 对无序
+容器而言则是其 hash 函数的运算结果)。'为避免累及内部次序,关联式容器和无序容器的所有迭代器均被声明为指向常量(不变量)的 value 或 key'。如果你更动关联
+式容器或无序容器的元素, 会导致编译错误。
+
+这使你无法在关联式容器身上运用移除型 (removing) 算法, 因为这类算法实际上悄悄更易了元素: "被移除元素"被其后的"未被移除元素"覆盖。
+
+现在问题来了, 如何从关联容器和无序容器中删除元素?
+
+好吧, 很简单:调用它们的成员函数! 每一种关联式容器和无序容器都提供用以移除元素的成员函数。例如你可以调用 erase():
+
+#include <algorithm>
+#include <iterator>
+#include <iostream>
+#include <set>
+
+using namespace std;
+
+int main(int argc, char** argv)
+{
+    set<int> coll = {1,2,3,4,5,6,7,8,9};
+
+    std::copy(coll.begin(), coll.end(), ostream_iterator<int>(cout, " "));
+    cout << endl;
+
+    int num = coll.erase(3);
+
+    cout << "the number of remove elements is " << num << endl;
+
+    std::copy(coll.begin(), coll.end(), ostream_iterator<int>(cout, " "));
+    cout << endl;
+    return 0;
+}
+
+注意, 容器类提供了多个不同的 erase() 成员函数。其中一种形式是以"欲删除之元素值"为唯一实参, 并返回被删除元素的个数。
+
+
+// !! 算法vs.成员函数
+
+就算我们符合种种条件, 得以使用某个算法, 那也未必就一定是好。容器本身可能提供功能相似而效能更佳的成员函数。
+
+一个极佳例子便是对 list 的元素调用 remove()。算法本身并不知道它工作于 list 身上, 因此它在任何容器中都一样, 做些四平八稳的工作: 改变元素值, 从而重
+新排列元素。如果它移除第一个元素, 后面所有元素就会分别被设给各自的前一个元素。这就违反了 list 的主要优点--借由修改链接 (link) 而非实值 (value)来安
+插、移动、移除元素。
+
+
+为了避免这么糟糕的表现, list 针对所有更易型算法提供了一些对应成员函数。是的, 如果你使用 list 就应该使用这些成员函数。
+
+#include <algorithm>
+#include <iterator>
+#include <iostream>
+#include <list>
+
+using namespace std;
+
+int main(int argc, char** argv)
+{
+    list<int> coll;
+
+    for(int i=0; i < 6 ; i++)
+    {
+        coll.push_front(i);
+        coll.push_back(i);
+    }
+
+    cout << endl;
+
+    // remove all elements with values 3(poor performance)
+    coll.erase(std::remove(coll.begin(), coll.end(),3), coll.end());
+    // remove all elements with values 4(good performance)
+    coll.erase(4);
+
+    return 0;
+}
+
+
+'如果高效能是你的首要目标, 你应该总是优先选用成员函数'。问题是你必须先知道, 某个容器确实存在效能明显突出的成员函数。面对 list 却使用 remove()算法
+, 决不会收到任何警告信息或报错通知。然而如果你决定使用成员函数, 一旦换用另一种容器, 就不得不更改代码。
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
