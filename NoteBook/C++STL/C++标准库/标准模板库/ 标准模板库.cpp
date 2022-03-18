@@ -1496,6 +1496,433 @@ int main(int argc, char** argv)
 , 决不会收到任何警告信息或报错通知。然而如果你决定使用成员函数, 一旦换用另一种容器, 就不得不更改代码。
 
 
+// !! 以函数作为算法的实参
+
+'有些算法可以接受用户自定义的辅助性函数, 借以提高弹性和能力'。这些函数将被算法内部调用。
+
+
+// !! 以函数作为算法实参的实例示范
+
+最简单的例子莫过于 for_each() 算法了。它针对区间内的每一个元素, 调用一个由用户指定的函数。下面是个例子:
+
+#include <vector>
+#include <algorithm>
+#include <iostream>
+
+using namespace std;
+
+void print(int elem){
+    cout << elem << " ";
+}
+
+int main(int argc, char** argv)
+{
+    vector<int> coll;
+    for(int i = 0; i <= 9; ++i){
+        coll.push_back(i);
+    }
+
+    std::for_each(coll.begin(), coll.end(), print);
+    cout << endl;
+    
+    return 0;
+}
+
+
+这里的 for_each() 函数针对区间 [coll.cbegin(), coll.cend()) 内的每个元素调用 print() 函数。
+
+算法以数种态度来面对这些辅助函数: 有的视为可有可无, 有的视为必要。你可以利用它们来指定查找准则、排序准则, 或定义某种操作使其在"容器元素转换至另一容器"
+时被调用。
+
+#include <set>
+#include <vector>
+#include <algorithm>
+#include <iterator>
+#include <iostream>
+
+#include "print.hpp"
+
+int square(int value)
+{
+    return value * value;
+}
+
+int main(){
+    std::set<int> coll1;
+    std::vector<int> coll2;
+
+    for(int i = 0; i <= 9; ++i){
+        coll1.insert(i);
+    }
+
+    PRINT_ELEMENTS(coll1,"initialized:");
+
+    std::transform(coll1.begin(),coll1.end(),std::insert_iterator(coll2),square);
+
+    PRINT_ELEMENTS(coll2,"squared:");
+    cout << endl;
+    return 0;
+}
+
+此例之中, square() 的作用是将 coll1 内的每一个元素予以平方运算, 然后转移到 coll2。
+
+
+// !! 判断式（Predicate）
+
+Predicate (判断式) 是一种特殊的辅助函数。所谓 predicate, 它会返回布尔值 (Boolean), 常被用来指定作为排序准则或查找准则。Predicate 可能有一或两
+个操作数, 视具体情形而定。
+
+注意, 并非任何返回布尔值的单参函数或双参函数都是合法的 predicate。'STL 要求, 面对相同的值, predicate 必须得出相同结果'。这条戒律使得那些“被调用时
+会改变自己内部状态”的函数出局。
+
+
+// !! Unary Predicate（单参判断式）
+
+'Unary predicate 会检查唯一实参的某项特性'。典型例子如下, 用来查找第一个质数。
+
+#include <list>
+#include <iostream>
+#include <string>
+#include <cstdlib>
+
+using namespace std;
+
+bool isPrime(int number) {
+    number = std::abs(number);
+    if(number == 0 || number == 1) {
+        return false;
+    }
+    int divisor;
+    for(divisor = number/2; number % divisor != 0; --divisor) {
+        ;
+    }
+    return divisor == 1;
+}
+
+int main(int argc, char** argv){
+    list<int> coll;
+    for(int i = 24; i < 40 ; ++i) {
+        coll.push_back(i);
+    }
+
+    auto pos = std::find_if(coll.begin(), coll.end(),isPrime);
+
+    if(pos != coll.end()) {
+        cout << *pos << "is the first prime" << std::endl;
+    }else{
+        cout <<  "no primer found" << std::endl;
+    }
+
+    return 0;
+}
+
+在这个例子中, 算法 find_if() 在给定区间内寻找使"传入之单参判断式 (unary predicate)" 运算结果为 true 的第一个元素。
+
+
+// !! Binary Predicate（双参判断式）
+
+'Binary predicate 的典型用途是, 比较两个实参的特定属性'。
+
+例如, 为了以你自己的原则对元素排序, 你必须以一个简单的 predicate 形式提供这项原则。如果元素本身不支持 operator<, 或如果你想使用不同的排序原则,这就
+派上用场了。
+
+下面这个例子, 根据每个人的姓名, 对一组元素进行排序:
+
+#include <algorithm>
+#include <deque>
+#include <iostream>
+#include <string>
+
+using namespace std;
+
+class Person
+{
+    public:
+        string firstname() const;
+        string lastname() const;
+    ...
+};
+
+bool personSortCriteria(const Person& p1, const Person& p2){
+    return p1.lastname() < p2.lastname() || (p1.lastname() == p2.lastname() && p1.firstname() < p2.firstname());
+}
+
+int main(int argc, char** argv)
+{
+    deque<Person> coll;
+    ...
+    std::sort(coll.begin(), coll.end(), personSortCriteria);
+    return 0;
+}
+
+注意, 你也可以使用函数对象 (function object) 来实现一个排序准则。这种做法的优点是, 制作出来的准则将是个类型 (type), 可用来作为“声明一个以某种类型
+为排序准则的 set”之类的事情。
+
+
+// !! 使用 Lambda
+
+Lambda 始自 C++11, 是一种"在表达式或语句内指明函数行为"的定义式。
+
+这导致你可以定义对象, 用以描述函数行为, 并将这些对象以"inline 实参"形式传给算法作为 predicate, 或是作为其他用途。
+
+
+例如下面这个语句:
+
+std::transform(coll1.begin(),coll1.end(), coll2.begin(), [](double b){return b*b*b; });
+
+其中的表达式:
+
+[](double b){return b * b * b; };
+
+'就定义了一个 lambda, 表述一个函数对象 (function object), 返回某个 double 的三次方值'。如你所见,这提供了一种能力可以直接描述"传给 transform()"
+的某种函数行为。
+
+
+// !! Lambda 的好处
+
+运用 lambda 具体指定" STL 框架内部将采取的行为",  可以解决先前存在的许多缺点。
+
+假设你想要查找某集合内"数值在 x 和 y 之间"的第一个元素:
+
+#include <algorithm>
+#include <deque>
+#include <iostream>
+
+using namespace std;
+
+int main(int argc, char** argv)
+{
+    deque<int> coll = {1,3,12,45,654,233,7,9};
+    int x = 5;
+    int y = 10;
+
+    auto pos = std::find_if(coll.begin(), coll.end(),[=](int value) { return value > x && value < y; });
+
+    cout << "first y > element > x is " << *pos << endl;
+    return 0;
+}
+
+当你调用 find_if(), 便以 inline 形式传递相应的 predicate 作为 find_if() 的第三实参:
+
+auto pos = std::find_if(coll.begin(), coll.end(),[=](int value) { return value > x && value < y;});
+
+
+Lambda 其实是个函数对象, 此处它将接受一个整数 value, 返回 "value 是否大于 x 且小于 y":
+
+[=](double value) {return value < y && value > x;}
+
+借由"在 [=] 内指明 = 作为 capture", 你所表达的意思是, "在 lambda 被声明时已有效"的所有符号都以 by value 形式传进 lambda 体内。于是在这个
+lambda 内部, 你拥有对" main() 内部声明的变量 x 和 y"的读取权。
+
+
+如果改用 [&] 作为 capture, 那就是以 by reference 方式传递 value, 致使 lambda 内部得以改动它们的 value。
+
+此外, C++ 编译器对 lambda 的优化效果高于它们对普通函数的优化效果。
+
+扼要地说, 'lambda 为"运用 STL 算法"提供了最高级、第一等的方便性、可读性、快速性和可维护性'。
+
+
+// !! 以 Lambda 作为排序准则（Sorting Criterion）
+
+举个例子, 使用 lambda 定义一个排序准则, 用来对一个"由 Person 构成的 vector" 排序。
+#include <algorithm>
+#include <deque>
+#include <string>
+#include <iostream>
+
+using namespace std;
+
+class Person
+{
+public:
+    string firstname() const;
+    string lastname() const;
+    ...
+};
+
+int main(int argc, char** argv)
+{
+    deque<Person> coll;
+    ...
+    std::sort(coll.begin(), coll.end(),[](const Person& a, const Person& b){
+        return a.lastname() < b.lastname() || (a.lastname() == b.lastname() && a.firstname() < b.firstname());
+    };)
+    return 0;
+}
+
+
+
+// !! Lambda 的局限
+
+Lambda 并非在每一方面都保持优势。让我们考虑使用 lambda 为关联式容器指出一个排序准则:
+
+auto cmp = [](const Person& a, const Person& b) {
+    return a.lastname() < b.lastname() || (a.lastname() < b.lastname() && a.firstname() < b.firstname());
+};
+
+由于 set 声明式需要指明 lambda 类型, 所以我们必须使用 decltype, 它会为一个 lambda 对象 (上例的 cmp) 产出类型。注意, 你也必须把 lambda 对象传
+给 coll 的构造函数, 否则 coll 会调用被传入的排序准则的 default 构造函数, 而根据 C++ 语言规则, lambda 没有 default 构造函数也没有 assignment
+操作符。基于这些局限, "以 class 定义某个函数对象作为排序准则" 说不定还比较直观些。
+
+
+Lambda 的另一个问题是, 它们无法拥有"跨越多次调用"都能被保存下来的内部状态(internal state)
+
+如果你需要这样的状态, 必须在外围作用域中声明一个对象或变量, 将它(搭配某种 capture) 以 by-reference 方式传入 lambda。与此相比, 函数对象允许你封装
+内部状态。
+
+
+// !! 函数对象（Function Object）
+
+'传递给算法的"函数型实参"(functional argument) 不一定得是函数, 可以是行为类似函数的对象'。这种对象称为函数对象(function object), 或称为仿函数
+(functor)。
+
+
+// !! 定义一个函数对象
+
+'函数对象是泛型编程 (generic programming) 强大威力和纯粹抽象概念的又一个例证'。你可以说,任何东西,只要其行为像函数,它就是个函数。因此如果你定义了一
+个对象,行为像函数,它就可以被当作函数使用。
+
+好,那么,什么才算是具备函数行为（也就是行为像个函数）? 
+
+'所谓函数行为, 是指可以"使用小括号传递实参,借以调用某个东西"'。
+
+例如:
+
+function(arg1,arg2);
+
+如果你指望对象也可以如此这般, 就必须让它们也有可能被"调用"---通过小括号的运用和实参的传递。没错, 这是可能的(在 C++ 中很少有什么是不可能的)。你只需定义
+operator(), 并给予合适的参数类型:
+
+class X{
+    public:
+        return-value operator()(argument) const;
+};
+
+现在, 你可以把这个 class 的对象当作函数来调用了:
+
+X fo;
+...
+fo(arg1, arg2);
+
+上述调用等同于:
+
+fo.operator(arg1, arg2);
+
+
+
+
+#include <vector>
+#include <algorithm>
+#include <iostream>
+
+using namespace std;
+
+
+class PrintInt{
+    public:
+        void operator()(int elem) const {
+            cout << elem << endl;
+        }
+};
+
+int main(int argc, char **argv)
+{
+    vector<int> coll;
+
+    for(int i = 0; i < 9 ; i++){
+        coll.push_back(i);
+    }
+
+    for_each(coll.begin(), coll.end(),PrintInt());
+
+    cout << endl;
+    return 0;
+}
+
+Class PrintInt 的定义显示, 你可以对其对象调用 operator() 并传入一个 int 实参。在语句
+
+std::for_each(coll.begin(), coll.end(), PrintInt());
+
+中的表达式:
+
+PrintInt();
+
+创建出一个临时对象作为 for_each() 算法的一个实参。for_each() 算法大致如下:
+
+namespace std{
+    template<typename Iterator, typename Operation>
+    Operation for_each(Iterator act, Iterator end, Operation op)
+    {
+        while(act != end){
+            op(*act);
+            ++act;
+        }
+    }
+}
+
+for_each() 使用临时对象 op (一个函数对象), 针对每个元素 act 调用 op(*act)。
+
+如果第三实参是个函数对象， 则以 *act 为实参, 调用函数对象 op 的 operator()。
+
+你也许不以为然, 也许认为函数对象看起来有点怪异、令人讨厌甚至毫无意义。的确，它们带来更复杂的代码，然而函数对象有其过人之处，比起寻常函数，
+它们有以下优点:
+
+// !! 1. 函数对象是一种带状态 (with state) 的函数
+
+'行为像 pointer 的对象我们称之为 smart pointer, 同样道理, 行为像 function 的对象我们可以称之为 smart function, 因为它们的能力超越了 
+operator()'。函数对象可拥有成员函数和成员变量,这意味着函数对象拥有状态(state)。事实上, 在同一时间点, 相同类型的两个不同的函数对象所表述的相同
+机能(same functionality),可具备不同的状态。这在寻常函数中是不可能的。另一个好处是,你可以在运行期初始化它们--当然必须在它们被使用(被调用)之前。
+
+
+
+// !! 2. 每个函数对象有其自己的类型
+
+寻常函数, 唯有在其签名式(signature)不同时, 才算类型不同。而函数对象即使签名式相同, 也可以有不同的类型。事实上由函数对象定义的每一个函数行为都有其自
+己的类型。这对于"运用 template 实现泛型编程"乃是一个卓越的贡献, 因为这么一来我们便可以将函数行为当作 template 参数来运用。这使得不同类型的容器可以
+使用同类型的函数对象作为排序准则。也可确保你不会在"排序准则不同"的集合(collection)间赋值、合并或比较。'你甚至可以设计函数对象的继承体系，以此完成某
+些特别事情'，例如在一个总体原则下确立某些特殊情况。
+
+
+// !! 3. 函数对象通常比寻常函数速度快。
+
+就 template 概念而言, 由于更多细节在编译期就已确定, 所以通常可能进行更好的优化。所以，传入一个函数对象（而非寻常函数）可能获得更好的执行效能。
+
+假设你需要对集合 (collection) 内的每个元素加上一个特定的值。如果你在编译期便确知这个值，可使用寻常函数完成工作:
+
+void add10(int &elem){
+    elem += 10;
+}
+
+void f(){
+    vector<int> coll;
+    ...
+    for_each(coll.begin(), coll.end(),add10);
+    return 0;
+}
+
+如果你需要数个不同的特定值, 而它们在编译期都已确定, 你可以使用 template:
+
+template<int theValue>
+void add(int &elem)
+{
+    elem += theValue;
+}
+
+void f1(){
+    vector<int> coll;
+    ...
+    for_each(coll.begin(), coll.end(),add<10>);
+}
+
+如果你得在执行时期处理这个特定值,那就麻烦了。你必须在函数被调用前先将这个数值传给该函数。这通常会导致生成若干全局变量, 让"算法的调用者"和"算法所调用的
+函数"都能看到和用到它们。真是一团糟。
+
+如果你两次用到该函数, 每次用到的特定值不同, 而且都是在执行时期才处理那些特定值, 那么寻常函数根本无能为力。
+
+
+如果使用函数对象, 我们就可以写出更具智能 (smarter) 的函数达成目的。对象可以有自己的状态，可以被正确初始化。
+
+
 
 
 
