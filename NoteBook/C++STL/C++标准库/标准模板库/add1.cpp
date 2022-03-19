@@ -36,4 +36,3 @@ int main(int argc, char** argv)
     PRINT_ELEMENTS(coll,"After add the first element");
     return 0;
 }
-

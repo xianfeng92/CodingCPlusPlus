@@ -1914,8 +1914,8 @@ void f1(){
     for_each(coll.begin(), coll.end(),add<10>);
 }
 
-如果你得在执行时期处理这个特定值,那就麻烦了。你必须在函数被调用前先将这个数值传给该函数。这通常会导致生成若干全局变量, 让"算法的调用者"和"算法所调用的
-函数"都能看到和用到它们。真是一团糟。
+如果你得在执行时期处理这个特定值,那就麻烦了。你必须在函数被调用前先将这个数值传给该函数。这通常会导致生成若干全局变量, 让"算法的调用者"和"算法所调用
+的函数"都能看到和用到它们。真是一团糟。
 
 如果你两次用到该函数, 每次用到的特定值不同, 而且都是在执行时期才处理那些特定值, 那么寻常函数根本无能为力。
 
@@ -1924,28 +1924,239 @@ void f1(){
 
 
 
+// !! 预定义的函数对象
+
+'C++ 标准库内含若干预定义的函数对象, 涵盖了许多基础运算。有了它们, 很多时候你就不必费心自己去写函数对象了'。
+
+一个典型的例子是作为排序准则的函数对象。Operator< 之默认排序准则乃是调用 less<>, 所以, 如果你声明:
+
+set<int> coll;
+
+会被扩展为:
+
+set<int,less<int>> coll;
+
+另一个运用 "预定义函数对象" 的地点是 STL 算法。考虑下面这个例子:
+
+#include <deque>
+#include <algorithm>
+#include <functional>
+#include <iostream>
+#include "print.hpp"
+
+using namespace std;
+
+int main(int argc, char** argv)
+{
+    deque<int> coll = {1,2,3,5,7,8,9,11,13};
+    PRINT_ELEMENTS(coll,"initialized:");
+
+    std::transform(coll.cbegin(),coll.cend(),coll.begin(),std::negate<int>());
+
+    PRINT_ELEMENTS(coll,"nagate: ");
+
+    std::transform(coll.cbegin(),coll.cend(),coll.begin(),std::multiplies<int>());
+
+    PRINT_ELEMENTS(coll,"square: ");
+    return 0;
+}
 
 
+首先, 预定义的函数对象, 其头文件是 <functional>
+
+#include <functional>
+
+然后, 两个预定义的函数对象被用来将 coll 内的每个元素反相然后平方。
+
+先是反相:
+
+std::transform(coll.cbegin(), coll.cend, coll.begin(),std::negate<int>());
+
+中, 表达式:
+
+std::negate<int>();
+
+根据预定义好的 class template negate<> 生成一个函数对象, 将传入的 int 设为负。
 
 
+// !! Binder
+
+你可以使用特殊的 function adapter (函数适配器), 或所谓 binder, 将预定义的函数对象和其他数值结合为一体。下面是个完整例子:
+
+#include <set>
+#include <deque>
+#include <algorithm>
+#include <iostream>
+#include <iterator>
+#include "print.hpp"
+
+using namespace std;
+using namespace std::placeholders;
+
+int main(int argc, char** argv)
+{
+    set<int, std::greater<int>> coll1 = {12,1,9,7,10,8,11,88};
+    deque<int> coll2;
+
+    PRINT_ELEMENTS(coll1, "initialzed: ");
+    std::transform(coll1.begin(), coll1.end(),std::insert_iterator(coll2),std::bind(multiplies<int>,_1,10));
+
+    PRINT_ELEMENTS(coll2, "transform: ");
+
+    std::replace_if(coll2.begin(),coll2.end(),std::bind(std::equal_to<int>,_1,70));
+    PRINT_ELEMENTS(coll2, "replaced ");
+
+    coll2.erase(std::remove_if(coll2.begin(),coll2.end(),bind(logical_and<bool>(),bind(std::greater_equal<int>(),_1,50), bind(less_equal<int>(),_1,80));
+    PRINT_ELEMENTS(coll2, "removed ");
+    return 0;
+}
+
+在这个例子中, 语句:
+
+    std::transform(coll1.begin(), coll1.end(),std::insert_iterator(coll2),std::bind(multiplies<int>,_1,10));
+
+将 coll1 的所有元素乘以 10, 然后以安插模式传送到 coll2。
+
+为了定义相应操作,'我们用上了 bind(), 它允许你借由低层的函数对象和占位符 (placeholder) 合成高层的函数对象'。所谓占位符是"带有前缀下画线"的数值标识
+符 (numeric identifier)。通过指定:
+
+std::bind(std::multiplies<int>(),_1,10);
+
+便定义出一个函数对象, 会将传入的第一实参乘以 10。
 
 
+你也可以使用这样一个函数对象将任何数值乘以 10。例如以下语句会把 990 写至标准输出设备:
+
+auto fun = std::bind(std::multiplies<int>(),_1,10);
+
+fun(99);
 
 
+注意, 占位符 (placeholder) 有自己的命名空间: std::placeholders
 
 
+// !! 函数对象 vs.Lambda
+
+Lambda 是一种隐式的 (implicitly) 预定义函数对象。lambda 通常提供 "用以定义使用于 STL 算法内的函数行为"的更直观做法。此外, lambda 应该和函数对
+象一样快。
+
+然而, lambda 也有若干缺点:
+
+1. 你无法让如此一个函数对象带有一个隐藏的内部状态(hidden internal state)。'所有定义出状态的数据,都由调用端定义,并以一个 capture 传递之'。
+
+2. 如果一个 lambda 在许多地方被需要, 那么"在函数行为被需要处才指明"的优点就有一部分褪色了, 你可以为此定义一个 lambda 并将它赋予一个 auto 对象
+   ,但这比起"直接定义一个函数对象"是否较具可读性呢 ? 或许这只是与口味有关。
 
 
+// !! 容器内的元素
+
+容器内的元素必须符合某些条件, 因为容器乃是以一种特别方式来操作它们。
 
 
+// !! 容器元素的必要条件
+
+STL 的容器、迭代器、算法都是 template, 因此它们可以操作任何类型--不论 STL 预定义的或用户自定义的, 都可以。然而, 由于某些加诸元素身上的操作, 导致出
+现某些条件。
+
+STL 容器元素必须满足以下三个基本要求:
+
+1. '元素必须可复制或可搬移'(copyable or movable)。也就是说,元素类型必须隐式或显式提供一个 copy 或 move 构造函数。'被制造出来的拷贝(generated
+    copy)应该与其原件等效',这意味着对它们的任何相等性测试(test for equality)的结果都应该是相等的(equal), 而且原件和拷贝的行为相同
+
+2. '元素必须可被 assignment 操作符加以搬移或赋值'。容器和算法以新元素覆写旧元素时用的是 assignment 操作符
 
 
+3. '元素必须可被一个析构函数销毁'。当元素被移除(remove), 容器会销毁该元素的内部拷贝。因此, 析构函数一定不能是 private。此外, 一如 C++ 惯常的做法，
+    析构函数一定不可抛出异常，否则世事难料
+
+这三个条件对任何 class 而言其实都是隐含成立的。如果某个 class 既没有为上述动作定义特殊版本, 也没有定义任何特殊成员破坏这些动作的健全性，那么它自然而
+然也就满足了上述条件。
 
 
+下面的条件也应当获得满足:
+
+1. '对序列式容器而言,元素的 default 构造函数必须可用'。我们可以在没有给予任何初值的情况下创建一个非空容器, 或增加容器的元素个数。这些元素都将以
+   default 构造函数完成, 不需任何实参
+
+2. 对于某些操作, 必须定义操作符 == 以执行相等测试。如果你想查找元素，这一点特别重要。
+
+3. 在关联式容器中, 元素必须定义出适用于排序准则的操作。默认情况下是操作符 <, 它将被函数对象 less<> 调用
+
+4. 无序容器应该为元素提供一个 hash 函数, 和一个相等性测试准则
 
 
+// !! Value 语义vs.Reference 语义
+
+'通常,所有容器都会建立元素拷贝(copy), 返回的也是元素拷贝'。这意味着容器内的元素与你放进去的东西相等(equal)但非同一(identical)。'如果你修改容器的元
+素, 实际上改变的是拷贝而不是原件'。
+
+Value 被复制意味着 STL 容器所提供的是 value 语义。它们容纳的是你安插的对象值, 而不是对象本身。然而现实中你也许需要用到 reference 语义, 让容器容纳
+元素的 reference。
+
+STL 只支持 value 语义, 不支持 reference 语义。这当然是利弊参半。好处是:
+
+1. 复制元素很简单
+
+2. 使用 reference 时容易导致错误。'你必须确保 reference 所指对象仍然健在',并须小心对付偶尔出现的环式指向(circular reference)状态
+
+缺点是:
+
+1. 复制元素可能会导致不良的效率; 有时甚至无法复制
+
+2. 无法在数个不同的容器中管理同一份对象
+
+现实中你同时需要两种做法。你不但需要一份独立(于原先对象)的拷贝(此乃 value 语义), 也需要一份代表原数据、但能相应改变原值的拷贝(此乃 reference 语义)。 
+'不幸的是, C++ 标准库不支持 reference 语义'。不过我们可以利用 value 语义实现 reference 语义。
+
+'一个显而易见的方法是以 pointer 作为元素'。
+
+然而寻常的 pointer 有些常见问题, 例如它们指向的对象也许不复存在, pointer 之间的"比较"行为也未必如你预期, 因为实际比较的是 pointer 而非其所指对象。
+'所以使用寻常 pointer 作为容器元素, 必须非常谨慎'。
+
+好一点的办法是使用某种 smart pointer, 那是一种对象, 有着类似 pointer 的接口, 但内部做了一些额外检查和处理。事实上自 TR1 起, C++ 标准库提供了
+class shared_ptr, 这是个"可以共享相同对象"的 smart pointer。
 
 
+// !! STL 内部的错误和异常
+
+差错是无可避免的, 也许是程序(或程序员)引起的逻辑性错误 (logical error), 也许是程序运行时的环境或背景(例如内存不足)所引起的运行期错误(runtimes 
+error)。这两种错误都能够经由异常 (exception) 被处理。
+
+
+// !! 错误处理（Error Handling）
+
+'STL 的设计宗旨是效能优先, 安全次之'。差错检查相当花时间, 所以 STL 中几乎没有它的踪影。如果你能正确无误地编写程序, 自然很好。如果你不行, 那就大难临
+头了。'C++ 标准库接纳 STL 之前, 对于是否应该加入更多的错误检验，曾有过讨论'。
+
+大部分人决定不加入, 原因有二:
+
+1. 错误检验会降低效率, 而速度始终是程序的总体目标。刚刚提过, 良好的效率是 STL 的设计目标之一。
+
+2. 如果你认为安全重于效率, 还是可以如愿: 或增加一层包装(wrapper), 或使用 STL 特殊版本。但是, 一旦错误检验被放进所有基本动作内, 再想消除它们以获得
+   高效率, 可就没辙了。举个例子, 如果每一个 subscript(下标) 操作符都对索引范围进行合法性检验，你就无法撰写不做检验的版本。反过来则可以。
+
+所以, 错误检验是可行的, 但并不是 STL 的内在条件。
+
+'C++ 标准库指出, 对于 STL 的任何运用,如果违反规则,将导致不明确的行为'。因此如果索引、迭代器、区间范围不合法, 结果将不明确。如果你使用的 STL 并非
+安全版本, 通常会导致不明确的内存访问,这可能导致难缠的副作用,甚至导致全盘崩溃。从这个意义上说, STL 和 C pointer 一样容易引发错误。寻找这样的错误是
+非常困难的, 尤其当你缺乏一个 STL 安全版本时, 更是如此。
+
+具体地说, 使用 STL, 必须满足以下要求:
+
+1. '迭代器务必合法而有效'。例如你必须在使用它们之前先将它们初始化。注意,迭代器可能会因为其他动作的副作用而变得无效。
+
+    例如: 对 vector 和 deque 而言, 一旦发生元素的安插、删除或重新分配; 对无序容器而言, 一旦发生 rehashing
+
+2. '迭代器如果指向 past-the-end 位置, 它并不指向任何对象, 因此不能对它调用 operator* 或 operator->'。这一点适用于任何容器的 end()、cend()
+   和 rend() 所返回的迭代器。
+
+3. 区间(range)必须是合法的
+
+   用以"指出某个区间"的前后两迭代器, 必须指向同一个容器; 从第一个迭代器出发, 必须可以到达第二个迭代器所指位置; 如果涉及的区间不止一个, 第二区间及后继
+   各区间必须拥有"至少和第一区间一样多"的元素; '覆写(overwritten)动作中的"标的区间"(destination range)必须拥有足够元素, 否则就必须采用
+   insert iterator(插入型迭代器)'
+
+以下实例展示了若干可能发生的错误:
 
 
 
