@@ -363,6 +363,564 @@ void foo(C& coll){
 
 // !! Iterator Function
 
+Array 提供了若干用以获取迭代器的常见操作。'Array 提供的是 random-access 迭代器, 因此原则上你可以对 array 运用任何 STL 算法'。
+
+c.begin();// 返回一个 random-access iterator 指向第一个元素
+c.end();// 返回一个 random-access iterator 指向最末元素的下一位置
+
+c.cbegin();// 返回一个 const random-access iterator 指向第一个元素
+c.cend();// 返回一个 const random-access iterator 指向最末元素的下一位置
+
+这些迭代器的精确类型由实现决定。然而对 array 而言, begin()、cbegin()、end() 和 cend() 返回的迭代器往往是寻常 pointer, '这很好, 因为 array<> 
+内部使用一个 C-style array 存放元素, 并使用寻常 pointer 提供 random-access 迭代器接口'。
+
+然而你不可依赖"迭代器是寻常 pointer"这一事实。举个例子, 如果你用的是安全版 STL (会检查区间差错和其他潜在问题), 那么 array 的迭代器类型往往会是一个
+辅助 class。
+
+
+只要 array 保持有效, 其迭代器也就保持有效。然而不同于任何其他容器, swap() 乃是将新值赋予 iterator、reference 和 pointer 指向的元素身上。
+
+
+// !! 把 array 当成 C-Style Array
+
+就像对待 class vector<> 一样, C++标准库保证 array<> 的所有元素一定位于连续且相邻的内存内。
+
+于是你可以预期, 对于 array a 的任何有效索引 i, 以下结果必为 true:
+
+&a[i] = &a[0] + i;
+
+
+这一保证带来某些重要结果。它意味着, 无论何处, 只要你可以使用寻常的 C-style array, 你就可以使用 array<>:
+
+std::array<char, 41> a;
+std::strcpy(&a[0],"hello world");// copy a c string into array
+
+然而,如果想直接访问 array 的元素，你不一定要用表达式 &a[0], 因为成员函数 data() 也具备相同用途:
+
+std::array<char, 41> a;
+std::strcpy(&a[0],"hello world");
+printf("%s\n",a.data());// print contents of array as C-string
+
+当然, 以此种方式使用 array<>, 你必须小心谨慎 (就像你使用寻常的 C-style array 和 pointer 时也总是必须小心谨慎)。举个例子, 你必须确保 array 的
+大小足够容纳被复制进来的数据,'而且如果你把其中的内容当作一个 C-string 来看, 你必须放置一个 '\0' 元素于尾端。
+
+注意, 绝对不要以迭代器表现"第一元素的地址"。Class array<> 的迭代器的真实类型取决于实现, 有可能与寻常的 pointer 完全不同:
+
+printf("%s\n", coll.begin());// Error(might work, but not protable)
+printf("%s\n", coll.data());// okay
+
+
+// !! Exception Handling
+
+Array 只提供极少量 logical error 检查。C++standard 规定"可抛出异常"的成员函数只有 at(), 它可说是 subscript 操作符的安全版本。
+
+// !! Array 运用实例
+
+#include <array>
+#include <algorithm>
+#include <iostream>
+#include <numeric>
+#include <functional>
+#include "print.hpp"
+
+using namespace std;
+
+int main(int argc, char** argv)
+{
+    array<int, 10> coll = {11, 12, 13, 14, 15, 16, 17};
+
+    PRINT_ELEMENTS(coll);
+
+    coll.back() = 999999999;
+    coll[coll.size() -1 ] = 42;
+    PRINT_ELEMENTS(coll);
+
+    cout << accumulate(coll.begin(), coll.end(),0) << endl;
+
+    transform(coll.cbegin(),coll.cend(),a.begin(),negate<int>());
+    PRINT_ELEMENTS(coll);
+
+    return 0;
+}
+
+
+// !! Vector
+
+
+vector 模塑出一个 dynamic array。它本身是"将元素置于 dynamic array 中加以管理"的一个抽象概念。不过请注意,C++ standard 并未要求必须以 dynamic
+array 实现 vector, 仅仅是规定了其相应条件和操作复杂度。
+
+使用 vector 之前, 必须包含头文件 <vector>:
+
+#include <vector>
+
+在此头文件内, 类型 vector 是一个定义于 namespace std 内的 template:
+
+namespace std{
+    template<typename T, typename Allocator = allocator<T>>
+    class vector;
+}
+
+Vector 的元素可以是任意类型 T。可有可无的第二个 template 参数用来定义内存模型 (memory model)。默认的内存模型是 C++ 标准库提供的 allocator。
+
+
+// !! Vector 的能力
+
+Vector 将元素复制到内部的 dynamic array 中。元素之间总是存在一定的顺序, 所以 vector 是一种 ordered collection。Vector 支持随机访问, 因此只
+要知道位置, 你可以在常量时间内访问任何一个元素。Vector 提供随机访问迭代器, 所以适用于任何 STL 算法。
+
+如果你在末端附加或删除元素, vector 的效率相当好。但如果你在前端或中段安插或删除元素,效率就不怎么样了, 因为作用点之后的每一个元素都必须移到另一位置,而
+每一次移动都得调用 assignment 操作符。
+
+
+// !! Size 和 Capacity
+
+Vector 优异效率的秘诀之一, 就是分配出"较其容纳的元素"更多的内存。为了能够高效运用 vector, 你应该了解大小和容量之间的关系。
+
+Vector 提供用以操作大小的函数有 size()、empty() 和 max_size()。另一个与大小有关的函数是 capacity(), 返回 vector 实际能够容纳的元素量。如果超越
+这个量, vector 就有必要重新分配内部内存。
+
+vector 的容量之所以重要, 有两个原因:
+
+1. 一旦内存重新分配, vector 元素相关的所有 reference、pointer、iterator 都会失效
+
+2. 内存重新分配很耗时间
+
+所以, 如果你的程序管理了"与 vector 元素相关"的 reference、pointer 或 iterator, 或如果程序的执行速度对你而言至关重要, 那就必须考虑容量问题。
+
+
+'你可以使用 reserve() 保留适当容量, 避免重新分配内存'。如此一来, 只要保留的容量尚有富余, 就不必担心 reference 失效。
+
+std::vector<int> coll;// creat an empty vector
+coll.reverse(80);// reverse memory for 80 elements
+
+避免重新分配内存的另一个方法是, 初始化期间就向构造函数传递额外实参, 构建足够的空间。如果你的实参是个数值, 它将成为 vector 的起始大小。
+
+std::vector<int> coll(80);
+
+欲获得这种能力, 元素类型必须提供一个 default 构造函数。对基础类型而言, 唯一能够保证的是 zero initialization。但是请注意, 如果类型很复杂, 就算提供
+了 default 构造函数, 初始化动作也很耗时。如果你这么做只为了保留足够内存, 那倒不如使用 reserve()。
+
+此外,'如何达到时间和空间的最佳效率, 由实现版本决定'。因此, 具体实现版本中容量的增长幅度可能比你我料想的还大。事实上,为了防止内存破碎, 在许多实现方案中即
+使你不调用 reserve(), 当第一次安插元素时也会一口气分配整块内存(例如 2K)。如果你有一大堆 vector, 每个 vector 的实际元素寥寥无几, 浪费的内存相当可观。
+
+
+既然 vector 的容量不会缩减, 我们便可确定, 即使删除元素, 其 reference、pointer 和 iterator 也会继续有效, 继续指向动作发生前的位置。然而安插动作却
+可能使 reference、pointer 和 iterator 失效。
+
+
+C++11 引入一个 vector 新函数: 一个不具强制力的要求, 可以缩减容量以符合当前的元素个数。
+
+coll.shrink_to_fit();// request to shrink memory, since c++ 11
+
+这个要求不具强制力, 以便为实现可能的特有优化保留回旋余地。因此你不能够期望之后的 coll.capacity == coll.size() 会获得 true。
+
+在 C++11 之前, 有一个间接缩减 vector 容量的小窍门:'两个 vector 交换内容后, 两者的容量也会互换'，因此下面的例子虽然保留了元素,却缩减了容量。
+
+template<typename T>
+void shrinkCapacity(std::vector<T> &v) {
+    std::vector<T> temp(v);// copy elements to new vector
+    v.swap(temp);// swap internal elements data
+}
+
+
+// !! Vector 的操作
+
+// !! 构建、复制和销毁
+
+vector<Elem> c;// Default constructor, 产生一个 empty vector
+
+vector<Elem> c(c2);// Copy constructor,建立 c2 的同型 vector 并成为 c2 的一份拷贝(每个元素都会被复制)
+
+vector<Elem> c = c2;// Copy constructor, 建立 c2 的同型 vector 并成为 c2 的一份拷贝(每个元素都会被复制)
+
+vector<Elem> c(rv);// Move constructor, 取 rvalue rv 的内容建立一个新的 vector, since c++ 11
+
+vector<Elem> c = rv;// Move constructor, 取 rvalue rv 的内容建立一个新的 vector, since c++ 11
+
+vector<Elem> c(n);// 利用元素的 Default 构造函数生成一个大小为 0 的 vector
+
+vector<Elem> c(n,val);// 建立一个大小为 0 的 vector, 每个元素的值为 val
+
+vector<Elem> c(begin,end);// 建立一个 vector,以区间[begin,end) 作为元素初值
+
+vector<Elem> c(initlist);// 建立一个 vector, 以 initlist 的元素为初始值
+
+vector<Elem> c = initlist;// 建立一个 vector, 以 initlist 的元素为初始值
+
+c.~vector();// 销毁所有元素,释放内存
+
+
+// !! Nonmodifying Operation
+
+c.empty();
+c.size();
+c.max_size();
+c.capacity();
+
+c.shrink_to_fit();
+
+c.reverse(N);
+
+c1 == c2;// 对每个元素调用 ==
+c1 < c2;
+c1 <= c2;
+
+// !! Assignment
+
+c = c2;// 将 c2 的全部元素值赋给 c
+
+c = rv;// 将 rvalue rv 的所有元素以 move assign 的方式赋值给 c
+
+c = initlist;// 将 initlist 的所有元素赋值给 c
+
+c.assign(n,elem);// 复制 n 个 elem, 赋值给 c
+
+c.assign(beg,end);//将区间[beg,end) 内的元素赋值给 c
+
+c.swap(c2);// 置换 c 和 c2 的数据
+
+std::swap(c, c2);// 置换 c 和 c2 的数据
+
+
+// !! Element Access
+
+欲访问 vector 的所有元素, 你必须使用 range-based for 循环、特定的操作函数或迭代器。
+
+按 C/C++ 惯例, 第一元素的索引为 0, 最末元素的索引为 size()-1。所以第 n 个元素的索引是 n-1。对于 non-const vector, 这些函数都返回元素的 
+reference, 也就是说, 你可以使用这些操作函数更改元素内容。
+
+c[idx];
+c.at(idx);
+c.front();
+c.back();
+
+对调用者来说, 最重要的事莫过于搞清楚这些操作是否执行范围检查。只有 at() 会那么做。如果索引越界, at() 会抛出 out_of_range 异常。其他函数都不做检查,
+如果发生越界错误，会引发不明确的行为。
+
+
+// !! Iterator Function
+
+'vector 提供了一些常规函数来获取迭代器'。vector 提供的是 random-access 迭代器。因此, 理论上说, 你可以把所有 STL 算法作用于 vector 身上。
+
+迭代器的确切类型由实现决定。对 vector 而言, begin()、cbegin()、end() 和 cend() 返回的往往是寻常 pointer。这是好的, 因为 vector 内部结构通常就是
+个 array, 而寻常 pointer 也提供了随机访问迭代器的接口。
+
+vector迭代器持续有效, 除非发生两种情况: 1.使用者在一个较小索引位置上安插或移除元素; 2. 由于容量变化而引起内存重新分配
+
+// !! Inserting and Removing
+
+依 STL 惯例, 你必须保证传入的实参合法: 1.迭代器必须指向一个合法位置; 2.区间的起始位置不能在结束位置之后。
+
+
+一如既往, 当 pop_back() 被调用时, 确保容器不为空是程序员的责任。例如:
+
+std::vector<Elem> coll;// empty vector
+coll.pop_back();// RUNTIME ERROR -> undefined behavior
+
+if(!coll.empty())
+{
+    coll.push_back();// OK
+}
+
+
+然而, 请注意, 在多线程环境中你必须确保: 在"检查容器是否为空"和 pop_back() 动作之间 coll 不被改动:
+
+关于效能, 以下情况你可以预期安插动作和移除动作会比较快些:
+
+· 在容器尾部安插或移除元素
+
+· 容量一开始就够大
+
+· 安插多个元素时, "调用一次"当然比"调用多次"来得快
+
+安插或移除元素, 都会使"作用点"之后的各元素的 reference、pointer 和 iterator 失效。如果安插动作甚至引发内存重新分配, 那么该容器身上的所有
+reference、pointer 和 iterator 都会失效。
+
+
+vector 并未提供任何函数可以直接移除"与某值相等"的所有元素。这是算法发挥威力的时候。以下语句可将值为 val 的所有元素移除:
+
+std::vector<Elem> coll;
+...
+coll.erase(std::remove(coll.begin(), coll.end(),val),coll.end());
+
+c.push_back(elem);// 附加一个 elem 的拷贝与 c 末尾
+c.pop_back();// 移除最后一个元素,但是不返回它
+c.insert(pos, elem);// 在 iterator 位置 pos 之前插入一个 elem 拷贝,并返回新元素的位置
+c.insert(pos, n, elem);
+c.insert(pos,beg. end);
+c.emplace(pos, args...);// 在 iterator 位置 pos 之前插入一个以 args... 为初值的元素, 并返回新元素的位置
+c.emplace_back(args...);// 附加一个以 args... 为初值的元素于末尾,不返回任何东西
+
+c.erase(pos);// 移除 iterator 位置 pos 上的元素, 返回下一元素的位置
+c.resize(N);// 
+c.clear();// 移除所有元素,将容器清空
+
+如果只是要移除"与某值相等"的第一个元素, 可以这么做:
+
+std::vector<int> coll;
+...
+std::vector<int>::iterator pos;
+pos = std::find(coll.begin(), coll.end(),val);
+if(pos != coll.end()){
+    coll.erase(pos);
+}
+
+
+// !! 将 Vector 当作 C-Style Array 使用
+
+就像 class array<> 一样, C++ 标准库保证 vector 的元素必须分布于连续空间中。
+
+因此你可以确定, 对于 vector v 中任意一个合法索引 i, 以下肯定为 true:
+
+&v[i] = &v[0] + i;
+
+保证了这一点, 就可推导出一系列重要结果。
+
+简单的说,'任何地点只要你需要一个 dynamic array, 你就可以使用 vector'。例如你可利用 vector 存放寻常的 C 字符串(类型为 char* 或 const char*):
+
+std::vector<char> v;// create vector as dynamic array
+v.resize(41);
+std::strcpy(&v[0],"hello world");// Copy C-String into vector
+printf("%s\n",&v[0]);// print contents of vector as C-String
+
+自C++11起, 如果想直接访问 vector 的元素, 不一定要用 &a[0], 因为成员函数 data() 也具备相同用途:
+
+std::vector<char, 41> v;// create static array of 41 char
+std::strcpy(v.data(),"hello world");// Copy C-String into array
+printf("%s\n", v.data());
+
+注意, 千万不要把迭代器当作"第一元素的地址"来传递。Vector 迭代器是由实现定义的, 也许并不是个寻常 pointer。
+
+// !! Exception Handling
+
+
+
+// !! Vector 使用实例
+
+#include <vector>
+#include <iostream>
+#include <string>
+#include <iterator>
+#include <algorithm>
+
+using namespace std;
+
+int main(int argc, char **argv)
+{
+    vector<string> sentence;// create empty vector for string
+
+    sentence.reverse(5);// reverse memory for five elements to avoid reallocation
+
+    sentence.push_back("hello");
+    sentence.insert(sentence.end(),{"how","are","you","?"});
+
+    copy(sentence.cbegin(),sentence.cend(),ostream_iterator<int>(cout, " "));
+    cout << endl;
+
+    cout << "max_size() " << sentence.max_size() << endl;
+    cout << "size() " << sentence.size() << endl;
+    cout << "capacity() " << sentence.capacity() << endl;
+
+    swap(sentence[1], sentence[3]);
+
+    sentence.insert(std::find(sentence.begin(),sentence.end(),"?"), "always");
+
+    sentence.back() = "!";
+
+    copy(sentence.cbegin(),sentence.cend(),ostream_iterator<int>(cout, " "));
+    cout << endl;
+
+    cout << "size () " << sentence.size() << endl;
+    cout << "capacity ()" << sentence.capacity() << endl;
+    cout << endl;
+
+    sentence.shrink_to_fit();
+
+    cout << "size () " << sentence.size() << endl;
+    cout << "capacity ()" << sentence.capacity() << endl;
+    cout << endl;
+    return 0;
+}
+
+
+
+// !! Class vector<bool>
+
+
+
+
+// !! Deque
+
+容器 deque 和 vector 非常相似。它也采用 dynamic array 来管理元素, 提供随机访问, 并有着和 vector 几乎一模一样的接口。不同的是 deque 的
+dynamic array 头尾都开放, 因此能在头尾两端进行快速安插和删除。
+
+
+为了提供这种能力, deque 通常实现为一组独立区块 (a bunch of individual blocks), 第一区块朝某方向扩展, 最末区块朝另一方向扩展。
+
+
+使用 deque 之前, 必须先包含头文件 <deque>:
+
+#include <deque>
+
+其中,  deque  类型定义于命名空间 std  内的一个 class template:
+
+namespace std{
+    template<Typename T typename Allocator = allocator<T>>
+    class  deque;
+}
+
+和 vector 相同, 这里的第一个 template 参数用来表明元素类型。第二个 template 实参可有可无, 用来指定 memory model, 默认为 allocator
+
+
+
+// !! Deque 的能力
+
+'Deque 与 vector 相比, 功能上的差异如下'
+
+1. 两端都能快速安插元素和移除元素 (vector 只在尾端逞威风), 这些操作可以在摊提的常量时间(amortized constant time)内完成
+
+2. 访问元素时 deque 内部结构会多一个间接过程, 所以元素的访问和迭代器的动作会稍稍慢一些
+
+3. 迭代器需要在不同区块间跳转, 所以必须是个 smart pointer, 不能是寻常 pointer
+
+4. 在内存区块大小有限制的系统中, deque 可以内含更多元素, 因为它使用不止一块内存。因此 deque 的 max_size() 能更大
+
+5. Deque 不支持对容量和内存重新分配时机的控制。特别要注意的是, 除了头尾两端, 在任何地点安插或删除元素都将导致指向  deque 元素的任何 pointer、
+   reference 和 iterator 失效。不过, deque 的内存重分配优于 vector, 因为其内部结构显示, deque 不必在内存重新分配时复制所有元素。
+
+6. Deque 会释放不再使用的内存区块。Deque 的内存大小是可缩减的,但要不要这么做，以及如何做，由实现决定
+
+
+
+'Deque 的以下特性跟 Vector 差不多'
+
+1. 在中段安插、移除元素的速度相对较慢，因为所有元素都需移动以腾出或填补空间
+
+2. 迭代器属于 random-access iterator
+
+
+'总之, 以下情形最好采用 deque'
+
+1. 你需要在两端安插和移除元素 (这是 deque 的拿手好戏)
+
+2. 无须指向(refer to)容器内的元素
+
+3. 要求"不再使用的元素必须释放" (不过 C++standard 对此无任何保证)
+
+
+Vector 和 deque 的接口几乎一样, 所以如果你不需要什么特殊性质，两者都可试试。
+
+
+// !! Deque 的操作函数
+
+
+deque<Elem> c;// Default 构造函数, 建立一个空的 deque, 没有任何元素
+deque<Elem> c(c2);// Copy constructor, 建立 c2 的同型 deque 并成为 c2 的一份拷贝(每个元素都会被复制)
+deque<Elem> c = c2; // Copy constructor, 建立 c2 的同型 deque 并成为 c2 的一份拷贝(每个元素都会被复制)
+
+deque<Elem> c(rv); // Move constructor, 取 rvalue rv 的内容建立一个新的 deque
+deque<Elem> c = rv; // Move constructor, 取 rvalue rv 的内容建立一个新的 deque
+
+deque<Elem> c(N);// 利用元素的 Default 构造函数 生成一个大小为 N 的deque
+
+deque<Elem> c(N, elem);// 建立一个大小为 N 的 deque, 每个元素都是 elem
+
+c.~deque();// 销毁所有元素, 释放内存
+
+
+'Deque 的各项操作只有以下两点和 vector 不同'
+
+1. Deque 不提供容量操作 capacity() 和 reserve()
+
+2. Deque 直接提供函数完成头部元素的安插和删除 push_front() 和 pop_front()
+
+
+// !! Nonmodifying Operation
+
+c.empty()
+c,size()
+c.max_size()
+
+c1 == c2
+c1 != c2
+c1 < c2
+c1 <= c2
+
+c[idx]
+c.at(idx)
+
+c.front();// 返回第一个元素
+c.back();// 返回最末元素
+c.begin()
+c.end();
+
+
+// !! Modifying Operation
+
+c = c2;// 将 c2 的全部元素赋值给 c
+c =  rv;// 将 rvalue rv 的所有元素以 move assign 的方式给 c
+
+c.assign(n, elem);// 赋值 n 个 elem, 赋值给 c
+
+c1.swap(c2);
+
+c.push_back(elem);// 附加一个 elem 拷贝于末尾
+c.pop_back();// 移除最后一个元素,但不返回它
+
+c.push_front(elem);// 在头部插入 elem 的一个拷贝
+c.pop_front();//移除第一个元素,但是不返回
+
+
+c.insert(pos,elem);// 在 iterator 位置 pos 之前插入一个 elem 的拷贝,并返回新元素的位置
+c.emplace(pos,args...); // 在 iterator 位置 pos 之前插入一个以 args ... 为初值的元素, 并返回新元素的位置,since c++ 11
+
+c.erase(pos);// 移除 iterator 位置 pos 上的元素,并返回下一元素的位置
+c.clear();// 移除所以元素,将容器清空
+
+
+
+// !! Deque 运用实例
+
+#include <iostream>
+#include <string>
+#include <deque>
+#include <algorithm>
+#include <iterator>
+
+using namespace std;
+
+int main(int argc, char** argv)
+{
+    deque<string> coll;
+
+    coll.assign(3,string("string"));
+    coll.push_back("last string");
+    coll.push_front("first string");
+
+    copy(coll.cbegin(),coll.cend(),ostream_iterator<string>(cout, "\n"));
+    cout << endl;
+
+    for(unsigned int i = 0 ; i < coll.size() ; i++)
+    {
+        coll[i] = "another" + coll[i];
+    }
+
+    coll.resize(4,"resize string");
+
+    copy(coll.cbegin(),coll.cend(),ostream_iterator<string>(cout, " "));
+
+    cout << endl;
+    return 0;
+}
+
+
+
+// !! List
+
+
+
+
 
 
 
