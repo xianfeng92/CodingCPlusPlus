@@ -918,6 +918,215 @@ int main(int argc, char** argv)
 
 // !! List
 
+List 使用一个 doubly linked list 管理元素。按惯例, C++ 标准库并未明定实现方式, 只是遵守 list 的名称、限制和规格。
+
+使用 list 时必须先包含头文件 <list>:
+
+#include <list>
+
+其中的 list 类型系定义于 namespace std 中, 是个 class template:
+
+namespace std{
+    template<typename T,typename Allocator = allocator<T>>
+    class list;
+}
+
+
+List 的元素可以是任何类型 T。第二个 template 实参可有可无, 用来指定内存模型。默认的内存模型是 C++ 标准库提供的 allocator。
+
+
+// !! List 的能力
+
+List 的内部结构完全迥异于 array、vector 或 deque。List 对象自身提供了两个 pointer, 或称 anchor (锚点), 用来指向第一个和最末一个元素。每个元素
+都有 pointer 指向前一个和下一个元素。如果想要安插新元素, 只需操纵对应的 pointer 即可。
+
+因此, list 在几个主要方面与 array、vector 或 deque 不同:
+
+1. 'List 不支持随机访问'。如果你要访问第 5 个元素, 就得顺着串链逐一爬过前 4 个元素。所以, 在 list 中随机巡访任意元素是很缓慢的行为。然而你可以从两端
+    开始航行整个 list, 所以访问第一个或最末一个元素的速度很快。
+
+2. 任何位置上(不只两端)执行元素的安插和移除都非常快, 始终都是常量时间内完成, 因为无须移动任何其他元素。实际上内部只是进行了一些 pointer 操作而已
+
+3. 安插和删除动作并不会造成指向其他元素的各个 pointer、reference 和 iterator 失效
+
+
+
+// !! Element Access
+
+欲访问 list 的所有元素, 你必须使用 range-based for 循环、特定操作函数或迭代器。List 不支持随机访问, 只有 front() 和 back() 能够直接访问元素。
+
+
+c = c2;// 将 c2 的全部元素赋值给 c
+c = rv;// 将 rvalue rv 的所有元素以 move assign 的方式给与 c
+c = inilist;
+c.swap(c2);
+swap(c, c2);
+
+
+c.front();
+c.back();
+
+一如既往, 这些操作并不检查容器是否为空。对空容器执行任何操作都会导致不明确的行为。所以调用者必须确保容器至少含有一个元素。
+
+std::list<Elem> coll;
+std::cout << coll.front() << std::end;//RUNTIME ERROR -> undefined behavior
+
+if(!coll.empty())
+{
+    std::cout << coll.front() << std::endl;
+}
+
+注意, 这段代码只在单线程环境中才 OK。在多线程环境中你需要同步机制 (synchronization mechanism) 确保"检查大小"和"访问元素"之间 coll 未曾被改动。
+
+
+
+// !! Iterator Function
+
+只有运用迭代器, 才能够访问 list 中的各个元素。由于 list 不能随机访问, 这些迭代器只是双向(而非随机)迭代器。所以凡是用到随机访问迭代器的算法
+(所有用来操作元素顺序的算法--特别是排序算法——都归此类)你都不能调用它们来处理 list, 不过你可以拿 list 的特殊成员函数 sort() 取而代之。
+
+c.begin();
+c.end();
+c.cbegin();
+c.cend();
+c.rbegin();
+c.rend();
+
+
+// !! Inserting and Removing
+
+List 提供 deque 的所有功能, 还增加了适用于 list 的 remove() 和 remove_if() 算法特殊版本。
+
+依 STL 惯例, 你必须保证传入的实参合法: 迭代器必须指向一个合法位置; 区间的起始位置不能在结束位置之后。
+
+为了移除元素, list 特别配备了 remove() 算法的特别版本。这些成员函数比 remove() 算法的速度更快, 因为它们只进行内部 pointer 操作, 不改变元素。
+
+所以, '面对 list, 你应该调用成员函数 remove() 而不是像面对 vector 和 deque 那样调用 STL 算法'
+
+
+std::list<Elem> coll;
+...
+
+// remove all elements with values val
+list.remove(val);
+
+
+然而, 如果只是要移除第一个"带有某值"的元素,讨论 vector 时提到的 std::remove 算法。
+
+
+你可以使用 remove_if() 以求定义出元素的移除准则(removing criterion), 做法是为该算法提供一个函数或函数对象。remove_if() 会将"造成该函数或函数对
+象返回 true"的每一个元素移除。
+
+
+c.push_back(elem);// 附加一个 elem 与容器末尾
+c.pop_back();// 移除最后一个元素,但是不返回它
+
+c.push_front(elem);//在头部插入 elem 的一个拷贝
+c.pop_front();// 移除头部的一个元素,但是不返回它
+c.insert(pos,elem);//在 iterator 位置 pos 之前插入一个 elem 拷贝,并返回新元素的位置
+
+c.erase(pos);// 移除 iterator 位置 pos 上的元素, 返回下一个元素的位置
+c.remove(val);// 移除所有值为 val 的元素
+
+c.clear();// 移除所有元素,将容器清空
+
+
+// !! Splice (接合)函数以及会改变元素次序的函数
+
+Linked list 的一大好处就是不论在任何位置, 元素的安插和移除都只需要常量时间。如果你有必要将若干元素从 A 容器转放到 B 容器, 那么上述好处就更见其效了
+, 因为你只需要重新定向某些指针即可。
+
+为了利用这个优势, list 不仅提供 remove(), 还提供其他若干成员函数, 用来改变元素和区间次序, 或重新链接relink, 我们不仅可以调用这些函数移动单一 list
+内的元素, 也可以移动两个 list 之间的元素--只要 list 的类型一致即可。
+
+// !! Special Modifying Operation
+
+c.unique();// 如果存在若干相邻而数值相同的元素,就移除重复元素,只留一个
+c.unique(op);//如果存在若干相邻都使得 op() 的结果为 true, 则移除重复元素只留一个
+c.splice(pos, c2);// 将 c2 内的所有元素转移（move）到 c 之内, 迭代器 pos 之前
+c.sort();// 以 operator< 准则对所有元素排序
+c.sort(op);// 以 op() 为准则对所有元素排序
+
+c.merge(c2);// 假设 c 和 c2 容器都包含 op() 准则下已排序(Sorted)的元素, 将 c2 的全部元素转移到 c,保证合并后的 list 仍为已排序(Sorted)
+
+
+c.merge(c2, op);// 假设 c 和 c2 容器都包含已排序(Sorted)的元素, 将 c2 的全部元素转移到 c,保证合并后的 list 在 op 准则下仍为已排序(Sorted)
+
+c.reverse(); // reverse the order
+
+
+
+// !! List 运用实例
+#include <algorithm>
+#include <iostream>
+#include <iterator>
+#include <list>
+
+using namespace std;
+
+void printlist(const std::list<int>& l1, const std::list<int>& l2) {
+  cout << "list1: " << endl;
+  copy(l1.cbegin(), l1.cend(), ostream_iterator<int>(cout, " "));
+  cout << endl;
+
+  cout << "list2: " << endl;
+  copy(l2.cbegin(), l2.cend(), ostream_iterator<int>(cout, " "));
+  cout << endl;
+}
+
+int main(int argc, char** argv) {
+  list<int> list1, list2;
+
+  for (int i = 0; i < 6; i++) {
+    list1.push_back(i);
+    list2.push_front(i);
+  }
+
+  printlist(list1, list2);
+
+  list2.splice(find(list2.cbegin(), list2.cend(), 3), list1);
+  printlist(list1, list2);
+
+  list2.splice(list2.end(), list2, list2.begin());
+  printlist(list1, list2);
+
+  list2.sort();
+  list1 = list2;
+  list2.unique();
+
+  printlist(list1, list2);
+
+  list1.merge(list2);
+
+  printlist(list1, list2);
+
+  return 0;
+}
+
+
+
+
+// !! Set 和 Multiset
+
+Set 和 multiset 会根据特定的排序准则, 自动将元素排序。两者不同之处在于 multiset 允许元素重复而 set 不允许。
+
+
+使用 set 或 multiset 之前, 必须先包含头文件<set>:
+
+#include <set>
+
+在这个头文件中, 上述两个类型都被定义为命名空间 std 内的 class template:
+
+namespace std{
+    template <typename T, typename Compare = less<T>, typename Allocator = allocator<T>>
+    class set;
+
+    template <typename T, typename Compare = less<T>, typename Allocator = allocator<T>>
+    class multiset;
+}
+
+
+
 
 
 
