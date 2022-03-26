@@ -1126,10 +1126,372 @@ namespace std{
 }
 
 
+'只要是可依据某排序准则被比较(所谓 comparable) 的任意类型 T 都可以成为 set 或 multiset 的元素类型'。可有可无的第二个 template 实参用来定义排序准
+则。如果没有传入某个排序准则, 就采用默认准则 less--这是个函数对象, 以 operator< 对元素进行比较。可有可无的第三实参用来定义内存模型。默认的内存模型是
+allocator, 由 C++ 标准库提供。
+
+所谓"排序准则", 必须定义 strict weak ordering, 其意义如下:
+
+1. 必须是非对称的
+
+对 operato< 而言, 如果 x < y 为 true, 则 y < x 为 false
+
+2. 必须是可传递的 transitive
+
+对 operator< 而言, 如果 x < y 为 true 且 y < z 为 true, 则 x < z 为 true
+
+3. 必须是非自反的
+
+对 operator< 而言, x < x 永远为 false
+
+4. 必须有等效传递性
+
+
+
+// !! Set 和 Multiset 的能力
+
+和所有标准的关联式容器类似, set 和 multiset 通常以平衡二叉树 (balanced binary tree) 完成--C++standard 并未明定, 但由 set 和 multiset 各项操
+作的复杂度可以得出这个结论。
+
+自动排序的主要优点在于令二叉树于查找元素时拥有良好效能。其查找函数具有对数 (logarithmic) 复杂度。但是, 自动排序造成 set 和 multiset 的一个重要限
+制:'你不能直接改变元素值,因为这样会打乱原本正确的顺序'。
+
+
+因此, 要改变元素值, 必须先删除旧元素,再插入新元素。以下接口反映了这种行为:
+
+1. Set 和 multiset 不提供任何操作函数可以直接访问元素
+
+2. 通过迭代器进行元素间接访问,有一个限制:从迭代器的角度看,元素值是常量
+
+
+// !! Set 和 Multiset 的操作函数
+
+
+
+// !! Create, Copy and Destroy
+
+有两种方式可以定义排序准则:
+
+1. 以template参数定义之。例如:
+
+std::set<int, std::greater<int>> coll;
+
+这种情况下排序准则就是类型的一部分。于是类型系统确保"只有排序准则相同的容器才能被合并"。这是排序准则的通常指定法。更精确地说, 第二参数是排序准则的类型
+, 实际的排序准则是容器所产生的函数对象。为了产生它, 容器的构造函数会调用"排序准则类型"的 default 构造函数。
+
+
+2. 以构造函数参数定义之
+
+这种情况下, 同一个类型可以运用不同的排序准则，而排序准则的初始值或状态也可以不同。如果运行期才获得排序准则, 而且需要用到不同的排序准则（但数据类型必须
+相同）, 这一方式可派上用场。
+
+
+如果用户没有提供特定的排序准则, 就采用默认准则--函数对象 less<>。less<> 通过 operator< 对元素进行排序。
+
+
+set c;// Default 构造函数, 建立一个空的 set, 不含任何元素
+set c(op);// 建立一个空的 set, 以 op 为排序准则
+
+set c = c2;//Copy 构造函数, 为相同类型的另一个 set 建立一份拷贝, 所有元素均被复制
+set c(rv);// Move 构造函数, 建立一个新的 set, 有相同类型, 取 rvalue rv 的内容
+
+c.~set();// 销毁所有元素, 释放内存
+
+
+如果用 operator== 对两个容器做比较, 两个容器内的元素将使用它们自己的 operator== 进行比较, 那意味着元素类型必须提供 operator==。
+
+
+// !! Nonmodifying Operation
+
+Set 和 multiset 提供常见的非更易型操作, 用来查询大小、相互比较:
+
+c.key_comp(); // 返回比较准则
+c.value_comp(); // 返回针对 value 的比较准则(和 key_comp() 相同)
+c.empty(); // 判断是否容器为空
+
+c.size(); // 返回目前的元素个数
+
+c.max_size(); //返回元素个数之最大可能性
+
+c1 == c2;
+c1 < c2;
+c1 <= c2;
+
+
+元素比较动作只适用于类型相同的容器。'换言之,元素和排序准则必须有相同的类型,否则编译期会产生类型方面的错误'。
+
+
+
+std::set<float> c1;
+std::set<float, std::greater<float>> c2;
+...
+if(c1 == c2){// Error different type
+    ....
+}
+
+
+比较动作是以 "字典顺序" 检查某个容器是否小于另一容器。
+
+
+// !! Special Search Operation
+
+'set 和 multiset 在元素快速查找方面有优化设计, 所以提供了特殊的查找函数'。
+
+面对 set 和 multiset 你应该优先采用这些优化算法, 如此可获得对数复杂度, 而非 STL 算法的线性复杂度。
+
+
+c.count(val);// 返回 元素值为 val 的元素的个数
+c.find(val);// 返回 元素值为 val 的第一个元素, 如果找不到则返回 end()
+c.lower_bound(val);// 返回 val 的第一个可安插位置, 也就是元素值 >= val 的第一个元素的位置
+
+c.equal_range(val);
+
+成员函数 find() 查找出与实参值相同的第一个元素, 并返回一个迭代器指向该位置。如果没找到这样的元素, 就返回容器的 end()。
 
 
 
 
+// !! Assignment
+
+set 和 multiset 只提供任何容器都提供的基本赋值操作。这些操作函数中, 赋值操作的两端容器必须具备相同类型。尽管"比较较准则"本身可能不同，但其类型必须相同。
+
+
+// !! Iterator Function
+
+Set 和 multiset 不提供元素直接访问, 所以只能采取 range-based for 循环或采用迭代器。
+
+c.begin();
+c.end();
+c.cbegin();
+c.cend();
+c.rbegin();
+c.rend();
+
+和所有关联式容器类似， 这里的迭代器是双向迭代器。更重要的是，从迭代器的角度看去， 所有元素都被视为常量， 这可确保元素不会被改动以至于打乱既有顺序。
+
+
+
+// !! Inserting and Removing
+
+C++11 保证, multiset 的 insert()、emplace() 和 erase() 成员函数都会保存等值元素间的相对次序, 插入的元素会被放在"既有的等值元素群"的末尾。
+
+
+
+注意, 用以安插元素的函数: insert() 和 emplace() , 其返回类型不尽相同:
+
+Set提供如下接口:
+
+pair<iterator, bool> insert(const value_type& val);
+iterator insert(const_iterator posHint, const value_type& val);
+
+template <typename ...Args>
+pair<iterator, bool> emplace(Args&& ...args);
+
+
+Multiset提供如下接口:
+
+iterator insert(const value_type& val);
+
+template <typename ...Args>
+iterator emplace(const value_type& val);
+
+
+返回类型之所以不相同, 原因是: multiset 允许元素重复而 set 不允许。
+
+因此, 如果将某元素安插至 set 内, 而该 set 已经内含同值元素, 安插动作将告失败。所以 set 的返回类型是以 pair 组织起来的两个值。
+
+1. pair 结构中的 second 成员表示安插是否成功
+
+2. pair 结构中的 first 成员表示新元素的位置, 或现存的同值元素的位置
+
+
+以下例子把数值为 3.3 的元素安插到 set c 中, 借此说明如何使用上述接口:
+
+std::set<double> c;
+...
+if(c.insert(3.3).second){
+    std::cout << "3.3 inserted" << std::endl;
+}else{
+    std::cout << "3.3 already existed" << std::endl
+}
+
+
+如果你还想处理新位置或旧位置, 代码得更复杂些:
+
+auto status = c.insert(value);
+if(status.second){
+    std::cout << value << "inserted as a element" << std::endl;
+}else{
+    std::cout << "already exists" << std::endl;
+}
+
+std::cout << std::distance(c.begin(),value.first) + 1 << std::endl;
+
+
+
+若欲删除"与某值相等"的元素, 只需调用 erase():
+
+std::set<Elem> coll;
+...
+// remove all elements with values val
+coll.erase(val);
+
+它返回的是被删除元素的个数, 在 set 身上其返回值非 0 即 1。
+
+
+如果 multiset 内含重复元素, 你不能使用 erase() 来删除这些重复元素中的第一个。但你可以这么做:
+
+std::multiset<Elem> coll;
+...
+// remove first element with value val
+std::multiset<Elem>::iterator pos;
+pos = coll.find(val);
+if(pos != coll.end()){
+    coll.erase(pos);
+}
+
+这里应该采用成员函数 find(), 而非 STL 算法 find(), 因为前者速度更快。
+
+Multiset 的 insert()、emplace() 和 erase() 操作函数都会保留等价元素的相对次序。自 C++11 起, 调用 insert(val) 或 emplace(args...), 新元素
+保证会被安插于等价元素所形成的区间的末端。
+
+
+
+// !! Exception Handling
+
+Set 和 multiset 是"以节点(node)为基础"的容器。如果节点构建失败, 容器仍保持原样。此外，由于析构函数通常并不抛出异常，所以节点的移除不可以失败。
+
+
+// !! Set 和 Multiset 运用实例
+
+以下程序展示了 set 的若干能力:
+
+#include <iostream>
+#include <set>
+#include <iterator>
+#include <algorithm>
+
+using namespace std;
+
+int main(int argc, char **argv)
+{
+    std::set<int, std::greater<int>> coll1;
+
+    coll1.insert({4,5,2,8,1});
+    coll1.insert(7);
+
+    // print all elements
+    for(auto pos = coll1.begin(); pos != coll1.end();++pos){
+        cout << *pos << endl;
+    }
+
+    for(auto ele: coll1){
+        cout << elem << endl
+    }
+
+    cout << endl;
+
+    auto status = coll1.insert(4);
+    if(status.second){
+        std::cout << "4 inserted as a element" << std::endl;
+    }else{
+        std::cout << "4 already exists" << std::endl;
+    }
+
+    set<int> coll2(coll1.begin(), coll1.end());
+
+    copy(coll2.cbegin(),coll2.cend(), ostream_iterator<int>(cout, " "));
+    cout << endl;
+
+    coll2.erase(coll2.begin(), coll2.find(3));
+
+    int num;
+    num = coll2.erase(5);
+    cout << num << "elements removed." << endl;
+
+    copy(coll2.cbegin(),coll2.cend(),ostream_iterator<int>(cout, " "));
+
+    cout << endl;
+    
+}
+
+首先建立一个空 set, 使用不同的 insert() 重载版本安插数个元素:
+
+std::set<int, std::greater<int>> coll1;
+coll1.insert({1,2,3,4,5});
+coll1.insert(5);
+
+
+注意数值为 5 的元素被安插两次, 但第二次安插会被忽略, 因为 set 不允许元素值重复。
+
+
+set<int> coll2(coll1.begin(), coll1.end());
+
+产生一个新的 set, 其内容纳升序(递增)排列的 int, 并以原先那个 set 的元素为初值。
+
+以下语句移除数值为 3 的元素之前的所有元素:
+
+coll2.erase(coll2.begin(),coll2.find(3));
+
+注意上述数值为 3 的元素位于区间尾端, 所以它没被移除
+
+
+
+// !! 运行期指定排序准则
+
+'无论是将排序准则作为第二个 template 实参传入, 或是采用默认的排序准则 less<>, 通常你都会将排序准则定义为类型的一部分'。但有时必须在运行期处理排序准
+则，或者有时候你需要对同一种数据类型采用不同的排序准则。此时你就需要一个"用来表现排序准则"的特殊类型，使你能够在运行期间才给定某个准则。
+
+以下程序说明了这种做法:
+
+#include <iostream>
+#include <set>
+
+#include "print.hpp"
+
+using namespace std;
+
+class RuntimeCmp{
+    public:
+        enum cmp_mode {normal,reverse};
+    private:
+        cmp_mode mode;
+        RuntimeCmp(cmp_mode m = normal) : mode(m) {}
+        template <typename T>
+        bool operator()(const T& t1, const T& t2){
+            return mode == normal ? t1 < t2 : t1 > t2;
+        }
+        
+        bool operator==(const RuntimeCmp& rc) const {
+            return mode == rc.mode;
+        }
+};
+
+typedef set<int,RuntimeCmp> Intset;
+
+int main() {
+    Intset coll1 = {3,2,8,6,7};
+    PRINT_ELEMENTS(coll1, "coll1:");
+
+    RuntimeCmp reverse_order(RuntimeCmp::reverse);
+
+    Intset coll2(reverse_order);
+    coll2 = {9,1,3,6,4,2};
+    PRINT_ELEMENTS(coll2, "coll2:");
+
+
+    coll1 = coll2;
+    coll1.insert(3);
+    PRINT_ELEMENTS(coll1, "coll1:");
+}
+
+
+在这个程序中, class RuntimeCmp 提供了一种泛化能力: 允许在运行期间对任何数据类型指定排序准则。其 default 构造函数设定以升序(ascending order)进行
+排序, 用的是默认值 normal。它也允许你传递 RuntimeCmp::reverse 作为构造函数实参, 导致以降序 descending order 排序。
+
+
+
+// !! Map 和 Multimap
 
 
 
