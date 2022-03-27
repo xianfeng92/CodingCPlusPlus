@@ -72,7 +72,9 @@
         "shared_mutex": "cpp",
         "cfenv": "cpp",
         "cinttypes": "cpp",
-        "*.in": "cpp"
+        "*.in": "cpp",
+        "charconv": "cpp",
+        "typeindex": "cpp"
     },
     "C_Cpp.clang_format_fallbackStyle": "Google",
     "C_Cpp.clang_format_style": "Google",
@@ -81,6 +83,7 @@
         "bptr",
         "myfunc",
         "mylib",
+        "nocase",
         "pfct",
         "xforg"
     ]

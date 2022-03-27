@@ -1493,6 +1493,739 @@ int main() {
 
 // !! Map 和 Multimap
 
+Map 和 multimap 将 key/value pair 当作元素进行管理。它们可根据 key 的排序准则自动为元素排序。Multimap 允许重复元素, map 不允许。
+
+使用 map 和 multimap 之前,你必须先包含头文件 <map>:
+
+#include <map>
+
+在其中, map 和 multimap 被定义为命名空间 std 内的 class template:
+
+namespace std{
+    template<Typename Key, typename T,
+    Typename Compare = less<Key>, Typename Allocator = allocator<pair<const Key,T>>>
+    class map;
+
+    template <typename Key, typename T,
+    Typename Compare = less<Key>, typename Allocator = allocator<pair<const Key,T>>>
+    class multiset;
+}
+
+第一个 template 实参将成为元素的 key 类型, 第二个 template 实参将成为元素的 value 类型。
+
+Map 和 multimap 的元素类型 Key 和 T 必须满足以下两个条件:
+
+1. Key 和 value 都必须是 copyable 或 movable
+
+2. 指定的排序准则而言, key 必须是 comparable
+
+
+第三个 template 实参可有可无, 用来定义排序准则。如果用户未传入某个排序准则, 就使用默认的 less<> 排序准则--以 operator< 进行比较。
+
+关于 multimap, 我们无法预测所有"拥有等价key"的元素的彼此次序, 不过它们的次序是稳固不变的。'C++11 保证 multimap 的安插和抹除动作都会保留等价元素的相对次序'。
+
+第四个 template 实参也是可有可无, 用来定义内存模型。默认的内存模型是 allocator, 由 C++ 标准库提供。
+
+
+
+// !! Map 和 Multimap 的能力
+
+和其他所有关联式容器一样, map/multimap 通常以平衡二叉树完成。C++standard 并未明定这一点, 但是从 map 和 multimap 各项操作的复杂度自然可以得出这一结论。'通常
+set、multiset、map 和 multimap 使用相同的内部结构, 因此, 你可以把 set 和 multiset 视为特殊的 map 和 multimap, 只不过 set 元素的 value 和 key 是同一对
+象'。
+
+因此, map 和 multimap 拥有 set 和 multiset 的所有能力和所有操作。当然, 某些细微差异还是有的: 首先,它们的元素是 key/value pair, 其次, map 可作为关联式数
+组(associative array)来运用。
+
+Map 和 multimap 会根据元素的 key 自动对元素排序。这么一来, 根据已知的 key 查找某个元素时就能够有很好的效率, 而根据已知 value 查找元素时, 效率就很糟糕。
+
+"自动排序"这一性质使得 map 和 multimap 身上有了一条重要限制: 你不可以直接改变元素的 key, 因为这会破坏正确次序。要修改元素的 key, 必须先移除拥有该 key 的元素,
+然后插入拥有新 key/value 的元素。从迭代器的观点看, 元素的 key 是常量。'至于元素的 value 倒是可以直接修改, 当然前提是 value 并非常量'。
+
+
+// !! Map 和 Multimap 的操作函数
+
+
+// !! Create,Copy, and Destroy
+
+map c;// Default constructor, 建立一个空 map/multimap 
+map c(op);// 建立一个空 map/multimap, 以 op 为排序准则
+
+map c(c2);// Copy constructor
+map c = c2;// Copy constructor
+
+map c(rv);// Move constructor, 取 rvalue rv 的内容建立一个新的 map/multimap
+map c = rv;// Move constructor, 取 rvalue rv 的内容建立一个新的 map/multimap
+
+map c(beg,end);
+map c(beg,end,op);
+
+c.~map();// 销毁所有元素, 释放内存
+
+
+其中, map 可为下列形式:
+
+map<Key,Value> // 一个 map 以 less<> 为排序准则
+
+map<Key,Value,Op> // 一个 map 以 Op 为排序准则
+
+multimap<Key,Value>
+multimap<Key,Value,Op>
+
+
+两种方式可以定义排序准则:
+
+1. 以 template 实参定义之
+
+std::map<float,std::string,std::greater<float>> coll;
+
+这种情况下, 排序准则就是类型的一部分。因此类型系统确保"只有排序准则相同的容器才能被合并"。这是比较常见的一种排序准则指定法。'更精确地说, 第三参数是排序准则的类型。
+实际的排序准则是容器所产生的函数对象 (function object)'。为了产生它,构造函数会调用"排序准则类型"的 default 构造函数。
+
+2. 以构造函数参数定义之
+
+这种情况下, 你可以有一个"排序准则类型"并为它指定不同的排序准则实例(也就是说,让该类型所产生的对象(代表一个排序准则)的初值或状态不同)。如果运行期才能获得排序准则,
+而且程序需要用到不同的排序准则(但其类型必须相同), 这一方式可派上用场。
+
+
+如果用户没有指定任何排序准则, 就采用默认准则——函数对象 less<>。less<> 通过 operator< 对元素排序。'再强调一次,排序准则也被用来检验同一容器内的两个元素的等价性'
+(例如用来找出重复元素)。只有当比较两个容器时,才需要操作符 ==。
+
+我想你应该宁愿另外定义一个类型, 避免无聊而重复地为了一个类型写那么一长串:
+
+typedef std::set<float, std::string, std::greater<std::string>> StringFloatMap;
+
+...
+
+StringFloatMap coll;
+
+
+
+// !! Nonmodifying Operation
+
+Map 和 multimap 提供了若干常见的非更易型操作, 用来查询大小、相互比较。
+
+
+"元素比较"函数只能用于类型相同的容器身上, 换言之, 两个容器的 key、value、排序准则都必须有相同的类型, 否则编译期会产生类型方面的错误。
+
+std::map<float, std::string> coll1;
+std::map<float, std::string, std::greater<std::string> > coll2;
+
+....
+
+if(coll1 == coll2)// Error, different type
+{
+
+}
+
+
+c.key_comp();//返回 比较准则
+c.value_comp();//返回针对 value 的比较准则
+
+c.empty();// 返回是否容器为空(相当于 size() == 0,当也许较快)
+c.size();//返回目前的元素数量
+
+c.max_size();//返回元素个数之最大可能量
+
+c == c2;// 返回 c 是否等于 c2 ---对每个元素调用 ==
+
+
+比较函数以"字典顺序"检查某个容器是否小于另一个容器。
+
+
+
+// !! Special Search Operation
+
+就像 set 和 multiset 一样, map 和 multimap 也提供特殊查找函数, 以便利用内部树状结构获取较好的效能。
+
+c.count(val);// 返回 key 为 val 的元素个数
+c.find(val);//返回 key 为 val 的第一个元素, 找不到就返回 end
+c.lower_bound(val);
+c.upper_bound(val);
+c.equal_range(val);
+
+
+
+// !! Assignment
+
+Map 和 multimap 只支持所有容器都提供的基本赋值操作。
+
+
+c = c2;// 将 c2 的全部元素赋值给 c
+
+c = rv;// 将 rvalue rv 的所有元素以 move assign 的方式给与 c
+
+c.swap(c2);// 置换 c 和 c2 的元素
+swap(c,c2);// 置换 c 和 c2 的元素
+
+
+这些操作函数中, 赋值动作的两端容器必须拥有相同类型。尽管"比较准则"本身可能不同，但其类型必须相同。
+
+
+// !! Iterator Function and Element Access
+
+Map 和 multimap 不支持元素直接访问, 因此元素的访问通常是经由 range-based for循环或迭代器进行。不过有个例外: map 提供 at() 以及 subscript() 操作符可直接访
+问元素。
+
+c.begin();
+c.cbegin();
+c.end();
+c.cend();
+
+c.rbegin();
+c.rend();
+
+'和其他所有关联式容器一样,这里的迭代器是双向迭代器'。所以, 对于只能接受随机访问迭代器的 STL 算法(例如排序算法或随机乱序(random shuffling)算法), map 和 
+multimap 就无福消受了。
+
+
+更重要的是, 在 map 和 multimap 中, 所有元素的 key 都被视为常量。因此, 元素的实质类型是 pair<const Key,T>。这个限制是为了确保你不会因为变更元素的 key 而破坏
+已排好的元素次序。
+
+
+下面示范使用 range-based for 循环访问 map 元素:
+
+std::map<std::string, float> coll;
+...
+
+for(auto &elem : coll){
+    std::cout << "key is " << elem.first << "and value is " << elem.second << std::endl;
+}
+
+
+其中的 elem 是个 reference, 指向"容器 coll 中目前正被处理的元素"。因此 elem 的类型是 pair<const std::string, float>。表达式 elem.first 取得元素的 key, 
+而表达式 elem.second 取得元素的 value。
+
+另一个例子是以迭代器访问元素 (C++11 之前必须使用这种方法):
+
+std::map<std::string, float> coll;
+...
+
+for(pos = coll.begin(); pos != coll.end(); ++pos){
+    std::cout << "key is " << pos->first << ", value is " << pos->second << std::endl;
+}
+
+在这里, 迭代器 pos 被用来迭代穿越整个由"以 const string 和 float 组成的 pair"所构成的序列, 你必须使用 operator-> 访问每次访问的那个元素的 key 和 value。
+
+如果你尝试改变元素的 key, 会引发错误:
+
+elem.first = "hello";// ERROR at compile time
+pos->first = "world";// ERROR at compile time
+
+不过如果 value 本身的类型并非 const, 改变 value 没有问题:
+
+elem.second = 3.14159;
+pos->second = 3.14159;
+
+如果你使用算法或 lambda 来操作 map 元素, 你必须很明确地声明元素类型:
+
+std::map<std::string, float> coll;
+...
+
+std::for_each(coll.begin(), coll.end(),[](std::pair<const std::string, float>& elem)
+{
+    elem.second += 1.2f;
+}
+);
+
+
+那么, 可以不写:
+
+std::map<std::string, float>
+
+而改为
+
+std::map<std::string, float>::value_type;
+
+或
+
+decltype(coll)::value_type;
+
+来声明元素类型。
+
+
+
+如果你一定得改变元素的 key, 只有一条路: 以一个"value 相同"的新元素替换掉旧元素。
+
+下面是个泛化函数:
+
+namespace MyLib{
+    template<typename Cont>
+    inline replace_key(Cont& c, const typename Cont::key_type &old_key, const typename Cont::key_type &new_key)
+    {
+        typename Cont::iterator pos;
+        pos = c.find(old_key);
+        if(pos != c.end()){
+            c.insert(typename Cont::value_type(new_key, pos->second));
+            c.erase(pos);
+            return true;
+        }else{
+            return false;
+        }
+    }
+}
+
+
+这个泛型函数的用法很简单, 把旧 key 和新 key 传递进去就行。例如:
+
+std::map<std::string, float> coll;
+...
+MyLib::replace_key(coll,"old key","new key");
+
+如果你面对的是 multimap, 情况也一样。
+
+
+注意, map 提供了一种非常方便的手法, 让你改变元素的 key。只需如此这般:
+
+coll["new key"] = coll["old key"];
+coll.erase("old key");
+
+
+
+
+// !! Inserting and Removing
+
+
+c.insert(val);// 安插一个 val 拷贝,并返回新元素的位置
+c.insert(pos, val);//安插一个 val  拷贝,并返回新元素的位置(pos 是个提示,指出安插动作的查找起点, 若提示恰当,可加快查找速度)
+
+c.insert(beg.end);// 将区间[beg,end) 内所有元素的拷贝安插到 c
+
+c.erase(val);// 移除与 val 相等的所有元素, 返回被移除元素的个数
+
+c.erase(pos);// 移除 iterator 位置 pos 上的元素, 无返回值
+
+c.clear();// 移除所有元素, 将容器清空
+
+
+对于 multimap, C++11 保证 insert()、emplace() 和 erase() 都会保留等价元素的相对次序, 而新增（被安插）的元素则一定被放在既有的等价元素（群）的末尾。
+
+安插一个 key/value pair 时, 你一定要记住, 在 map 和 multimap 内部, key 被视为常量。你要么得提供正确类型, 要么得提供隐式或显式类型转换。
+
+自 C++11 起, 安插元素的最方便做法就是把它们 initializer list 的形式传进去
+
+
+std::set<std::string, float> coll;
+...
+coll.insert({"London",2.12});
+
+
+
+'有三种不同的方法可以将 value 传入 map 或 multimap 内':
+
+1. 运用 value_type。为了避免隐式类型转换, 你可以利用 value_type 明确传递正确类型。value_type 是容器本身提供的类型定义。
+
+std::map<std::string, float> coll;
+...
+coll.insert(std::map<std::string, float>::value_type("London",2.12));
+
+或
+
+coll.insert(decltype(coll).value_type("London",2.12));
+
+
+2. 运用 pair<>。另一个做法是直接运用 pair<>
+
+
+std::map<std::string, float> coll;
+
+........
+
+// use implicitly conversion
+coll.insert(std::pair<std::string, float>("London",2.12));
+
+// use no implicitly conversion
+coll.insert(std::pair<const std::string, float>("London",2.12));
+
+上述第一个 insert() 语句内的类型并不正确, 所以会被转换成真正的元素类型。为了做到这一点, insert() 成员函数被定义为 member template
+
+
+3. 运用 make_pair()。C++11 面世之前最方便的办法是运用 make_pair() 函数, 它根据收到的两个实参构建出一个 pair 对象:
+
+
+std::map<std::string, float> coll;
+...
+
+if(coll.insert(std::make_pair("London",2.12)).second){
+    std::cout << "Ok could insert London, 2.12 " << std::endl;
+}else{
+    std::cout << "OOPs could not insert London, 2.12 " << std::endl;
+}
+
+欲移除"携带某个 value"的元素, 调用 erase() 即可办到:
+
+std::map<std::string, float> coll;
+...
+coll.erase(key);
+
+这个 erase() 版本会返回被移除元素的个数。如果你处理的是 map, erase() 的返回值只可能是 0或 1。
+
+如果 multimap 内含重复元素, 你无法使用 erase() 删除重复元素中的第一个。但你可以这么做:
+
+std::map<std::string, float> coll;
+auto pos = coll.find(key);
+
+if(pos != coll.end()){
+    coll.erase(pos);
+}
+
+这里应该采用成员函数 find(), 而非 STL 算法 find(), 因为前者速度更快。
+
+移除元素时,当心发生意外状况。移除迭代器所指对象时,有一个很大的危险,比如:
+
+
+std::map<std::string, float> coll;
+...
+
+for(auto pos = coll.begin(); pos != coll.end(); ++pos){
+    if(pos->second == value){
+        coll.erase(pos);// RUNTIME ERROR
+    }
+}
+
+'对 pos 所指元素调用 erase(), 会使 pos 不再成为 coll 的一个有效迭代器'。如果此后你未对 pos 重新设值就径直使用 pos, 前途未卜!事实上, 只要一个 ++pos 动作就会
+导致不明确行为。
+
+
+C++11 之后的解决方案很容易, 因为 erase() 总是返回一个迭代器指向其后继元素:
+
+std::map<std::string, float> coll;
+...
+for(auto pos = coll.begin(); pos != coll.end();){
+    if(pos->second == value)
+    {
+        pos = coll.erase(pos);
+    }else
+    {
+        ++pos;
+    }
+}
+
+
+
+// !! 将 Map 视为关联式数组(Associative Array)
+
+通常, 关联式容器并不提供元素的直接访问, 你必须依靠迭代器。不过 map 是例外。Non-const map 提供了 subscript 下标操作符, 支持元素的直接访问。C++11 另外提供一个
+成员函数 at(), 可用于 const 和 non-const map。
+
+c[key];// 安插一个带着 key 的元素--如果尚未存在于容器中。返回一个 reference 指向带着 key 的元素
+c.at(key);// 返回一个 reference 指向带着 key 的元素
+
+at() 会依据它收到的"元素的 key" 取得元素的 value; 如果不存在这样的元素则抛出 out_of_range 异常。
+
+'至于 operator[], 其索引就是 key。这意味着 operator[] 的索引可能属于任何类型, 不一定是整数。如此的接口就是所谓的关联式数组接口'。
+
+
+"operator[] 的索引类型不必然是整数"并不是它和寻常 array 唯一不同之处。如果你选择某 key 作为索引, 容器内却没有相应元素, 那么 map 会自动安插一个新元素, 其
+value 将被其类型的 default 构造函数初始化。因此, 你不可以指定一个"不具 default 构造函数"的 value 类型。注意, 基础类型都有一个 default 构造函数, 设立初值 0
+
+
+关联式数组的行为方式可说是毁誉参半:
+
+1. 优点是你可以通过更方便的接口对 map 安插新元素
+
+std::map<std::string, float> coll;
+
+coll["hello"] = 7.7;
+
+其中的语句:
+
+coll["hello"] = 7.7;
+
+处理如下:
+
+1. 处理 coll["hello"]
+
+如果存在 key 为 "hello" 的元素, 上式会返回元素的 reference
+
+如果没有任何元素的 key 是 "hello", 上式便为 map 自动安插一个新元素, 令其 key 为 "hello", 其 value 则以 d efault 构造函数完成, 并返回一个 reference 
+指向新元素
+
+
+2. 将 7.7 赋值给  value
+
+接下来便是将 7.7 赋值给上述刚刚诞生的新元素
+
+这样, map  之内就包含了一个 key 为 "hello" 的元素, 其 value  为 7.7
+
+
+缺点是你有可能不小心误置新元素
+
+
+// !! Map 和  Multimap 运用实例
+
+
+// !! 在 Map/Multimap 身上使用算法和 Lambda
+
+#include <map>
+#include <iostream>
+#include <string>
+#include <algorithm>
+
+using namespace std;
+
+int main(int argc, char** argv)
+{
+    map<string, double> coll{{"hello",2.12},{"world",2.32}};
+
+    for_each(coll.begin(), coll.end(),[](pair<const string, double>& elem){
+        elem.second *= elem.second;
+    });
+
+
+    for_each(coll.begin(), coll.end(),[](decltype(coll)::value_type &elem){
+        cout << elem.first << " " << elem.second << endl;
+    });
+
+    return 0;
+}
+
+一如所见, 对于 map, for_each() 被调用两次: 一次用来对每个元元素计算平方，一次用来打印每个元素。在第一次调用中, 元素类型被明确声明了出来, 而在第二次调用中, 用
+的是 value_type。第一次调用中元素以 by reference 方式传递, 使其 value 得以被改动; 第二次调用用的是一个const reference, 避免产生非必要的拷贝。
+
+
+
+// !! 将 Map 当作关联式数组 (Associative Array)
+
+
+// !! 将 Multimap 当作字典(Dictionary)
+
+
+// !! 查找具有某特定 Value 的元素
+
+
+// !! 综合实例:运用 Map、String 并于运行期指定排序准则
+
+这里再示范一个例子, 针对高级程序员而非 STL 初学者。你可以把它视为展现 STL 威力与疑难的一个范例。更明确地说, 这个例子展现了以下技巧:
+
+1. 如何使用 map, 包括使用关联式数组接口
+
+2. 如何撰写和使用函数对象--function object
+
+3. 如何在运行期定义排序准则--sorting criterion
+
+4. 如何在"大小写无关"的情况下比较字符串
+
+#include <algorithm>
+#include <cctype>
+#include <iomanip>
+#include <iostream>
+#include <map>
+#include <string>
+
+using namespace std;
+
+class RuntimeStringCmp {
+ public:
+  enum cmp_mode { normal, nocase };
+  RuntimeStringCmp(cmp_mode m = normal) : mode(m) {}
+
+  bool operator()(const string& s1, const string& s2) const {
+    if (mode == normal) {
+      return s1 < s2;
+    } else {
+      return lexicographic_compare(s1.begin(), s1.end(), s2.begin(), s2.end(),
+                                   nocase_compare);
+    }
+  }
+
+ private:
+  const cmp_mode mode;
+  static bool nocase_compare(char c1, char c2) {
+    return toupper(c1) < toupper(c2);
+  }
+};
+
+void fillAndPrint(StringStringMap & coll);
+
+typedef std::map<std::string, std::string> StringStringMap;
+
+int main(int argc, char** argv) {
+
+    StringStringMap coll1;
+    fillAndPrint(coll1);
+
+    RuntimeStringCmp ignoreCase(RuntimeStringCmp::nocase);
+    StringStringMap coll2(ignoreCase);
+
+    fillAndPrint(coll2);
+
+    return 0;
+}
+
+void fillAndPrint(StringStringMap& coll) {
+    coll["hello"] = "world";
+    coll["tell"] = "me";
+    coll["fuck"] = "you";
+    coll["bluent"] = "Green";
+    coll["black"] = "night";
+    coll["bunny"] = "pink";
+
+    // print all elements
+    for(auto &elem : coll) {
+        cout << elem.first << " " << elem.second << endl;
+    }
+}
+
+
+
+
+// !! Unordered Container
+
+Hash table, 作为一个重要的用于集合(collection) 的数据结构, 并不是 C++ 标准库第一版的一部分。它们并不是原始 STL  的一部分, 标准委员会认为, 将它们纳入
+C++98 的提案太晚呈现了。然而, 自 TR1 起, 带有 hash table 特性的容器终于走入了 C++ 标准。
+
+TR1 引入了一个以 hash table 为基础的容器群, 这些标准化的 class 所提供的特性结合原有实现, 但又不完全吻合其中任何一个。为了避免名称冲突, 它们选择不一样的 class 
+名称。最终决议是, 提供所有原本已存在的那些 associative 容器, 但改而带着前缀 unordered_。
+
+这也显示它和其他 associative 容器之间的最重要差异: "以 hash table 为基础"的容器，其内的元素没有清晰明确的次序。
+
+
+概念上, unordered 容器以一种随意顺序包含你安插进去的所有元素。也就是说, 你可以把这个容器想成一个袋子(bag): 你可以放元素进去, 但当你打开袋子对所有元素做某些事,
+你是以一种随机的次序来访问它们。所以, 相比于 set 和 map, 这里不需要排序准则; 相比于  sequence 容器, 你没有语义可用来放元素到某个特定位置。
+
+
+就像各个 associative 容器那样, 这里的个别 class 也互不相同:
+
+1. Unordered set 和 multiset 存放的是某特定类型的 value, 而 unordered map 和 multimap 存放的元素都是 key/value pair,  其中 key 被用来作为"存放和查
+   找某特定元素(包含相应的 value)"的依据。
+
+2. Unordered set 和 map 都不允许元素重复, 而 unordered multiset 和 multimap 都允许
+
+
+欲使用一个 unordered set 或 unordered multiset,你必须首先包含头文件 <unordered_set>。欲使用一个 unordered map 或  multimap, 你必须首先包含头文件
+<unordered_map>:
+
+#include <unordered_map>
+#include <unordered_set>
+
+
+在那里, 上述四种类型分别被定义为 namespace std 内的 class template:
+
+namespace std{
+
+    template <typename T, typename Hash = hash<T>, 
+    typename EpPred = equal_to<T>,typename Allocator = allocator<T>>
+    class unordered_set;
+
+    template <typename T, typename Hash = hash<T>,
+    typename EpPred = equal_to<T>,typename Allocator = allocator<T>>
+    class unordered_multiset;
+
+    template <typename Key,typename T, typename Hash = hash<T>,
+    typename EpPred = equal_to<T>,typename Allocator = allocator<T>>
+    class unordered_map;
+
+    template <typename Key,typename T, typename Hash = hash<T>,
+    typename EpPred = equal_to<T>,typename Allocator = allocator<T>>
+    class unordered_multimap;
+}
+
+
+一个 unordered set 或 unordered multiset 的元素类型, 可以是任意指派的 T, 只要它是可比的(comparable)
+
+对于 unordered map 和 unordered multimap, 第一个 template 参数是元素的 key 类型, 第二个 template 参数是元素的 value 类型。一个 unordered map 
+或 unordered multimap 的元素可拥有任何类型的 Key 和 T,只要它们满足以下两个条件:
+
+1. Key 和 value 都必须可被复制或可被搬移(copyable or movable)
+
+2. Key 必须可被"等价准则"拿来比较
+
+注意, 元素类型 (value_type) 是个 pair<const Key,T>
+
+可有可无的第二或第三 template 参数用来定义 hash function。如果没有指明使用哪个 hash function, 就使用默认的 hash<>, 这是个 function object, 定义于
+<functional>, 可用于所有整数类型、浮点数类型、pointer、string 及若干特殊类型。
+
+可有可无的第三或第四 template 参数用来定义等价准则。
+
+可有可无的第四或第五 template 参数用来定义内存模型。默认的内存模型(memory model) 是 allocator, 由 C++ 标准库提供。
+
+
+// !! Unordered 容器的能力
+
+所有标准化 unordered container class 都以 hash table 为基础。尽管如此, 仍允许种种实现选择。通常 C++ 标准库并不指明所有实现细节, 这样才能允许种种可能的选择
+, 但 unordered 容器仍有若干被具体指明的性质, 基于以下假设:
+
+1. 这些 hash table 使用 chaining 做法, 于是一个 hash code 将被关联至一个 linked list
+
+2. 上述那些 linked list 是单链或双链, 取决于实现。C++standard 只保证它们的 iterator 至少是 forward iterator
+
+3. 关于  rehashing, 有各式各样的实现策略:
+
+    1. 传统做法是, 在单一 insert 或 erase 动作出现时, 有时会发生一次内部数据重新组织
+
+    2. 所谓递进式 incremental hashing 做法是, 渐进改变 bucket 或 slot 的数量, 这对即时 real-time 环境特别有用, 因为在其中突然放大 hash table 的代价也
+       许太高
+
+
+对于每个将被存放的元素(一个 key/value pair)=, hash function 会把 key 映射至 hash table 内的某个 bucket (slot) 中。每个 bucket 管理一个单向
+linked list, 内含所有会造成 hash function 产出相同数值的元素。
+
+
+内部使用 hash table, 其主要优点是它惊人的运行期行为。假设拥有良好的 hashing 策略, 并且有良好的实现, 你可以保证在安插、删除、查找元素时获得摊提常量时间(之所以是摊
+提的,因为偶尔发生的 rehashing 可能是个大型操作，带着线性复杂度)。
+
+
+Unordered 容器的几乎所有操作——包括 copy construction 和 assignment, 元素的安插和寻找, 以及等价比较——的预期行为, 都取决于 hash function 的质量。
+
+如果 hash function 对不同的元素竟产生相等数值, hash table 的任何操作都会导致低下的执行效率。这个缺点不完全是由于数据结构本身, 也因为客户对此没有足够的意识。
+
+
+Unordered 容器比起寻常的 associative 容器, 也有若干缺点:
+
+1. Unordered 容器不提供 operator<, >、<= 和 >= 用以安排布置(order)这些容器的多重实例。然而提供了 == 和 != 
+
+2. 不提供 lower_bound() 和 upper_bound()
+
+3. 由于 iterator 只保证至少是个 forward iterator, 因此反向 iterator 都不提供
+
+由于元素的(key) value 具体关系到元素的位置--这里指的是 bucket entry——你不可以直接改动元素的(key)value。因此, 很像 associative 容器那样, 欲改动一个元素的
+value, 你必须先移除拥有旧 value 的元素, 然后安插一个拥有新 value 的新元素。
+
+这个接口反映出以下行为:
+
+1. Unordered 容器不提供直接元素访问操作
+
+2. 通过 iterator 进行的间接访问有其束缚: 从 iterator 的角度观之, 元素的(key) value 是常量
+
+
+身为一个程序员, 你可以指定若干会影响 hash table 行为的参数:
+
+
+1. 你可以指定 bucket 的最小数量
+
+2. 你可以(并且有时候必须)提供你自己的 hash function
+
+3. 你可以(并且有时候必须) 提供你自己的等价准则
+
+4. 你可以指定一个最大负载系数 maximum load factor, 一旦超过就会自动 rehashing
+
+5. 你可以强迫 rehashing
+
+
+但是你不能够影响以下行为:
+
+1. 成长系数(growth factor), 那是自动rehashing时用来成长或缩小 list of buckets 的系数
+
+2. 最小负载系数(minimum load factor), 用来强制进行 rehashing
+
+
+注意, rehashing 只可能发生在以下调用之后: insert()、rehash()、reserve() 或clear()
+
+
+在那些支持等价(equivalent) key的容器内, 也就是说在 unordered multiset 和 multimap 内, 带有等价 key 的元素将会被相邻排列。Rehashing 以及其他可能于内部改变
+元素次序的操作, 都会维持带有等价 key 的元素的相对次序。
+
+
+
+// !! 创建和控制 Unordered 容器
+
+
+// !! Create, Copy, and Destroy
+
+
+unordered c;// Default 构造函数, 建立一个
+
 
 
 
