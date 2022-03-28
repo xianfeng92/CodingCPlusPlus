@@ -2220,15 +2220,769 @@ value, 你必须先移除拥有旧 value 的元素, 然后安插一个拥有新 
 
 // !! 创建和控制 Unordered 容器
 
+Hash table 是颇为复杂的数据结构。也因此, 你有许多 ability 可以定义或查询它们的行为。
 
 // !! Create, Copy, and Destroy
 
+Unord c;// Default 构造函数, 建立一个 empty unordered 容器, 不含任何元素
+Unord c(bnum);// 建立一个 empty unordered 容器,内部使用至少 bnum 个 bucket
 
-unordered c;// Default 构造函数, 建立一个
+Unord(bnum, hf);// 建立一个 empty unordered 容器, 内部使用至少 bnum 个 bucket,并以 hf 作为 hashfunction
+Unord(bnum, hf,cmp);// 建立一个 empty unordered 容器, 内部使用至少 bnum 个 bucket, 并以 hf 作为 hashfunction, 以 cmp 作为 predict 来鉴定等价 value
+
+
+Unord c(c2);// Copy constructor, 建立 c2 容器的拷贝,类型相同(所有元素都会被复制)
+Unord c = c2; //Copy constructor, 建立 c2 容器的拷贝,类型相同(所有元素都会被复制)
+
+Unord c(rv);// Move constructor, 取 rvalue rv 的内容建立一个新的 c
+Unord c = rv;// Move constructor, 取 rvalue rv 的内容建立一个新的 c
+
+Unord c(beg,end);
+
+Unord c(initlist);
+Unord c = initlist;
+
+c.~Unord(); // 销毁所有元素, 释放内存
+
+
+
+unordered_set<Elem> c;// 一个 unordered set, 使用 hash<> 作为默认 hash function, 使用 equal_to<> (operator==) 作为默认的比较函数
+unordered_set<Elem, Hash> c;// 一个 unordered set, 使用 Hash 作为默认 hash function, 使用 equal_to<> (operator==) 作为默认的比较函数
+unordered_set<Elem, Hash, Cmp> c;//  一个 unordered set, 使用 Hash 作为默认 hash function, 使用 Cmp 作为默认的比较函数
+
+
+unordered_multiset<Elem> c;// 一个 unordered_multi set, 使用 hash<> 作为默认 hash function, 使用 equal_to<> (operator==) 作为默认的比较函数
+unordered_set<Elem, Hash> c;// 一个 unordered_multi set, 使用 Hash 作为默认 hash function, 使用 equal_to<> (operator==) 作为默认的比较函数
+unordered_set<Elem, Hash, Cmp> c;// 一个 unordered_multi set, 使用 Hash 作为默认 hash function, 使用 Cmp 作为默认的比较函数
+
+unordered_map<Key, T> c;//  一个 unordered_multi map, 使用 hash<> 作为默认 hash function, 使用 equal_to<> (operator==) 作为默认的比较函数
+unordered_set<Key, T, Hash> c// 一个 unordered_multi map, 使用 Hash 作为默认 hash function, 使用 equal_to<> (operator==) 作为默认的比较函数
+unordered_set<Key, T, Hash, Cmp> c;//  一个 unordered_multi map, 使用 Hash 作为默认 hash function, 使用 Cmp 作为默认的比较函数
+
+unordered_multimap<Key, T> c;// 一个 unordered_multi map, 使用 hash<> 作为默认 hash function, 使用 equal_to<> (operator==) 作为默认的比较函数
+unordered_multimap<Key, T, Hash> c;// 一个 unordered_multi map, 使用 Hash 作为默认 hash function, 使用 equal_to<> (operator==) 作为默认的比较函数
+unordered_multimap<Key, T, Hash, Cmp> c;// 一个 unordered_multi map, 使用 Hash 作为默认 hash function, 使用 Cmp 作为默认的比较函数
+
+
+关于构建, 有很多种实参传递形式。
+
+一方面, 你可以传递众多 value 成为初始元素:
+
+1. 来自一个相同类型的既有容器 (copy constructor)
+
+2. 来自一个区间 [begin,end) 的所有元素
+
+3. 来自一个初值列表内的所有元素
+
+
+另一方面, 你可以传递若干实参, 用来影响 unordered 容器的行为:
+
+1.  Hash函数
+
+2. 等价准则
+
+3. Bucket的最初数量
+
+
+你不可以指定 maximum load factor 成为类型的一部分, 或是通过一个构造函数实参指定它, 虽然这是你可能经常想要初始设定的东西。欲指定最大负载系数，你必须在构建后立刻
+调用一个成员函数:
+
+std::unordered_set<std::string> coll;
+coll.max_load_factor(0.7);
+
+递给 max_load_factor() 的实参必须是个 float。通常 0.7~0.8 是速度和内存消耗量之间一个不错的折中。注意, 默认的最大负载系数是1.0, 意思是通常碰撞(collision)会
+在 rehash 之前发生。'基于此,如果你很重视速度,应该总是明确地设置最大负载系数'。
+
+
+// !! 布局操作（Layout Operation）
+
+Unordered 容器也提供了一些用来查询及影响内部布局的操作函数。
+
+c.hash_function();// 返回 hash 函数
+c.key_eq();// 返回 相等性判断式
+c.bucket_count();// 返回当前的 bucket 数量
+c.max_bucket_count();
+
+c.load_factor();
+c.max_load_factor();
+
+c.rehash(bnum);// 将容器 rehash, 使其 bucket 个数至少为 bnum
+c.reverse(num);// 将容器 rehash, 使其空间至少可拥有 num 个元素
+
+除了 max_load_factor(), 成员函数 rehash() 和 reserve() 也很重要。它们提供 rehash 一个 unordered 容器 (也就是改变 bucket 个数)的功能, 但有略微不同的
+接口: 最初 TR1 只提供 rehash(), 它要求为 hash table 提供 bucket 的大小至少是传入的大小。问题是,以此接口,你仍然必须考虑最大负载系数。如果最大负载系数是 0.7 而
+你打算准备 100 个元素, 你必须将 100 除以 0.7, 以此计算只要没超过100个元素就一定不会引发 rehashing的大小。也就是说, 你必须传入 143 给 rehash() 以避免在最高达
+到 100 个元素的情况下出现进一步 rehashing。'如果使用 reserve(), 这一计算是内部进行的, 所以你可以仅仅传递 hash table 应该筹备的元素个数':
+
+coll.rehash(100);// prepares for 100 / max_load_factor elements
+coll.reverse(100);// prepares for 100 elements
+
+利用 bucket_count(), 你可以查询 unordered 容器目前拥有的 bucket 个数。
+
+
+
+// !! 提供你自己的 Hash 函数
+
+所有 hash table 都需要一个 hash 函数, 把你放进去的元素的 value 映射至某个相关的 bucket。它的目标是, 两个相等的 value 总是导致相同的 bucket 索引, 而不同的
+value 理应导致不同的 bucket 索引。'对于任何范围的 value, hash 函数应该提供良好的 hash value 分布'。
+
+Hash 函数必须是个函数或 function object, 它接受一个元素类型下的 value 作为参数,并返回一个类型为 std::size_t 的 value。因此, bucket 的当前数量并未被考虑。
+将其返回值映射至合法的 bucket 索引范围内, 是由容器内部完成。因此, 你的目标是提供一个函数，可把不同的元素值均匀映射至区间 [0, size_t) 内。
+
+下面示范如何提供你自己的 hash 函数:
+
+#include <functional>
+
+class Customer{
+    ...
+};
+
+class CustomerHash{
+public:
+    std::size_t operator()(const Customer &c) const {
+        return ...;
+    }
+};
+
+std::unordered_set<Customer, CustomerHash> custset;
+
+在这里, CustomerHash 是一个 function object, 为 class Customer 定义出 hash 函数。
+
+如果不愿意传递一个 function object 成为容器类型的一部分,你也可以传递一个 hash 函数作为构造函数实参。然而请注意, hash 函数相应的 template 类型也必须对应设妥:
+
+std::size_t customer_hash_func(const Customer& c){
+    return ...;
+}
+
+std::unordered_set<Customer, std::size_t(*)(const Customer&)>
+custset(20, customer_hash_func);
+
+在这里, customer_hash_func() 被传递为构造函数第二实参, 其类型为"一个 pointer, 指向某函数,该函数接受一个 Customer 并返回一个 std::size_t", 作为第二
+template 实参。
+
+'默认的 hash 函数是 hash<>,那是 <functional> 提供的一个 function object, 可对付常见类型:包括所有整数类型、所有浮点数类型、pointer、string, 以及若干特殊
+类型'。这些之外的其他类型, 你就必须提供你自己的 hash 函数。
+
+提供一个好的 hash 函数, 说来容易做来难。就像搭便车一样, 你可以使用默认的 hash 函数来完成你自己的 hash 函数。'一个天真的做法是, 单纯把那些数据栏由默认之 hash 函
+数产生的所有 hash value 加起来'。
+
+class CustomerHash{
+public:
+    std::size_t operator()(const Customer& c) const{
+        return std::hash<std::string>()(c.fname) + std::hash<std::string>()(c.lname)
+        + std::hash<long>()(c.no);
+    }
+};
+
+这里, 返回的 hash value 只不过是 Customer 的数据栏 fname、lname 和 no 的 hash value 总和。
+
+如果预定义的所有 hash 函数对这些数据栏的类型以及所给予的值都能运作良好, 那么三个值的总和必然也在 [0,std::size_t) 范围内。根据一般溢出规则(common over ow 
+rule), 上述结果值应该也能够有良好的分布。
+
+然而专家认为, 这仍然是个粗劣的 hash 函数。提供一个良好的 hash 函数可能是十分棘手的事, 似乎不如想象中那么轻松。
+
+
+一个较好的做法如下, 使用由 Boost 提供的 hash 函数和一个便利接口:
+
+#include <functional>
+
+template <typename T>
+inline void hash_combine(std::size_t& seed, const T& val) {
+    seed = std::hash<T>()(val) + 0x9e3779b9 + (seed << 6) + (seed>>2);
+}
+
+
+template <typename T, typename ...Types>
+inline void hash_value(std::size_t& seed, const T& val, const Type& ...args) {
+    hash_combine(seed, val);
+    hash_value(seed, args...);
+}
+
+
+template <typename ...Types>
+inline std::size_t hash_value(const Types& ...args) {
+    std::size_t seed = 0;
+    hash_value(seed, args...);
+    return seed;
+}
+
+
+// !! 提供你自己的等价准则
+
+作为 unordered 容器类型的第三或第四 template 参数, 你可以传递等价准则, 那应该是个 predicate, 用以找出同一个 bucket 内的相等 value。
+
+默认使用的是 equal_to<>, 它以 operator== 进行比较。基于此, 提供合法等价准则的最方便做法就是为你自己的类型提供 operator==。
+
+
+class Customer{
+    ...
+};
+
+bool operator==(const Customer&c1, const Customer&c2){
+    ...
+}
+
+std::unordered_set<Customer,CustomerHash> custset;
+std::unordered_map<Customer,string, CustomerHash> custmap;
+
+然而, 你也可以提供你自己的等价准则, 例如:
+
+#include <functional>
+
+class Customer{
+    ...
+};
+
+class CustomerEqual{
+    public:
+        bool operator==(const Customer&c1, const Customer&c2) const{
+            return ...;
+        }
+};
+
+
+std::unordered_set<Customer, CustomerHash, CustomerEqual> custset;
+std::unordered_map<Customer, string, CustomerHash, CustomerEqual> custmap;
+
+
+这里针对类型 Customer 定义了一个 function object, 你必须在其中实现 operator() 使它能够比较两个元素(对 map 而言是两个 key)并返回一个 bool 值指示它
+们是否相等。
+
+只要 value 在当前的等价准则下被视为相等,它们也应该在当前的 hash 函数下产出相同的 hash value。基于这个原因, 一个 unordered 容器如果被实例化时带有一个
+非默认的等价准则, 通常也需要一个非默认的 hash 函数。
 
 
 
 
+// !! Unordered 容器的其他操作
+
+// !! Nonmodifying Operation
+
+c.empty();
+c.size();
+c.max_size();
+
+c1 == c2;
+c1 != c2;
+
+再次注意, 对比较而言, unordered 容器只提供操作符 == 和 !=。 在最坏情况下, 他们有可能提供二次复杂度。
+
+
+// !! Special Search Operation
+
+'Unordered 容器对于快速查找元素有着优化设计。为了从这种行为中得利, 这种容器提供特殊的查找函数'。
+
+这些函数是寻常算法的特殊版本,有着相同名称。'你应该总是选择这些针对 unordered 容器的优化版本以达到常量时间复杂度,而不是寻常算法的线性复杂度', 前提是
+hash value 均匀分布。
+
+举个例子, 在一个拥有 1 000 个元素的集合中查找, 平均只需 1 次比较动作, 而不是 associative 容器的 10 次, 也不是 sequence 容器的 500 次。
+
+
+c.count(val);// 返回元素值为 val 的元素个数
+c.find(val);// 返回元素值为 val 的第一个元素 如果找不到就返回 end
+
+
+
+// !! Assignment
+
+unordered 容器只提供所有容器都提供的基本赋值操作:
+
+c = c2;
+c = rv;
+c = initlist;
+c.swap(c2);
+swap(c, c2);
+
+
+这些操作的左右两端容器必须有相同类型, 更明确地说是其 hash function 的类型以及等价准则必须相同——即使 hash  函数本身可能不同。如果hash 函数不同, 它们将能
+够被赋值或交换。
+
+
+// !! 迭代器相关函数和元素访问
+
+Unordered 容器并不允许直接元素访问, 所以你必须使用 range-based for 循环或 iterator。
+
+对于 unordered (multi)set, 从 iterator 的角度观之, 所有元素都被视为 const。对于 unordered (multi) map, 所有元素的 key 都被视为 const。 
+这是必要的, 确保你无法因为改变元素的 value 而危及元素位置。
+
+虽然元素之间 no specific order , 但 value 会在当前 hash 函数的作用下决定其所属的 bucket 位置。
+
+c.begin();
+c.cbegin();
+c.end();
+c.cend();
+c.rbegin();
+c.rend();
+
+
+与 map/multimap 对应, unordered map/multimap 的元素类型是 pair<const Key,T>, 意味着你需要 first 和 second 才能访问一个元素的 key 和 value。
+
+std::unordered_map<std::string, float> coll;
+...
+for(auto &elem : coll){
+    cout << elem.first << " " << elem.second << endl;
+}
+...
+
+for(auto pos = coll.cbegin(); coll.cend(); pos++){
+    cout << pos->first << " " << pos->second << endl;
+}
+
+
+尝试改变 key 值会导致错误:
+
+elem.first = "hello world";//ERROR at compile time
+pos->first = "world";//ERROR at compile time
+
+
+改变元素的 value 就没问题, 只要 elem 是个 non const reference 且 value 的类型不是 const。
+
+
+如果你使用算法和 lambda 来操作 map 内的元素, 你必须明确声明元素类型:
+
+std::unordered_map<std::string,int> coll;
+...
+std::for_each(coll.begin(), coll.end(),[](pair<std::string,int>& elem){
+    elem.second += 10;
+});
+
+
+pair<std::string,int>
+
+你也可以写成:
+
+unordered_map<std::string,int>::value_type
+
+或
+
+decltype(coll)::value_type
+
+
+
+若要改变元素的 key, 只有一个选择: 必须以一个新元素替换旧元素, 二者有相同的 value。
+
+
+// !! Inserting and Removing Element
+
+
+依 STL 惯例, 你必须保证传入的实参合法:1. 迭代器必须指向一个合法位置;  2. 区间的起始位置不能在结束位置之后
+
+一般而言, erasing 函数并不会令"指向至其他元素"的 iterator 和 reference 失效。然而成员函数 insert() 和 emplace() 有可能令所有 iterator 失效,
+当 rehashing 发生, 尽管指向至元素的 reference 将总是保持有效。
+
+
+c.insert(val);// 安插一个 val  拷贝,并返回新元素的位置
+c.insert(pos, val);//指定安插动作的起点, 若提示恰当可加快速度
+
+c.insert(beg, end);// 将区间[beg,end) 所以元素拷贝到 c
+
+c.erase(val);// 移除与 val 相等的所以元素
+
+c.erase(pos);// 移除 iterator 位置 pos 上的元素
+
+c.clear();// 移除所有元素, 将容器清空
+
+
+Unordered set 提供以下接口:
+
+pair<iterator, bool> insert(const value_type& val);
+
+template <typename ...Args>
+pair<iterator, bool> emplace(Args&& ...args);
+
+
+Unordered multiset 提供以下接口:
+
+iterator insert(const value_type& val);
+
+template <typename ...Args>
+iterator emplace(Args&& ...args);
+
+
+返回类型不同, 起因于 unordered multiset/multimap 允许元素重复, 而 unordered set/map 不允许。
+
+
+对于 unordered map/multimap, 若欲安插一个 key/value pair, 你必须牢记在心, 其内部把 key 视为 const。你提供的若非准确的类型,就必须存在隐式或显式类型
+转换。
+
+
+自 C++11 开始, 安插元素的最方便方法就是把它们放进一个 initializer list, 其中第一项是 key, 而第二项是 value:
+
+std::unordered_map<std::string,int> coll;
+...
+
+coll.insert({"hello",123});
+
+
+另外, 还有三种办法可将一个 value 放进一个 unordered map/multimap 中:
+
+1. 使用 value_type:
+
+coll.insert(decltype(coll)::value_type("hello",123));
+
+
+2. 使用 pair<>
+
+coll1.insert(pair<std::string,int>("hello",123));
+
+
+3. 使用 make_pair()
+
+coll.insert(make_pair("hello",123));
+
+
+
+下面是个简单例子, 安插元素到 unordered map 内, 并检查是否成功
+
+std::unordered_map<std::string, float> coll;
+...
+
+if(coll.insert(make_pair("hello",12.3)).second){
+    cout << "Insert success" << endl;
+}else{
+    cout << "Insert failure" << endl;
+}
+
+如果一个 unordered multiset/multimap 内含重复元素, 且你只想移除其中的第一个元素, 不可以使用 erase() 。应该这么做:
+
+auto pos = coll.find(val);
+
+if(pos != coll.end()){
+    coll.erase(pos);
+}
+
+在这儿你应该使用成员函数 find(), 它比算法 find() 快速。
+
+
+
+// !! Bucket 接口
+
+我们有可能通过一个特定的 bucket 接口访问个别 bucket, 用以曝露整个 hash table 的内部状态。
+
+c.bucket_count();
+c.bucket(val);// 返回 val 将被找到的那个 bucket 编号
+
+
+// !! 使用 Unordered Map 作为 Associative Array
+
+就像 map 一样, unordered map 也提供一个 subscript 下标操作符用来直接元素访问, 还提供一个相应的成员函数 at()。
+
+对于操作符 [], 其索引也就是用来识别元素的 key。这意味着操作符 [] 的索引可能是任何类型, 而非只是整数类型。这样的接口, 也就是所谓的 associative array 接口。
+
+关于操作符 [], 索引类型并不是它和寻常 C-style array 的唯一不同。请注意, 你不能给出错误的索引; 如果你指定某个 key 为索引, 却找不到对应的元素, 就会有一个新
+元素被自动安插到 map 内。该新元素的 value 将由其类型的 default 构造函数初始化。因此, 欲使用这一特性, 你就不能指定一个没有 default 构造函数的 value 类型。
+
+
+
+// !! Exception Handling
+
+
+// !! Unordered 容器的运用实例
+
+下列程序示范了 unordered 容器的基本能力, 采用的是 unordered set:
+
+#include <iostream>
+#include <unordered_set>
+#include <algorithm>
+#include <numeric>
+#include "print.hpp"
+
+using namespace std;
+
+int main(int argc, char** argv){
+
+    unordered_set<int> coll = {1,2,3,4,5,6,7,8,9,10,11,12,13,14};
+
+    //printf all elements
+    PRINT_ELEMENTS(coll);
+
+    coll.insert({1,2,-9,-2});
+    PRINT_ELEMENTS(coll);
+
+    coll.erase(2);
+
+    coll.insert(accumulate(coll.begin(), coll.end()));
+
+    if(coll.find(9) != coll.end()){
+        cout << "9 is available" << endl;
+    }
+
+    unordered_set<int>::iterator pos;
+    for(pos = coll.begin(); pos != coll.end();){
+        if(*pos < 0){
+            pos = coll.erase(pos);
+        }else{
+            ++pos;
+        }
+    }
+
+    PRINT_ELEMENTS(coll);
+    return 0;
+}
+
+
+如果你只是 insert、erase and find 带有某特定 value 的元素, unordered 容器会提供最佳运行期行为, 因为所有这些操作都有摊提常量复杂度。然而你不可对元素次
+序有任何假设。
+
+
+如果使用 unordered multiset 而不是 unordered set, 就允许元素重复。
+
+#include <unordered_set>
+#include "print.hpp"
+
+using namespace std;
+
+int main(int argc, char **argv){
+    unordered_multiset<int> coll = {1,2,3,4,5,6,7,8,9,10};
+
+    coll.insert({1,2,3,4,5,6,7,8,9,10});
+    PRINT_ELEMENTS(coll);
+
+    coll.erase(2);
+
+    auto pos = coll.find(9);
+    if(pos != coll.end()){
+        coll.erase(pos);
+    }
+    PRINT_ELEMENTS(coll);
+    return 0;
+}
+
+
+
+// !! 提供你自己的 Hash 函数和等价准则
+
+
+
+
+
+// !! 其他 STL 容器
+
+STL 是个框架(framework), 除了提供标准容器, 也允许你使用其他数据结构作为容器。你可以使用 string 或寻常 array 作为 STL容器, 也可以自行撰写特殊容器满足特殊
+需求。如果你自行撰写容器, 仍可从诸如排序、合并等算法中受益。这样的框架正是"开放-封闭"(Open Closed)  守则--开放以允许扩展，封闭以谢绝修改--的极佳范例。
+
+下面是使你的容器"STL 化"的三种不同方法:
+
+1. The invasive approach (侵入式做法)。直接提供 STL 容器所需接口。特别是诸如 begin() 和 end() 之类的常用函数。这种做法需以某种特定方式编写容器, 所以
+   是侵入式的。
+
+2. The noninvasive approach (非侵入式做法)。撰写或提供特殊迭代器, 作为算法和特殊容器间的接口。这一做法是非侵入式的，它所需要的只是"遍历容器所有元素"的
+   能力--这是任何容器都能以某种形式展现的能力。
+
+3. The wrapper approach (包裹法)。将上述两种方法加以组合, 我们可以写一个 wrapper class 来包装任何数据结构, 并显露出与 STL 容器相似的接口。
+
+
+本小节首先将 string 视为标准容器来讨论, 当作侵入式做法的一个例子, 然后再以非侵入式做法讨论重要的标准容器:寻常的C-style array。
+
+
+// !! String 作为一种 STL 容器
+
+C++ 标准库的 string class 是以侵入式做法编写 STL 容器的一个好例子。string 可被视为以字符 (character) 为元素的一种容器;字符构成序列,你可以在该序列
+来回移动遍历。因此, 标准的 string class 提供了 STL 容器接口。string 也提供成员函数 begin() 和 end() ,返回随机访问迭代器,可用来遍历整个 string。
+同时, 为了支持 iterator 和 iterator adapter, string 也提供若干操作函数如 push_back(), 用以支持 back inserter。
+
+从 STL 角度思考, string 的处理有点不寻常,因为你通常将 string 当作一个对象来处理(可以传递、复制或设定 string)。但如果要对单个字符进行处理,采用 STL 算法
+将大有助益。
+
+
+
+// !! C-Style Array 作为一种 STL 容器
+
+你可以把寻常的 C-style array 当成 STL 容器使用, 但这种 array 并不是 class, 所以不提供 begin() 和 end() 等成员函数, 也不允许存在任何成员函数。
+这里, 我们只能采用非侵入式做法或包裹法。
+
+采取非侵入式做法很简单, 你只需要对象, 它能够借由 STL 迭代器接口遍历 array 的所有元素。事实上这样的对象早就恭候多时, 就是寻常的 pointer。STL 设计之初就决
+定让迭代器拥有和寻常 pointer 一样的接口, 于是你可以将寻常 pointer 当成迭代器来使用。
+
+这又一次展示了纯抽象的泛化概念: 任何东西只要行为类似迭代器就是一种迭代器。事实上 pointer 正是一个随机访问迭代器。
+
+以下例子示范了如何以 C-style array 作为 STL 容器(始自C++11):
+
+#include <iostream>
+#include <vector>
+#include <iterator>
+
+using namespace std;
+
+int main(int argc, char** argv){
+    int vals[] = {1,2,3,4,5,6,7};
+    // using std::begin() std::end() for ordinary C array
+    std::vector<int> v(std::begin(vals), std::end(vals));
+
+    std::copy(std::begin(vals), std::end(vals),ostream_iterator<int>(cout, " "));
+    cout << endl;
+
+    return 0;
+}
+
+这里我们使用了一个定义于 <iterator> 的辅助函数, 以及任何一个允许针对寻常 C-style array 使用全局性 begin() 和 end() 的容器头文件。如你所见, 对于任何寻
+常的 C-style array vals, std::begin() 和 std::end() 产出对应的起点和终点：
+
+int vals[] = {1,2,3,4,5,6,7,8};
+std::begin(vals);
+std::end(vals);
+
+这些函数有重载版本, 所以你可以把它们用在 STL 容器或任何提供 begin() 和 end() 成员函数的 class:
+
+std::vector<int> v;
+std::begin(v);
+std::end(v);
+
+
+// !! 实现 Reference 语义
+
+通常, STL 容器提供的是 value 语义而非 reference语义, 后者构建了元素的内部拷贝, 任何操作返回的也是这些拷贝。
+
+
+
+// !! 使用 Shared Pointer
+
+
+C++ 标准库提供了许多 smart pointer class。如果你打算在不同的容器之间共享对象, class shared_ptr<> 是适当的选择。
+
+以此目的来使用它, 看起来如下:
+
+#include <algorithm>
+#include <deque>
+#include <iostream>
+#include <memory>
+#include <set>
+#include <string>
+
+using namespace std;
+
+class Item {
+ private:
+  std::string name;
+  float price;
+
+ public:
+  Item(const std::string& n, float p = 0.0f) : name(n), price(p) {}
+
+  string getName() const { return name; }
+
+  void setName(const std::string& n) { name = n; }
+
+  float getPrice() const { return price; }
+
+  void setPrice(float p) { price = p; }
+};
+
+template <typename Coll>
+void printItems(const std::string& msg, const Coll& coll) {
+  cout << msg << endl;
+  for (const auto& item : coll) {
+    cout << item.getName() << " " << item.getPrice() << endl;
+  }
+}
+
+int main(int argc, char** argv) {
+
+    typedef shared_ptr<Item> ItemPtr;
+    set<ItemPtr> allItems;
+
+    deque<ItemPtr> bestSelles;
+
+    bestSelles = {ItemPtr(new Item("YYY",12.21)), ItemPtr(new Item("hhhh",12.21), ItemPtr(new Item("he",12.21),ItemPtr(new Item("UUU",32.21))};
+
+    allItems = {ItemPtr(new Item("qqq",12.21)), ItemPtr(new Item("mmm",12.21))};
+
+    allItems.insert(bestSelles.begin(), bestSelles.end());
+
+    printItems("bestSelles", bestSelles);
+    printItems("allItems", allItems);
+    cout << endl;
+
+    for_each(bestSelles.begin(), bestSelles.end(),[](shared_ptr<ItemPtr>& item) {
+        elem->setPrice(elem->getPrice()*2);
+    });
+
+    bestSelles[1] = *(std::find_if(allItems.begin(), allItems.end(),[](shared_ptr<ItemPtr>& item) {
+        return item->getName() == "pizza";
+    }));
+
+    return 0;
+}
+
+
+
+// !! 各种容器的使用时机
+
+C++ 标准库提供各具特色的不同容器。问题是:该如何选择最佳的容器类型?
+
+如果你需要处理的元素数量很少,可以忽略复杂度,因为线性算法通常对元素本身的处理过程比较快, 这种情况下,线性复杂度搭配快速的元素处理要比对数复杂度搭配缓慢的元素
+处理来得划算。
+
+
+1. 默认情况下应该使用 vector。vector 的内部结构最简单, 并允许随机访问,所以数据的访问十分方便灵活,数据的处理也够快
+
+2. 如果经常要在序列头部和尾部安插和移除元素, 应该采用 deque
+
+   如果你希望元素被移除时,容器能够自动缩减内部内存用量, 那么也该采用deque。此外, 由于 vector 通常采用一个内存区块来存放元素, 而 deque 采用多个区块,所以
+   后者可内含更多元素。
+
+3. 如果需要经常在容器中段执行元素的安插、移除和移动,可考虑使用 list。
+
+   List 提供特殊的成员函数, 可以在常量时间内将元素从 A 容器转移到 B 容器。但由于 list 不支持随机访问, 所以如果只知道 list 的头部却要造访 list 的中段元
+   素, 效能会大打折扣。和所有以节点为基础的容器相似, 只要元素仍是容器的一部分, list 就不会令指向那些元素的迭代器失效。Vector 则不然, 一旦超过其容容量,它
+   的所有 iterator、pointer 和 reference 都会失效; 至于deque, 当它的大小改变, 所有iterator、pointer和reference都会失效。
+
+4. 如果你要的容器对异常的处理使得每次操作若不成功便无任何作用, 那么应该选用 list
+
+5. 如果你经常需要根据某个准则查找元素,应当使用依据该准则进行 hash 的 unordered set 或 multiset。然而, hash 容器内是无序的,所以如果你必须依赖元素的次
+   序(order), 应该使用 set 或 multiset, 它们会对元素排序
+
+6. 如果想处理 key/value pair, 请采用 unordered (multi) map。如果元素次序很重要,可采用 (multi) map
+
+7. 如果需要关联式数组 (associative array), 应采用 unordered map。如果元素次序很重要,可采用 map
+
+8. 如果需要字典结构, 应采用 unordered multimap。如果元素次序很重要,可采用 multimap
+
+
+
+关联式容器拥有自动排序能力, 并不意味着它们在排序方面的执行效能更高。事实上, 由于关联式容器每安插一个新元素都要进行一次排序, 速度反而不及序列式容器经常采用的
+手法: 先安插所有元素, 然后调用排序算法进行一次完全排序。
+
+
+下面两个简单的程序分别使用不同的容器,从标准输入设备读取 string、排序,然后打印所有元素(去掉重复字符串):
+
+#include <iostream>
+#include <set>
+#include <algorithm>
+#include <string>
+#include <iterator>
+
+using namespace std;
+
+int main(int argc, char** argv)
+{
+    set<string> coll(istream_iterator<string>(cin), istream_iterator<string>());
+    copy(coll.cbegin(), coll.cend(),ostream_iterator<string>(cout, "\n"));
+
+    return 0;
+}
+
+
+#include <iostream>
+#include <vector>
+#include <algorithm>
+#include <string>
+#include <iterator>
+
+using namespace std;
+
+int  main(int argc, char** argv)
+{
+    vector<string> coll(istream_iterator<string>(cin), istream_iterator<string>());
+    sort(coll.begin(), coll.end());
+    unique_copy(coll.begin(), coll.end(),ostream_iterator<string>(cout, " "));
+    return 0;
+}
+
+
+
+现实中预测哪种容器最好, 往往相当困难。STL 的一大优点就是你可以轻而易举地尝试各种版本。主要工作--各种数据结构和算法--已经就位, 你只需依照对自己最有利的方式
+将它们组合运用就行了。
 
 
 

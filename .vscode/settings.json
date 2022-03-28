@@ -80,11 +80,15 @@
     "C_Cpp.clang_format_style": "Google",
     "cSpell.words": [
         "aggr",
+        "bnum",
         "bptr",
+        "custmap",
+        "custset",
         "myfunc",
         "mylib",
         "nocase",
         "pfct",
+        "Unord",
         "xforg"
     ]
 }
