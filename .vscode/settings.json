@@ -82,6 +82,8 @@
         "aggr",
         "bnum",
         "bptr",
+        "crbegin",
+        "crend",
         "custmap",
         "custset",
         "myfunc",
