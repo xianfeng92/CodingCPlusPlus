@@ -660,5 +660,206 @@ insert_iterator         insert(value)       inserter(cont)
 '因此, back inserter 只能用在 vector、deque、list 和 string 身上, front inserter 只能用在 deque 和 list 身上'。
 
 
+// !! Back Inserter
+
+Back inserter 或称 back insert iterator, 借由成员函数 push_back() 将一个 value 附加于容器尾部。
+
+由于 push_back() 只存在于 vector、deque、list 和 string, 所以 C++ 标准库中也只有这些容器支持 back inserter。
+
+'Back inserter 生成时, 其初始化过程必须确知其所属容器'。
+
+函数 back_inserter() 为此提供了一条捷径。以下例子展示了 back inserter 的用法:
+
+#include <vector>
+#include <algorithm>
+#include <iterator>
+#include "print.hpp"
+
+using namespace std;
+
+int main(int argc, char** argv){
+
+    vector<int> coll;
+    // create back insert for coll
+    back_insert_iterator<vector<int> > iter(coll);
+
+    // insert element with usually iterator interface
+    *iter = 1;
+    ++iter;
+    *iter = 2;
+    ++iter;
+    *iter = 3;
+    PRINT_ELEMENTS(coll);
+
+    // create back insert and insert elements
+    // convinienty way of inserting
+    back_inserter(coll) = 44;
+    back_inserter(coll) = 55;
+    PRINT_ELEMENTS(coll);
+
+
+    coll.resize(2 * coll.size());
+
+    std::copy(coll.begin(), coll.end(),back_inserter(coll));
+    PRINT_ELEMENTS(coll);
+
+    return 0;
+}
+
+
+注意, 一定要在调用 copy() 之前确保有足够大的空间。因为 back inserter 在安插元素时, 可能会造成指向该 vector 的其他迭代器失效。因此, 如果不保留足够空
+间, 这个算法可能会形成"源端迭代器失效"状态。
+
+
+String 也提供一套 STL 容器接口, 包括 push_back()。所以你也可以利用 back inserter 为 string 附加字符。
+
+
+
+// !! Front Inserter
+
+'Front inserter 或称 front insert iterator, 乃是借由成员函数 push_front() 将一个 value 加于容器头部'。
+
+
+由于 push_front() 只在 deque、list 和 forward list 有所实现, 所以 C++ 标准库中也就只有这些容器支持 front inserter。
+
+
+Front inserter 生成时, 其初始化过程必须确知其所属容器。函数 front_inserter() 为此提供了一条捷径。
+
+以下展示了 front inserter 的用法:
+
+#include <list>
+#include <algorithm>
+#include <iterator>
+#include "print.hpp"
+
+using namespace std;
+
+int main(int argc, char** argv){
+
+    list<int> coll;
+    // create front insert for coll
+    front_inserter_iterator<list<int> > iter(coll);
+
+    *iter = 1;
+    ++iter;
+    *iter = 2;
+    ++iter;
+    *iter = 3;
+
+    PRINT_ELEMENTS(coll);
+    // create front insert for coll and insert element
+    // convinient way
+    front_inserter(coll) = 33;
+    front_inserter(coll) = 34;
+    PRINT_ELEMENTS(coll);
+
+    std::copy(coll.begin(), coll.end(), front_inserter(coll));
+
+    PRINT_ELEMENTS(coll);
+    return 0;
+}
+
+
+output:
+
+3 2 1
+
+34 33 3 2 1
+
+1 2 3 33 34 34 33 3 2 1
+
+注意, 安插多个元素时, front inserter 以逆序方式插入, 这是因为它总是将下一个元素安插于前一个元素的前面。
+
+
+
+// !! General Inserter
+
+General inserter 或称 general insert iterator, 根据两个实参完成初始化:1. 容器, 2. 待安插位置。迭代器内部以"待安插位置"为实参调用成员函数
+insert()。便捷函数 inserter() 则提供了更方便的手段来产生 general inserter 并加以初始化。
+
+General inserter 对所有标准容器均适用(只有 array 和 forward list 除外), 因为那些容器都提供有  insert() 成员函数。
+
+然而对 associative 和 unordered 容器而言, 安插位置只是个提示, 因为在这两种容器中元素的真正位置视其 value 而定。
+
+安插动作完成后, general inserter 获得刚被安插的那个元素的位置。相当于调用以下语句:
+
+pos = container.insert(pos,value);
+++pos;
+
+为什么要将 insert() 的返回值赋予 pos 呢? 这是为了确保该迭代器的位置始终有效。
+
+如果没有这一赋值动作,在 deque、vector 和 string 中, 该 general inserter 本身可能会失效。因为每一次安插动作都会(或至少可能会)使指向容器的所有迭代器失效。
+
+
+下面展示 general inserter 的用法:
+
+#include <set>
+#include <list>
+#include <algorithm>
+#include <iterator>
+
+#include "print.hpp"
+
+using namespace std;
+
+int main(int argc, char **argv){
+
+    set<int> coll;
+    insert_iterator<set<int> > iter(coll, coll.begin());
+
+    *iter = 1;
+    ++iter;
+    *iter = 2;
+    ++iter;
+    *iter = 3;
+    PRINT_ELEMENTS(coll,"set: ");
+
+    inserter(coll, coll.end()) = 44;
+    inserter(coll, coll.end()) = 55;
+    PRINT_ELEMENTS(coll, "set: ");
+
+    list<int> coll2;
+    copy(coll.begin(),coll.end(),inserter(coll2, coll2.begin()));
+    PRINT_ELEMENTS(coll2, "list: ");
+
+
+    copy(coll.begin(), coll.end(),inserter(coll2, ++coll2.begin()));
+    PRINT_ELEMENTS(coll2, "list: ");
+
+    return 0;
+}
+
+
+output:
+
+set: 1 2 3
+
+set: 1 2 3 44 55
+
+list: 1 2 3 44 55
+
+list: 1 1 2 3 44 55 2 3 44 55
+
+
+上述的  copy()  动作用来展示 general inserter 维护着元素次序。第二个  copy() 动作使用区间中的一个适当位置为实参。
+
+
+// !! Associative 容器的订制型 Inserter
+
+
+如前所述, 对于 associative 容器, general inserter 的"位置实参"只不过是个提示,用来强化速度。如果使用不当反而可能导致较糟的效能。举个例子, 如果逆序安插,
+这个提示就可能使程序变慢,  因为它使程序总是从错误的位置开始查找安插点。
+
+
+// !! Stream (串流)迭代器
+
+
+
+
+
+
+
+
+
 
 
