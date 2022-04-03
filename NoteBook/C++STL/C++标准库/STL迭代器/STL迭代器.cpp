@@ -853,13 +853,348 @@ list: 1 1 2 3 44 55 2 3 44 55
 
 // !! Stream (串流)迭代器
 
+Stream 迭代器是一种迭代器适配器, 借由它, 你可以把 stream 当成算法的来源端和目的端。更明确地说, 一个 istream 迭代器可用来从 input stream 读取元素, 而
+一个 ostream 迭代器可以用来对 output stream 写入元素。
+
+Stream 迭代器的一种特殊形式, 是所谓 stream buffer 迭代器, 用来对 stream buffer 进行直接读取和涂写操作。
 
 
 
+// !! ostream 迭代器
+
+Ostream 迭代器可以将 "被赋值"(assigned value) 写入 output stream。用了它, 算法就可以直接写入 stream。
+
+其实现机制 inserter 迭代器概念一致, 唯一的区别在于 ostream 迭代器将赋值动作转化为 output 动作(通过 operator<<)。如此一来算法就可以使用寻常的迭代器接口
+直接对 stream 执行涂写动作。
+
+
+建立 ostream 迭代器时, 你必须提供一个 output stream 作为实参, 迭代器会把 value 写至该 output stream。另一个实参可有可无, 是个字符串, 被用来作为各个
+元素值之间的分隔符。
+
+ostream 迭代器是针对尚未确定的元素类型 T 而定:
+
+namespace std{
+    template <typename T, typename charT = char, typename traits = char_traits<T>>
+    class ostream_iterator;
+}
+
+
+ostream 迭代器的各项操作:
+
+ostream_iterator<T>(ostream);// 为 ostream 建立一个 ostream 迭代器
+ostream_iterator<T>(ostream, delim);// 为 ostream 建立一个 ostream 迭代器, 各元素间以 delim 为分隔符
+
+*iter;// No-op(返回 iter)
+iter = value;// 将 value 写到 ostream
+
+++iter;// No-op(返回 iter)
+iter++; //No-op(返回 iter)
+
+带默认值的第二和第三个 template 实参用来指明所使用的 stream 类型。
+
+
+以下展示了 ostream 迭代器的用法:
+
+#include <iostream>
+#include <vector>
+#include <algorithm>
+#include <iterator>
+
+using namespace std;
+
+int main(int argc, char** argv){
+
+    ostream_iterator<int> intWriter(cout," ");
+
+    *intWriter = 42;
+    ++intWriter;
+    *intWriter = 77;
+    ++intWriter;
+    *intWriter = -5;
+
+    vector<int> coll = {1,2,3,4,5,6,7,8,9};
+    std::copy(coll.begin(),coll.end(),ostream_iterator<int>(cout));
+    cout << endl;
+
+    std::copy(coll.begin(),coll.end(),ostream_iterator<int>(cout, "<"));
+
+    return 0;
+}
+
+
+output:
+
+42
+77
+-5
+123456789
+1<2<3<4<5<6<7<8<9<
+
+注意, 分隔符的类型是 const char*。如果你传一个 string 对象进去, 别忘了调用 c_str() 成员函数以吻合正确类型。
+
+string delim;
+...
+ostream_iterator<int>(cout,delim.c_str());
 
 
 
+// !! Istream 迭代器
+
+
+Istream 迭代器是 ostream 迭代器的拍档,用来从 input stream 读取元素。通过 istream 迭代器, 算法可以从 stream 直接读取数据。然而 istream 迭代器较
+ostream 迭代器稍微复杂一些(这很正常, read 本来就比 write 复杂一些)。
+
+建立 istream 迭代器时, 你必须提供一个 input stream 作为实参, 迭代器将从其中读取数据。然后它便经由 input 迭代器的寻常接口, 使用 operator>> 读取元素。
+然而, 读取动作有可能失败(可能因为读到文件尾部,或读取错误), 此外算法的数据来源端也需要一个"终点位置"。
+
+为解决这些问题, 你可以使用一个所谓的 end-of-stream 迭代器, 它以 istream 迭代器的 default 构造函数生成。只要有任何一次读取失败,  所有 istream 迭代器都
+会变成 end-of-stream 迭代器。所以进行一次读取后, 你就应该将 istream 迭代器拿来和 end-of-stream 迭代器比较一番,看看这个迭代器是否仍然有效。
+
+
+'istream 迭代器的各项操作'
+
+istream_iterator<T>();// 建立一个 end_of_stream 迭代器
+istream_iterator<T>(istream);// 为 istream 建立一个迭代器(可能会立即读取第一个值)
+
+*iter;// 返回此前读取的值
+iter->member;// 返回此前读取元素的成员
+
+++iter;// 读取下一个值
+
+iter1 == iter2;// 检查 iter1 和 iter2 是否相等
+
+
+注意, istream 迭代器的构造函数会将 stream 打开, 并往往会读取第一个值, 否则一旦 operator* 在此迭代器初始化后被调用, 就无法返回第一个元素了。所以,在确实需要
+用到 istream 迭代器之前,别过早定义它。不过某些实现版本可能会延缓第一次读取动作直到 operator* 首次被调用。
+
+
+Istream 迭代器是针对未定类型 T 而定义的:
+
+namespace std{
+    template <typename T, typename charT = char, typename traits = char_traits<charT>, 
+    typename Distance = ptrdiff_t>
+
+    class istream_iterator;
+}
+
+
+拥有默认值的第二和第三 template 实参, 用来指明 stream 类。第四个 template 实参(也有默认值)用来指明表达"迭代器距离(difference)"的类型。
+
+如果满足以下条件, 我们便说两个istream迭代器相等:
+
+· 两者都是 end-of-stream 迭代器(因而不能再进行读取),或
+
+· 两者都可以再进行读取动作, 并指向相同的 stream
+
+以下展示 istream 迭代器的各项操作:
+
+
+#include <iostream>
+#include <iterator>
+
+using namespace std;
+
+int main(int argc, char **argv){
+
+    istream_iterator<int> intReader(cin);
+
+    istream_iterator<T> intReadEOF;
+
+    while(intReader != intReadEOF){
+        cout << "once " << *intReader << endl;
+        cout << "once again " << *intReader << endl;
+        ++intReader;
+    }
+}
+
+如果执行这个程序并给予以下输入:
+
+1 2 3 f 4
+
+程序输出如下:
+
+once 1
+once again 1
+once 2
+once again 2
+once 3
+once again 3
+
+如你所见, 字符 f 的输入导致程序结束。是的, 由于格式错误, stream 不再处于 good 状态, 于是 istream 迭代器 intReader 就和 end-of-stream 迭代器 
+intReaderEOF 相同, 使得循环条件为 false, 进而结束循环。
+
+
+// !! Stream 迭代器的另一例,使用 advance()
+
+以下例子使用了两种 stream 迭代器, 而且用到了迭代器函数 advance():
+
+#include <iterator>
+#include <iostream>
+#include <algorithm>
+#include <string>
+
+using namespace std;
+
+int main(int argc, char** argv){
+    istream_iterator<string> cinPos(cin);
+    ostream_iterator<string> coutPos(cout, " ");
+
+    while(cinPos != istream_iterator<string>){
+        advance(cinPos,2);
+        if(cinPos != istream_iterator<string>){
+            *coutPos = *cinPos++;
+        }
+    }
+    cout << endl;
+    return 0;
+}
+
+迭代器函数 advance() 用来帮助迭代器前进到另一位置。当它被用来搭配 istream 迭代器, 结果便是"跳过输入单元(input token)"。
+
+假设你的输入如下:
+
+No one object if you are doing
+a good programming jod for
+someone whom you respect
+
+
+则输出如下:
+
+object are good for you
+
+千万别忘了, 调用 advance() 之后、访问 *cinPos 之前, 一定要记得检查 istream 迭代器是否依然有效, 如果对 end-of-stream 迭代器调用 operator*, 
+会导致不明确的行为。
 
 
 
+// !! Move (搬移)迭代器
+
+从 C++11 开始, 提供了一个迭代器适配器(iterator adapter), 用来将任何对底层元素的处理转换为一个 move 操作。
+
+举个例子:
+
+std::list<std::string> s;
+...
+std::vector<std::string> v1(s.begin(), s.end());// copy string into v1
+...
+std::vector<std::string> v2(make_move_iterator(s.begin()), make_move_iterator(s.end()));// move string into v2
+...
+
+
+这些迭代器的应用之一是, 让算法以 move 取代 copy, 将元素从一个区间放到另一个区间。然而注意,一般而言, move() 算法做同样的事情。
+
+一般而言, 只有当"算法将元素从某个来源区间迁移(transfer)至某个目标区间", 这种情况下在算法中使用 move 迭代器才有意义。此外, 你必须确保每个元素只被处理一次,
+否则,其内容将被搬移一次以上, 那会导致不明确的行为。
+
+注意,唯一保证"元素只被读取或被处理一次"的迭代器种类是 input iterator。因此, 通常只有当"某算法有个来源端, 其内要求 input iterator, 并且有个目的端,其内使
+用 output iterator", 这时候使用 move 迭代器才有意义。唯一例外是 for_each(), 它可处理被指明区间(passed range)内的被搬移元素(moved element),例如把它
+们搬移到一个新容器内。
+
+
+
+// !! Iterator Trait (迭代器特性)
+
+'迭代器可以区分为不同类型(category), 每个类型都代表特定的迭代器能力'。如果能根据不同的迭代器种类将操作行为重载(overload), 将会很有用, 甚至很必要。通过迭代器标志(tag)和特性(trait,
+由 <iterator>提供)可以实现这样的重载。
+
+C++ 标准库为每个迭代器种类提供了一个迭代器标志(iterator tag), 用来作为迭代器的标签(label):
+
+namespace std{
+    struct output_iterator_tag{
+
+    };
+
+    struct input_iterator_tag{
+
+    };
+
+    struct forward_iterator_tag : public input_iterator_tag{
+
+    };
+
+    struct bidirectional_iterator_tag: public forward_iterator_tag{
+
+    };
+
+    struct random_access_iterator_tag: public bidirectional_iterator_tag{
+
+    };
+}
+
+请注意, 这里用到了继承。所以我们可以说, 任何 forward 迭代器都是一种 (is a) input 迭代器。然而请注意, forward 迭代器 tag 只派生自 input 迭代器 
+tag, 和 output 迭代器 tag 无关。事实上 forward 迭代器的某些特性的确不符合 output 迭代器的要求。
+
+
+如果你撰写泛型码(generic code), 可能不只对迭代器种类(category)感兴趣, 可能还需要了解迭代器所指元素的类型。C++ 标准库提供了一种特殊的 template 结构来定
+义所谓的迭代器特性(iterator trait), 该结构包含迭代器相关的所有信息，为"迭代器应具备的所有类型定义(包括迭代器种类、元素类型等)"提供一致的接口:
+
+
+namespace std{
+    template<typename T>
+    struct iterator_traits{
+        typedef typename T::iterator_category iterator_category;
+        typedef typename T::value_type value_type;
+        typedef typename T::difference_type difference_type;
+        typedef typename T::pointer pointer;
+        typedef typename T::reference reference;
+    };
+}
+
+在这个 template 中, T 表示迭代器类型。有了它, 我们就可以撰写任何"运用迭代器种类或其元素类型"的泛型码。
+
+例如以下表达式就可以取得迭代器类型为 T 的元素类型(value type):
+
+typename std::iterator_traits<T>::value_type
+
+这个 trait 结构有两个优点:
+
+1. 确保每一个迭代器都提供了所有必要的类型定义
+2. 能够针对特定的迭代器实施特化(specialization)
+
+
+
+上述第二条适用于"以寻常 pointer 作为迭代器"时:
+
+namespace std{
+    template <typename T>
+    struct iterator_traits<T*>{
+        typedef T value_type;
+        typedef ptrdiff_t difference_type;
+        typedef random_access_iterator_tag iterator_category;
+        typedef T* pointer;
+        typedef T& reference;
+    };
+}
+
+
+
+// !! 为迭代器编写泛型函数(Generic Function)
+
+由 iterator trait, 你可以撰写这样的泛型函数:根据迭代器而派生某种类型定义,或根据迭代器种类(category)而采用不同的实现代码。
+
+
+// !! 运用迭代器的 value_type
+
+某些算法内部需要一个以元素类型为类型的临时变量, 这正是使用 iterator trait 的一个简单例子。这样的临时变量可以声明如下:
+
+typename std::iterator_traits<T>::value_type tmp;
+
+其中 T 是迭代器类型。
+
+
+另一个例子是将元素循环往复地移动:
+
+template<typename ForwardIterator>
+void shift_left(ForwardIterator beg, ForwardIterator end) {
+    typedef typename std::iterator_traits<ForwardIterator>::value_type value_type;
+    if(beg != end) {
+        value_type tmp(*beg);
+        ...
+    }
+}
+
+
+// !! 运用迭代器的 iterator_category
+
+如果希望针对不同的迭代器种类采取不同的实现方案, 你需要下面两个步骤:
 
