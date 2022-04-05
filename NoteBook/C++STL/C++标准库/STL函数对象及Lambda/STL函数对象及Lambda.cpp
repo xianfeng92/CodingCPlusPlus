@@ -297,3 +297,282 @@ MeanValue mv = for_each(coll.begin(), coll.end(),MeanValue());
 
 // !! Predicate(判断式) vs.Function Object(函数对象)
 
+所谓 predicate (判断式), 就是返回 Boolean 值(意指任何可转为 bool 的值)的函数或 function object。对 STL 而言并非所有返回 Boolean 值的函数都是合法的
+predicate。这可能会导致出人意料的行为。试看下例:
+
+#include <iostream>
+#include <list>
+#include <algorithm>
+
+#include "print.hpp"
+
+
+using namespace std;
+
+
+class Nth{
+private:
+    int nth;
+    int count;
+public:
+    Nth(int n):nth(n), count(0){}
+
+    bool operator()(int){
+        return ++count == nth;
+    }
+};
+
+int main(int argc, char** argv){
+
+    list<int> coll = {1,2,3,4,5,6,7,8,9,10};
+    PRINT_ELEMENTS(coll);
+
+    list<int>::iterator pos;
+    pos = std::remove_if(coll.begin(), coll.end(),Nth(3));
+    coll.erase(pos);
+    PRINT_ELEMENTS(coll,"3th removed");
+
+    return 0;
+}
+
+
+这个程序定义了一个 function object Nth, 当它第 n 次被调用时会返回 true。然而如果你把它传给 remove_if()--此算法会把每一个"令单参数判断式结果为true"
+的元素移除。
+
+
+output: 1 2 3 4 5 6 7 8 9 10
+
+3th removed: 1 2 4 5 7 8 9 10
+
+两个元素--也就是第3和第6个元素——被移除了! 为什么这样? 因为该算法的常见做法会在其内部保留 predicate 的一份拷贝(副本):
+
+template<typename ForwIter, typename Predicate>
+ForwIter std::remove_if(ForwIter begin, ForwIter end, Predicate op){
+    beg = find_if(beg,end op);
+    if(beg == end){
+        return beg;
+    }else{
+        ForwIter next = beg;
+        return remove_copy_if(++next,end, beg, op);
+    }
+}
+
+
+这个算法使用 find_if() 查找应被移除的第一个元素。然而, 接下来它使用传入的 predicate op 的拷贝去处理剩余元素, 这时原始状态下的 Nth 再次被使用,因而会移
+除剩余元素中的第 3 个元素, 也就是整体的第 6 个元素。
+
+这种行为不能说是一种错误, 因为 C++standard 并未明定 predicate 是否可被算法复制一份拷贝。因此, 为了获得 C++ 标准库的保证行为,你传递的 function object 
+其行为"不应该因被复制次数或被调用次数而异"。也就是说, 如果你以两个相同的实参调用同一个 unary predicate, 该式应该总是返回相同结果。
+
+
+'换句话说, predicate 不应该因为被调用而改变自身状态; predicate 的拷贝应该和其正本有着相同状态'。要达到这一点, 你一定得保证不能因为函数调用而改变 predicate
+的状态, 你应当将 operator() 声明为 const 成员函数。
+
+其实我们完全可以避免这种尴尬结果, 让算法和 Nth 这样的 function object 一起正常运作, 而且效率不打折扣。你可以这么实现 remove_if(), 直接以其 find_if()
+的内容替换其调用:
+
+
+template <typename ForwIter, typename Predicate>
+Forward remove_if(ForwIter beg, ForwIter end, Predicate op){
+
+    while(beg != end && !op(*beg)){
+        ++beg;
+    }
+    if(beg == end){
+        return beg;
+    }
+    else{
+        ForwIter next = beg;
+        return remove_copy_if(++next, end, beg, op);
+    }
+}
+
+注意, 如果采用 lambda, 你可以让 function object 的每一个拷贝共享状态, 这个问题就不会发生。
+
+
+
+// !! 预定义的 Function Object 和 Binder
+
+C++ 标准库提供了许多预定义的 function object 和 binder, 后者允许你合成更多精巧的 function object。我们称之为机能合成(functional composition)的能
+力, 其所要求的基础 function object 和 adapter 都在本节呈现。欲使用它们, 你必须首先包含头文件<functional>:
+
+#include <functional>
+
+
+// !! 预定义的 Function Object
+
+
+下面是所有预定义的 function object, 其中 bit_and、bit_or 及 bit_xor 始自 C++11。
+
+
+negate<type>(); // - param
+plus<type>(); // param1 + param2
+minus<type>(); // param1 - param
+multiplies<type>(); // param1 * param2
+divides<type>();// param1 / param2
+modules<type>(); // param1 % param2
+
+equal_to<type>(); // param1 == param2
+not_equal_to<type>(); // param1 != param2
+less<type>(); // param1 < param2
+less_equal<type>(); // param1 <= param2
+greater<type>(); // param1 > param2
+greater_equal<type>(); // param1 >= param
+
+logical_not<type>(); // !param1
+logical_and<type>(); // param1 && param2
+logical_or<type>(); // param1 || param2
+
+bit_and<type>(); // param1 & param2
+bit_or<type>(); // param1 | param2
+bit_xor<type>(); // param1 ^ param2
+
+
+对对象排序或比较(用于排序函数和 associative 容器)时, 默认以 less<> 为比较准则, 因此默认的排序操作总是产生升序(也就是 element < nextElement)。
+Unordered 容器的默认相等性准则是 equal_to<>。
+
+
+// !! Function Adapter 和 Binder
+
+所谓 function adapter (函数适配器), 是指能够将不同的 function object (或是和某值或某寻常函数) 结合起来的东西, 它自身也是个 function object。
+
+
+自 C++11 开始,C++ 标准库提供的 function adapter。
+
+bind(op, args...);// 将 args 绑定给 op
+
+mem_fn(op);// 调用 op， 把它当做某个 Object 的成员函数
+
+
+最重要的 adapter 就是 bind()。它允许你:
+
+1. 在既有的或预定义的 function object 之外另配接及合成(adapt and compose) 新的 function object。
+
+2. 调用全局函数(global function)
+
+3. 针对 object、pointer to object 和 smart pointer to object 调用成员函数
+
+
+// !! bind() Adapter
+
+一般而言 bind() 用来将参数绑定于可调用对象(callable object)。
+
+因此, 如果一个函数、成员函数、函数对象(function object) 或 lambda 需要若干参数, 你可以将参数绑定为"明白指出的"或"被传入的"实参。欲明白指出实参,
+你只需写出其名称, 欲使用被传入的实参, 则可利用预定义占位符 _1、_2、..., 它们被定义于命名空间 std::placeholders 内。
+
+Binder 的一个典型应用是, 当使用C++ 标准库提供之预定义 function object 时具体指定参数。例如:
+
+#include <functional>
+#include <iostream>
+
+using namespace std;
+
+int main(int argc, char** argv){
+
+    auto plus10 = std::bind(std::plus<int>(), std::placeholder::_1, 10);
+    std::cout << "+10    " < plus10(7) << std::endl;
+
+    auto plus10times2 = std::bind(std::multiplies<int>,(std::bind(std::plus<int>(), std::placeholder::_1, 10), 2);
+    std::cout << "+10 * 2 " < plus10times2(100) << std::endl;
+
+    auto pow3 = std::bind(std::multiplies<int>(),std::bind(std::multiplies<int>(),std::placeholder::_1,std::placeholder::_1), std::placeholder::_1);
+    cout << pow3 << std::endl
+
+
+    auto inverseDevide = std::bind(std::divide<double>(), std::placeholder::_2, std::placeholder::_1);
+
+    cout << inverseDevide(49,7) << std::endl;
+
+    return 0;
+}
+
+这里出现四个不同的 binder, 分别定义出不同的 function object。例如 plus10 定义为:
+
+std::bind(std::plus<int>(), std::placeholder::_1, 10);
+
+它所表现的 function object 内部调用 plus<> (也就是 operator+), 以占位符(placeholder_1 作为第一参数/操作数, 以 10 作为第二参数/操作数。'占位符 _1 表示
+实际传入此表达式之第一实参'。于是,对于传给此表达式之任何实参, 这个 function object 会产出"实参+10"的结果值。
+
+
+为了避免沉闷而令人生厌地重复写出命名空间 placeholders, 你可以使用对应的 using 指示符。有了以下两个 using 指示符, 就可以缩短整个语句如下:
+
+using namespace std;
+using namespace std::placeholders;
+
+bind(plus<int>(),_1,10);
+
+也可以直接调用 binder 而不必先为它建立一个对应的 function object。例如:
+
+
+std::cout << bind(plus<int>(),_1,10)(7) << std::endl;
+
+
+本例的其他语句示范如何嵌套合成更复杂的 function object。
+
+例如下列表达式定义了一个 function object, 把 10 加在被传入的实参身上,再将结果乘以2:
+
+bind(multiplies<int>(),bind(plus<int>(),_1,10), 2);
+
+
+如你所预期, 表达式的核定 (evaluated) 次序是由内而外。
+
+
+// !! 调用全局函数
+
+
+下面的例子示范了 bind() 如何被用来调用全局函数:
+
+#include <iostream>
+#include <algorithm>
+#include <iostream>
+#include <functional>
+#include <locale>
+#include <string>
+
+using namespace std;
+using namespace std::placeholders;
+
+char myToUpper(char c) {
+    std::locale loc;
+    return std::use_facet<std::ctype<char>>(loc).toupper(c);
+}
+
+int main(int argc, char ** argv){
+
+    string s("Internationalization");
+    string sub("Nation");
+
+    string::iterator pos;
+    pos =search(s.begin(), s.end(), bind(equal_to<char>(),bind(myToUpper,_1), bind(myToUpper,_2)));
+
+    if(pos != s.end()){
+        cout << "\"" << sub << "is part of " << s << endl;
+    }
+    
+}
+
+这里我们使用 search() 算法检验 sub 是否为 s 的一个子字符串,大小写不计。有了以下:
+
+bind(equal_to<char>(),bind(myToUpper,_1), bind(myToUpper,_2))
+
+便是建立一个 function object 并相当于调用:
+
+myToUpper(param1) == myToUpper(param2)
+
+
+其中 myToupper() 是我们自己写的一个便捷函数, 用来将 string 内的字符转为大写
+
+请注意, bind() 内部会复制被传入的实参。若要改变这种行为, 让 function object 使用一个 reference 指向被传入之实参, 可利用 ref() 或 cref()。例如:
+
+
+void incr(int& i){
+    ++i;
+}
+
+int i = 0;
+bind(incr,i)();// increment a copy of i, no effect for i
+bind(incr, ref(i))();// incrent i
+
+
+
+// !! 调用成员函数
