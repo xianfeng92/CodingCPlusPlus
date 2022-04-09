@@ -86,6 +86,7 @@
         "crend",
         "custmap",
         "custset",
+        "fopow",
         "myfunc",
         "mylib",
         "nocase",

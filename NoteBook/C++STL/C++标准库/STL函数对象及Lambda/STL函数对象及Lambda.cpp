@@ -576,3 +576,389 @@ bind(incr, ref(i))();// incrent i
 
 
 // !! 调用成员函数
+
+以下程序示范  bind() 如何被用来调用成员函数:
+
+#include <algorithm>
+#include <functional>
+#include <iostream>
+#include <string>
+#include <vector>
+
+using namespace std;
+using namespace std::placeholders;
+
+class Person {
+ private:
+  string name;
+
+ public:
+  Person(const string& n) : name(n) {}
+  void print() const { cout << name << endl; }
+
+  void print2(const string& prefix) const { cout << prefix << name << endl; }
+  ...
+};
+
+int main(int argc, char** argv) {
+  vector<Person> coll = {Person("alice"), Person("Bob"), Person("Amy"),
+                         Person("Tony")};
+
+  for_each(coll.begin(), coll.end(), bind(&Person::print,_1));
+  cout << endl;
+
+  for_each(coll.begin(), coll.end(), bind(&Person::print2, _1, "Person: "));
+  cout << endl;
+
+  bind(&Person::print2, _1, "This is:")(Person("Stefen"));
+}
+
+其中的:
+
+bind(&Person::print,_1)
+
+定义一个 function object, 其内针对传入的 Person 调用 param1.print()。'也就是说, 由于第一实参是个成员函数, 下一个实参将定义"用以调用成员函数"的对象'。
+
+
+其他任何实参都会被传递给该成员函数。这意味着:
+
+bind(&Person::print2, _1, "Person: ");
+
+
+定义出一个 function object, 其内针对传入的 Person 调用 param1.print2("Person:")。
+
+
+在这儿, 传入的对象是 coll 的成员(元素)。原则上你可以直接传递对象，例如:
+
+Person n("nico");
+bind(&Person::print2, _1, "Person: ")(n);
+
+这会导致调用 n.print2("This is:")。
+
+
+注意, 你也可以传递 pointer to object 甚至 smart pointer 给 bind():
+
+
+vector<Person*> cp;
+...
+std::for_each(cp.begin(), cp.end(), std::bind(&Person::print,std::placeholders::_1));
+
+
+
+std::vector<std::shared_ptr<Person>>  sp;
+...
+std::for_each(sp.begin(), sp.end(), std::bind(&Person::print,std::placeholders::_1));
+
+
+注意, 你也可以调用"具改动能力的成员函数"(modifying member function):
+
+class Person
+{
+private:
+    ...
+public:
+    void setName(const string& name){
+        this->name = name;
+    }
+};
+
+std::vector<Person> coll;
+...
+std::for_each(coll.begin(), coll.end(),std::bind(&Person::setName,std::placeholder::_1, "paul"));
+
+
+调用 virtual 成员函数也没问题。如果 base class 的某个成员函数被绑定, 而调用它的是个 derived class 对象, 正确的  derived class virtual 函数会被调用。
+
+
+// !! mem_fn() Adapter
+
+对于成员函数, 你也可以改用 mem_fn() adapter, 那就不再需要以占位符表示调用者(对象):
+
+std::for_each(coll.begin(), coll.end(),std::mem_fn(&Person::print));
+
+
+若有额外实参被传给成员函数, mem_fn() 就拿其中第一实参作为调用者(对象), 其他实参当作成员函数的实参:
+
+std::bind(std::mem_fn(&Person::print))(n);// call n.print
+std::bind(std::mem_fn(&Person::print2))(n,"Person:");// call n.print2("Person: ")
+
+
+然而, 如果要为 function object 绑定额外实参, 还是必须使用 bind():
+
+
+std::for_each(coll.begin(),coll.end(),std::bind(std::mem_fn(&Person::print2), std::placeholders_1, "Person:"));
+
+
+
+// !! 绑定至数据成员(Data Member)
+
+
+你也可以绑定至数据成员。考虑以下例子(命名空间在此省略不写):
+
+std::map<std::string, int> coll;
+...
+int sum = std::accumulate(coll.begin(), coll.end(), 0, std::bind(std::plus<int>, std::placeholders::_1),
+std::bind(&std::map<string, int>::value_type::second, _2)));
+
+
+这里调用 accumulate(), 它使用一个 binary predicate 对所有元素求和。然而由于我们的容器是个 map, 其元素是  key/value pair, 为了得到对元素的
+value 的访问权, 必须这么做:
+
+std::bind(&std::map<string, int>::value_type::second, std::placeholders::_2));
+
+把"每次调用这个 predicate 所传入的第二实参"绑定为元素的数据成员 second。
+
+
+// !! 以 Function Adapter 搭配用户自定义的 Function Object
+
+#include <math>
+
+template<typename T1, typename T2>
+struct fopow{
+    T1 operator()(T1 base, T2 exp) const {
+        return std::pow(base, exp);
+    }
+};
+
+注意, 第一实参和返回值拥有相同的类型 T1, 指数则可以拥有不同的类型 T2。
+
+下列程序展示了如何使用用户自定义的 function object fopow<>()。更明确地说, 它使用 fopow<>() 搭配 bind() function adapter:
+
+#include <iostream>
+#include <vector>
+#include <algorithm>
+#include <functional>
+#include <iterator>
+#include "fopow.hpp"
+
+using namespace std;
+using namespace std::placeholders;
+
+int main(int argc, char** argv)
+{
+
+    vector<int> coll = {1,2,3,4,5,6,7,8,9};
+
+    std::transform(coll.begin(), coll.end(),ostream_iterator<float>(cout, " "), std::bind(fopow<float, int>,3,_1));
+
+    cout << endl;
+    std::transform(coll.begin(), coll.end(),ostream_iterator<float>(cout, " "), std::bind(fopow<float, int>,_1,3));
+    cout << endl;
+
+    return 0;
+}
+
+
+
+// !! 运用 Lambda
+
+lambda 的引入始自 C++11, 这带来一种很具威力又十分便利的方法,允许我们提供局部机能(local functionality), 特别是用来具体指明算法和成员函数的细节。
+
+lambda 为 C++ 带来十分重要而深具意义的改善(当我们使用 STL 时)。因为如今你有了一个直观、易读的方式,可将独特的行为传递给算法和容器的成员函数。如果你需要将特
+定行为传给算法,只要在需要的地方像指明函数那样把它写出来即可。
+
+
+// !! Lambda vs.Binder
+
+#include <iostream>
+
+using namespace std;
+
+int main(int argc, char **argv){
+
+    auto plus10 = [](int i){ return i + 10; };
+    cout << plus10(7) << endl;
+
+    auto  plus10times2 = [](int i){ return (i + 10) * 2; };
+    cout << plus10times2(7) << endl;
+
+    auto pow3 = [](int i){ return i * i *i; };
+    cout << pow3(7) << endl;
+
+    auto inverseDevide = [](double d1, double d2){ return d1 / d2; };
+    cout << inverseDevide(7,79) << endl;
+    
+    return 0;
+}
+
+
+拿下面这个 function object 声明式来比较:使用 binder 制造"加 10 而后乘以 2"。
+
+auto plus10times2 = std::bind(std::multiplies<int>(),std::bind(std::plus<int>(), std::placeholders_1, 10), 2);
+
+
+以 lambda 定义相同的机能, 如下:
+
+auto plus10times2 = [](int i) { return (i + 10) * 2;};
+
+
+
+// !! Lambda vs.带有状态的 (Stateful) Function Object
+
+
+让我们以 lambda 替换定制的 function object。
+
+#include <iostream>
+#include <vector>
+#include <algorithm>
+
+using namespace std;
+
+int main(int argc, char **argv)
+{
+
+    vector<int> coll = {1,2,3,4,5,6,7,8,9};
+
+    long sum = 0;
+    for_each(coll.begin(), coll.end(), [&sum](int element){
+        sum += element;
+    };);
+
+    double mv = static_cast<double>((sum)) / static_cast<double>(coll.size());
+    cout << mv << endl;
+}
+
+
+这里, 不再需要针对将被传入的 function object 定义一个 class, 只要传入你所需要的机能就是了。'然而计算所得的状态(state)被置于 lambda 之外的变量 sum',所以
+你最终必须使用 sum 来计算中值(mean value)。
+
+在 function object 中, 状态(sum)将被彻底封装, 我们可以提供额外的成员函数来处理状态, 例如以 sum 为基础计算中值。
+
+MeanValue mv = for_each(coll.begin(), coll.end(),MeanValue());
+cout << "mv is " << mv.value() << endl;
+
+所以, 从调用端的视角观之, 你可以把 "用户自定义的 function object" 视为比 "这里所展示的 lambda 版本" 更紧凑更不易造成错误。
+
+处理状态(state)时, 如果使用 mutable 就该特别小心。
+
+#include <algorithm>
+#include <iostream>
+#include <list>
+
+#include "print.hpp"
+
+using namespace std;
+
+int main(int argc, char** argv) {
+  list<int> coll = {1, 2, 3, 4, 5, 6, 7, 8, 9};
+  PRINT_ELEMENTS(coll);
+
+  int count = 0;
+  list<int>::iterator pos;
+  pos = remove_if(coll.begin(), coll.end(),
+                  [count](int) mutable { return ++count == 3; };);
+
+  coll.erase(pos, coll.end());
+
+  PRINT_ELEMENTS(coll);
+
+  return 0;
+}
+
+然而一如前所述,你可能会陷入同一个问题, 第三和第六元素都被移除了,导致以下输出:
+
+coll: 1,2,3,4,5,6,7,8,9
+3 rd removed: 1,2,4,5,7,8,9
+
+之所以如此, 因为 lambda 对象被 remove_if() 算法在执行过程中复制了一份, 于是存在两个 lambda 对象都移除第三元素, 导致重复的行为。
+
+如果你以 by reference 方式传递实参,又未使用 mutable, 那么行为一如预期, 因为 remove_if() 内部所用的两个 lambda 对象共享同一状态。因此，对于下面的动作:
+
+int count = 0;
+pos = remove_if(coll.begin(), coll.end(),[&count](int){
+    return ++count == 3;
+};);
+
+
+// !! Lambda 调用全局函数和成员函数
+
+
+当然, 任何 lambda 都可以调用其他函数:
+
+#include <iostream>
+#include <algorithm>
+#include <list>
+#include <locale>
+#include <string>
+
+using namespace std;
+
+char myToUpper(char c) {
+    std::locale loc;
+    return std::use_facet<std::ctype<char>> (loc).toupper(c);
+}
+
+int main(int argc, char* argv[]) {
+
+    string s("Internationalization");
+    string sub("National");
+
+    string::iterator pos;
+    pos = search(s.begin(), s.end(), [](char c1, char c2) {
+        return myToUpper(c1) == myToUpper(c2);
+    });
+}
+
+
+
+当然, 你可以用相同方式调用成员函数:
+
+#include <functional>
+#include <iostream>
+#include <vector>
+#include <string>
+#include <algorithm>
+
+using namespace std;
+
+class Person{
+private:
+    string name;
+public:
+    Person(string n): name(n){}
+
+    void print() const {
+        cout << name << endl; 
+    }
+
+    void print2(const string& prefix) const {
+        cout << prefix << name << endl;
+    }
+};
+
+int main(int argc, char** argv){
+
+    vector<Person> coll = {Person("tick"), Person("amy"), Person("Tony")};
+
+    for_each(coll.begin(), coll.end(), [](const Person& p){
+        p.print();
+    });
+
+    cout << endl;
+
+    for_each(coll.begin(), coll.end(),[](const Person& p){
+        p.print2("Person: ");
+    });
+
+    return 0;
+}
+
+
+// !! Lambda 作为 Hash 函数、排序准则或相等准则
+
+一如先前所言, 你也可以使用 lambda 作为 hash 函数、排序准则或相等准则。例如:
+
+class Person{
+    ...
+};
+
+auto hash = [](const Person& p){
+    ...
+};
+
+auto eq = [](const Person& p1, const Person& p2){
+    ...
+};
+
+unordered_set<Person, decltype(hash), decltype(eq)> pset(10, hash, eq);
+
