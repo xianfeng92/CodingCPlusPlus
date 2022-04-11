@@ -366,6 +366,626 @@ int bestResultInTime(){
     }
 }
 
+注意 future f 不能是声明于 bestResultInTime() 内的 local 对象, 那样的话若时间太短以至于无法完成 accurateComputation(),future 析构函数会停滞
+(block)直到异步操作结束。
 
+如果传入一个 zero 时间段, 或一个过去时间点, 就可以仅轮询(poll) 是否有个后台任务已被启动，或是否它正在运行中:
+
+future<...> f(async(func));
+
+while(f.wait_for(std::chrono::seconds(0) != std::chrono::future_status::ready)){
+    ...
+}
+
+然而请注意, 如此循环有可能不会结束,在单线程环境中, 这一调用将被推迟直至 get() 被调用。
+
+
+
+// !! 实例：等待两个Task
+
+#include <future>
+#include <thread>
+#include <chrono>
+#include <iostream>
+#include <random>
+#include <exception>
+
+using namespace std;
+
+
+void doSomething(char c){
+    default_random_engine dre(c);
+    uniform_int_distribution<int> id(10, 1000);
+    for(int i=0; i < 1000; i++){
+        std::this_thread::sleep_for(std::chrono::milliseconds(id(dre)));
+        cou.put(c).flush();
+    }
+}
+
+int main(int argc, char** argv){
+
+    cout << "Starting 2 operation async " << endl;
+    auto f1 = std::async([](){doSomething('.');});
+    auto f2 = std::async([](){doSomething('+')});
+    // if at least one of background task is running
+    if(f1.wait_for(std::chrono::seconds(0) != std::future_status::deferred || 
+       f2.wait_for(std::chrono::seconds(0) != std::future_status::deferred))){
+
+           while(f1.wait_for(std::chrono::seconds(0) != std::future_status::ready && 
+                 f2.wait_for(std::chrono::seconds(0) != std::future_status::ready))){
+                     ...
+                     this_thread.yield();
+                 }
+       }
+       cout.put('\n').flush();
+
+       try {
+           f1.get();
+           f2.get();
+       }catch(const std::exception& e){
+           cout << e.what() << endl;
+       }
+
+       cout << "done" << endl;
+
+    return 0;
+}
+
+再一次, 我们有个操作函数 doSomething() 不时打印一个被传为实参的字符。
+
+现在, 借由 async(), 我们在后台启动 doSomething() 两次, 打印两种不同字符, 使用不同的延迟时间, 后者由相应的随机数序列(random-number sequence)产生:
+
+
+auto f1 = std::async([]() {doSomething('.');});
+auto f2 = std::async([]() {doSomething('+');});
+
+在多线程环境中, 此时将同时运行起两个操作, 不定时打印出不同的字符。
+
+接下来, 轮询(poll)是否其中一个操作已完成:
+
+
+while (f1.wait_for(std::chrono::seconds(0) != std::future_status::ready)
+        f2.wait_for(std::chrono::seconds(0) != std::future_status::ready)){
+            ...
+            this_thread.yield();
+        }
+
+然而万一 async() 被调用时上述两个 task 都未被在后台启动, 这个循环将永远不会结束, 所以我们首先必须检查是否至少有一个操作未被推迟 (not deferred):
+
+
+if(f1.wait_for(std::chrono::seconds(0) != std::future_status::deferred
+   f2.wait_for(std::chrono::seconds(0)) != std::future_status::deferred)){
+
+
+   }
+
+
+事实上，如果你移除 sleep_for()语句(它会在每次打印字符时强制推迟), 第一循环会在首次 context switch (切换至其他线程)前全部做完，那么程序的输出比较可能
+像下面这样:
+
+Starting 2 operation async
+...........
++++++++++++
+done
+
+如果环境不支持多线程, 这份输出还是会出现, 因为这种情况下对 doSomething() 的两次调用将会借由对 get() 的调用而被同步调用。
+
+
+// !! 传递实参 (Passing Argument)
+
+前一个例子示范了"传递实参给后台任务"的一种做法: 使用一个 lambda 并让它调用后台函数:
+
+auto f1 = std::async([](){doSomething('.');});
+
+当然, 也可以传递"在 async() 语句之前就已存在"的实参。一如以往, 可采用 by value 方式或 by reference 方式传递它们:
+
+char c = '@';
+auto f2 = std::async([=](){doSomething(c);});
+
+由于定义 capture 为 [=], 因此传递给 lambda 的是 c 的拷贝(copy) 及所有其他 visible object, 所以在 lambda 内你可以传递那个 c 拷贝给 doSomething()。
+
+
+然而另有其他办法可以传递实参给 async(),  因为 async() 提供了 callable object 的惯常接口。举个例子m 如果你传递 function pointer 作为第一实参给
+async(), 你可以传递更多实参, 它们将成为被调用的那个函数的参数:
+
+char c = '@';
+auto f = std::async(doSomething, c);
+
+也可以采用 by reference 方式传递实参, 但这么做的风险是, 被传递值甚至可能在后台任务启动前就变得无效。这对于 lambda 及"直接被调用的函数"都适用:
+
+char c = '@';
+auto f1 = std::async([&](){doSomething(c);});
+auto f2 = std::async(doSomething, std::ref(c));
+
+但是, 当心, 如果你"以 by reference 方式传递实参"只是为了可在另一个线程中改动它们, 你可能轻易落入不明确行为(undefined behavior) 之中。
+
+考虑下面的例子, 在试图启动一个输出循环(于后台打印一个字符)后, 你改变该字符:
+
+void doSomething(const char& c);
+...
+char c = '@';
+auto f = std::async([&](){doSomething(c);});// pass by reference
+...
+c = '_';
+f.get();
+
+
+首先,"这里"以及"在 doSomething() 内"对 c 的处理, 其次序无法预期。因此, 该字符的变换可能发生于输出循环之前、之中或之后。更糟的是,'我们在某一线程中改动 
+c, 在另一个线程中读取 c, 这是对同一对象的异步并发处理(所谓 data race)', 将导致不可预期的行为, 除非你使用 mutex(互斥体) 或 atomic 保护并发处理动作。
+
+所以, 让我们说清楚: 如果你使用 async(), 就应该以 by value 方式传递所有"用来处理目标函数"的必要 object, 使 async() 只需使用局部拷贝(local copy)。
+如果复制成本太高, 请让那些 object 以 const reference 的形式传递, 且不使用 mutable。
+
+
+你也可以传给 async() 一个"指向成员函数"的 pointer。这种情况下, 位于该成员函数名称之后的第一个实参必须是个 reference 或 pointer, 指向某个 object,
+后者将调用该成员函数:
+
+class X{
+public:
+    void mem(int num);
+    ...
+};
+
+X x;
+auto a = std::async(&X::mem,x,42);// try to call x.mem(42) async
+
+
+
+// !! Shared Future
+
+正如我们已看到的, class std::future 提供了"处理并发运算之未来结果"的能力。然而你只能处理该结果一次。第二次调用 get() 会导致不可预期的行为
+(根据 C++ 标准库的说法, 通常是鼓励抛出一个 std::future_error)。
+
+
+然而有时候, 多次处理"并发运算之未来结果"是合理的, 特别当多个其他线程都想处理这份结果时。基于这个目的, C++ 标准库提供了 class std::shared_future, 于是你可
+以多次调用 get(), 导致相同结果, 或导致抛出同一个异常。
+
+考虑下面这个例子:
+
+#include <future>
+#include <thread>
+#include <iostream>
+#include <stdexcept>
+
+using namespace std;
+
+int querrNumber(){
+    cout << "Read number: ";
+    int num;
+    cin >> num;
+
+    if(!cin){
+        throw std::runtime_error("no number read");
+    }
+    return num;
+}
+
+void doSomething(char c, shared_future<int> f){
+
+    try{
+        f.get();// get result of queryNumber
+
+        for(int i = 0; i < num; i++){
+            this_thread::sleep_for(std::chrono::milliseconds(100));
+            cout.put(c).flush();
+        }
+    }catch(const std::exception& e){
+        cout << e.what() << endl;
+    }
+}
+
+int main(int argc, char** argv){
+
+    try{
+        shared_future<int> f = std::async(queryNumber);
+
+        auto f1 = std::async(std::launch::async, doSomething, '.', f);
+        auto f2 = std::async(std::launch::async, doSomething, '+', f);
+        auto f3 = std::async(std::launch::async, doSomething, '-', f);
+
+        f1.get();
+        f2.get();
+        f3.get();
+    }catch(const std::exception& e){
+        cout << e.what() << endl;
+    }
+
+    cout << "done" << endl;
+    return 0;
+}
+
+此例之中有个线程调用 queryNumber() 查询一个整数值, 该值随后被其他已执行的多个线程使用。为执行这份任务, 用以启动"查询线程"的那个 std::async() 的执行结果被
+赋值给一个 shared_future object, 后者以返回值为 template 参数:
+
+
+shared_future<int> f = std::async(queryNumber);
+
+也就是说, shared future 可以寻常的 future 为初值, 于是 future 的状态会被搬移到 shared future 身上。为了能在上述声明式中使用 auto, 你可以改而调用成员函
+数 share():
+
+auto f = std::async(queryNumber).share();
+
+就内部而言, '所有 shared future object 共享所谓 shared state, 后者由 async() 建立,用来存放目标函数的运行结果(也存放函数本身——如果它被推迟执行的话)'。
+
+这个 shared future 随后被传给其他线程, 它们启动 doSomething() 并以该 shared future 作为第二实参:
+
+auto f1 = std::async(std::launch::async, doSomething, '.', f);
+auto f2 = std::async(std::launch::async, doSomething, '+', f);
+auto f3 = std::async(std::launch::async, doSomething, '-', f);
+
+每一次 doSomething() 被调用, 便通过传入之第二参数 shared future 的成员函数 get(), 等待及处理 queryNumber() 的执行结果:
+
+void doSomething(char c, shared_future<int> f){
+    try{
+        int num = f.get();
+        for(int i = 0; i < num; i++){
+            ...
+        }
+    }catch(...){
+        ...
+    }
+}
+
+
+如果 queryNumber() 抛出异常(当程序未能读到整数时), 那么对 doSomething() 的每一次调用都会获得因 f.get() 而来的异常, 于是对应的异常处理
+(exception handling) 便会发生。
+
+
+一位并发库(concurrency library)作者——在某次私下联络中所言:"如果代码紧紧保持着高度协调, 以 by reference 方式传递是好的。但如果代码进入一个对于目标和限制
+都不甚了解的地带, 那么还是以 by value 方式传递较佳"。
+
+
+// !! 低层接口: Thread 和 Promise
+
+'除了高级接口 async() 和 (shared) future, C++ 标准库还提供了一个启动及处理线程的低层接口'。
+
+
+// !! Class std::thread
+
+欲启动某个线程, 只需先声明一个 class std::thread 对象, 并将目标任务(task)当作初始实参, 然后要么就等待它结束, 要么就将它卸离(detach):
+
+void doSomething();
+
+std::thread t(doSomething);// start do something in background
+...
+
+t.join();// wait for to finish(block util doSomething ends)
+
+
+就像对待 async() 一样, 你可以传入任何 callable object (可以是 function、member function、function object、lambda), 并可夹带任何可能的实参。
+然而请注意, 除非你真的知道你在做什么, 否则面对"处理目标函数所必须"的所有 object 都应该以 by value 方式传递, 使得 thread 只使用 local copy。
+
+
+此外, 这是个低层接口, 所以我们会感兴趣这一接口和高级的 async() 相比之下不提供哪些性质:
+
+1. Class thread 没有所谓发射策略(launch policy)。'C++ 标准库永远试着将目标函数启动于一个新线程中。如果无法做到会抛出 std::system_error 并带着差错
+    码 resource_unavailable_try_again'
+
+2. 没有接口可处理线程结果, 唯一可获得的是一个独一无二的线程 ID
+
+3. 如果发生异常, 但未被捕捉于线程之内, 程序会立刻中止并调用 std::terminate()。若想将异常传播至线程外的某个 context, 必须使用 exception_ptr
+
+4. 你必须(像个调用者般地)声明是否"想要等待线程结束"(那就调用 join()) 或打算"将它自母体卸离 (detach) 使它运行于后台而不受任何控制"(那就调用 detach())。
+   如果你在 thread object 寿命结束前不这么做, 或如果它发生了一次 move assignment, 程序会中止并调用 std::terminate()。
+
+
+5. 如果你让线程运行于后台而 main() 结束了, 所有线程会被鲁莽而硬性地终止。
+
+
+下面是第一个完整例子:
+
+#include <chrono>
+#include <iostream>
+#include <random>
+#include <stdexcept>
+#include <thread>
+
+using namespace std;
+
+void doSomething(int num, char c) {
+  try {
+    default_random_engine dre(c);
+    uniform_int_distribution<int> id(10, 1000);
+    for (int i = 0; i < num; i++) {
+      std::this_thread::sleep_for(std::chrono::milliseconds(id(dre)));
+      cout.put(c).flush();
+    }
+  }catch (std::exception& e) {
+      cout << e.what() << endl;
+  }
+}
+
+int main(int argc, char** argv) {
+    try{
+        std::thread t1(doSomething);
+        cout << "Staring fg thread" << t1.get_id() << endl;
+
+        for(int i = 0; i < 5 ; i++) {
+            thread t(doSomething, 10, i + 'a');
+            cout << "detach started fg thread" << t.get_id() << endl;
+            t.detach();// detach the thread into background
+        }
+
+        cin.get();// wait for any input
+        cout << "-join fg thread " << t1.get_id() << endl;
+        t1.join();
+    }catch(const std::exception& e){
+        cout << e.what() << endl;
+    }
+
+    return 0;
+}
+
+本例的 main() 启动若干线程, 让它们都执行 doSomething()。基于以下原因不论 main() 或是 doSomething() 都有 try-catch 子句:
+
+1. 在 main() 中, "创建线程"这个动作有可能抛出一个夹带差错码 resource_unavailable_try_again 的异常 std::system_error
+
+2. 在 doSomething() 中, 由于此函数被启动为 std::thread, 任何异常若未被捕捉都会造成程序终止
+
+main() 所启动的第一个线程, 稍后我们便"等待它结束":
+
+thread t1(doSomething,5,'.');
+...
+
+t1.join();
+
+其他线程则是启动之后便被卸离(detached), 所以有可能 main() 结束时它们还在执行:
+
+for(int i=0; i< 5; i++){
+    thread t(doSomething, 10, 'a'+i);
+    t.detach();
+}
+
+一旦 main() 结束, 程序会立刻终止所有后台线程。
+
+
+// !! 当心 Detached Thread (卸离后的线程)
+
+Detached thread (卸离后的线程) 很容易形成问题--如果它们使用 nonlocal 资源的话。问题出在你丧失了对 detached thread 的控制, 没有轻松的办法可以得知它是
+否运行, 以及运行多久。因此, 请确定绝不要让一个 detached thread 访问任何寿命已结束的 object。基于这个理由, "以 by reference 方式传递变量和 object"给线
+程, 总是带有风险。'强烈建议以 by value 方式传递'。
+
+请注意, 寿命问题一样困扰 global 和 static object, 因为当程序退离 exit, detached thread 可能还在运行, 意味着它仍有可能访问"已被销毁"或"正在析构"的
+global 或 static object, 这会导致不可预期的行为。
+
+所以, 请考虑以下数点作为 detached thread 的一般性规则:
+
+1. Detached thread 应该宁可只访问 local copy
+
+2. 如果 detached thread 用上了一个 global or static object, 你应该做以下事情之一:
+
+   确保这些 global/static object 在"对它们进行访问"之所有 detached thread 都结束(或都不再访问它们) 之前不被销毁。一种做法就是使用 condition variable
+   , 它让 detached thread 用来发信号说它们已结束。离开 main() 或调用 exit() 之前你必须先设置妥这些 condition variable, 然后发信号(to signal)说可进
+   行析构了
+
+   以调用 quick_exit() 的方式结束程序。这个函数之所以存在完全是为了以"不调用 global 和 static object 析构函数"的方式结束程序
+
+由于 std::cin、std::cout 和 std::cerr 及其他 global stream object 按标准所说乃是"在程序运行期间不会被销毁", 所以 detached thread 访问这些 object
+应该不会导致不可预期的行为。
+
+尽管如此, 请牢记一个经验法则:终止 detached thread 的唯一安全方法就是搭配"...at_thread_exit()" 函数群中的某一个。这会"强制 main thread 等待 detached 
+thread 真正结束"。或者你也可以选择忽略这一性质而相信某位评论家所言: 'Detached thread 应该被移到‘危险性质’的篇章中, 几乎没有人需要它'。
+
+
+
+// !! Thread ID
+
+如你所见, 程序打印 thread ID 时, 若非借由 thread object, 就是在一个 thread 内使用 name-space this_thread (此亦由<thread>提供):
+
+
+void doSomething(int num, char c){
+    ...
+    cerr <<this_thread::get_id() << endl;
+
+    thread t(doSomething, 10, 'a');
+    cout << t.get_id() << endl;
+}
+
+这所谓 thread ID 隶属于特殊类型 std::thread::id, 其值独一无二。此外, class id 有个 default 构造函数, 会产生一个独一无二的 ID 用来表现"no thread":
+
+std::cout << "id of no thread" << std::thread::id() << std::endl;
+
+唯一允许对 thread ID 进行的操作是"比较", 以及调用 output 操作符输出至某个 stream。你不该有任何进一步假设, 像是"no thread 拥有 ID 0 或 main thread
+拥有ID 1"之类的想象。事实上实现(implementation) 有可能在被申请时才动态生成这些ID, 而不是在 thread 被启动时就生成之, 那么 main thread 的编号就取决于
+先前对 thread ID 的申请次数。以下代码:
+
+
+std::thread t1(doSomething, 5, 'a');
+std::thread t2(doSomething, 6, 'b');
+std::thread t3(doSomething, 7, 'c');
+
+std::cout << "t3 ID" << t3.get_id() << endl;
+std::cout << "main ID " << std::this_thread::get_id() << endl;
+std::cout << "no thread ID" << std::thread::id() << endl;
+
+因此, 识别线程(例如主线程 master thread) 的唯一办法是, 将线程启动时的 ID 存储下来, 以此为唯一识别值:
+
+std::thread::id masterThreadId;
+void doSomething(int num, char c){
+    if(std::this_thread::get_id() == masterThreadId){
+        ...
+    }
+    ...
+}
+
+
+std::thread master(doSomething, 10, 'n');
+masterThreadId = master.get_id();
+...
+
+std::thread slave(doSomething, 11, 'w');
+...
+
+注意, 已结束的线程的 ID 可能会被系统拿去重复使用。
+
+
+
+// !! Promise
+
+现在, 新问题来了: 如何在线程之间传递参数和处理异常(也就是高级接口如 async() 如何实现这一技术)。欲传递数值给线程, 你可以仅仅把它们当作实参来传递。
+如果你需要线程的运行结果, 可用 by reference 方式传递, 就像 async() 描述的那样。
+
+然而, 另一个用来传递运行结果和异常(亦被视为一种结果)的一般性机制是: class std::promise。所谓 promise object 是 future object 的配对兄弟, 二者都能暂时
+持有一个 shared state (用来表现一个结果值或一个异常)。但 future object 允许你取回数(借由 get()), promise object 却是让你提供数据(借由 set_...() 函数
+群中的一个)。
+
+下面是个例子:
+
+#include <thread>
+#include <future>
+#include <iostream>
+#include <string>
+#include <exception>
+#include <stdexcept>
+#include <functional>
+#include <utility>
+
+using namespace std;
+
+void doSomething(std::promise<std::string> &p){
+    try{
+        std::cout << "read char ('x' for exception)" << std::endl;
+        char c = std::cin.get();
+        if(c == 'x'){
+            std::string s =  std::runtime_error(std::string("char") + c + "process");
+            p.set_value(std::move(s));
+        }
+    }
+}
+
+
+int main(int argc, char** argv){
+    try{
+        std::promise<std::string> p;
+        std::thread t(doSomething, std::ref(p));
+        t.detach();
+        ...
+        std::future<std::string> f(p.get_future());
+        std::cout << "result: " << f.get() << std::endl;
+    }catch(const std::exception& e){
+        cout << e.what() << endl;
+    }catch(...){
+        std::cerr << "Exception"  << std::endl;
+    }
+    return 0;
+}
+
+在包含 <future> (其中有 promise 的声明)之后, 你可以声明一个 promise object, 令它针对"持有值"或"返回值"特化(如果两者都是none, 就特化为 void):
+
+
+std::promise<std::string> p;
+
+Promise 内部会建立一个 shared state, 在这里被用来存放一个相应类型的值或一个异常, 并可被 future object 取其数据当作线程结果。
+
+这个 promise 随后被传给一个在分离线程(separate thread)中运行的任务(task):
+
+std::thread t(doSomething, std::ref);
+
+借由 std::ref()我们确保这个 promise 以 by reference 方式传递, 使其状态得以被改变(copying 不适用于 promise)。
+
+然后在线程内调用 set_value() 或 set_exception(), 便得以在 promise 中存放一个值或一个异常:
+
+void doSomething(std::promise<std::string> &p){
+    try
+    {
+        p.set_value(std::move(s));// store result
+    }
+    catch(const std::exception& e)
+    {
+        p.set_exception(std::current_exception());// store exception
+        std::cerr << e.what() << '\n';
+    } 
+}
+
+此处用上了定义于 <exception> 内的辅助函数 std::current_exception(), 它会将当前异常以类型 std::exception_ptr 生成出来, 如果当前并无异常就生成
+nullptr。这个异常会被存放于 promise object 内部。
+
+一旦 shared state 存有某值或某个异常, 其状态就转变为 ready。于是你可以在他处取出其内容。但是"取出"动作需要借助一个"共享相同 shared state"的
+future object。为此, 我们在 main() 内对 promise object 调用 get_future(), 建立起这一相应的 future object。也可以在启动线程之前先建立该
+future object:
+
+
+std::future<std::string> f(p.get_future());
+
+现在, 通过 get() 我们可以取得"被存储的结果", 或是令"被存储的异常"再次被抛出:
+
+f.get();
+
+
+
+
+// !! Class packaged_task<>
+
+async() 予你一个权柄, 使你得以处理 task 的成果, 该 task 是你尝试立刻启动于后台的。然而有时候虽然你需要处理一个后台 task 的成果, 你其实不需要立刻启动该
+task。举个例子, thread pool 可控制何时运行以及多少个后台 task 同时运行, 此情况下我们不再这么写:
+
+
+double compute(double x, double y);
+std::future<double> f = std::async(compute, 7, 5);
+...
+double res = f.get();
+
+而是写成这样:
+
+double compute(double x, double y);
+std::package_task<double(double,double)> task(compute);// create a task
+...
+task(7, 5);// start a task(typically in a seperat thread)
+...
+double res = task.get();
+
+其中的 task 通常(但非一定)启动于某一分离线程中。
+
+上述的 class std::packaged_task<> 定义于 <future> 内, 持有目标函数及其可能结果。
+
+
+
+// !! 细说启动线程 (Starting a Thread)
+
+介绍完"启动线程"和"处理返回值或异常"之高级及低层接口后, 让我们总结所有概念, 并提供若干尚未提及的细节。
+
+
+Thread 接口层级
+
+call std::async()   return value or exception automatically are provide by a std::future<>
+
+call task of class std::packaged_task return value or exception automatically are provide by a std::future
+
+call object of class std::thread  set value or exception in a std::promise<>
+
+
+概念上, 我们有数个层面可以启动线程并处理其返回值或异常:
+
+1. 低层接口 class thread 让我们得以启动线程。为了"返回数据", 我们需要可共享的变量(global 或 static 变量, 或是以实参传递的变量)。为了"返回异常",可利用类
+   型 std::exception_ptr (它被  std::current_exception() 返回并可被 std::rethrow_exception()处理。
+
+
+2. Shared state 的概念使我们能够以一种较便捷的方法处理返回值或异常。搭配低层接口所提供的 promise 我们可以建立一个 shared state 然后通过一个 future 来
+   处理它。
+
+
+3. 在高级层面中, class packaged_task 或 async() 会自动建立一个 shared state, 它会因为一个 return 语句或一个未被捕获的异常(uncaught exception)而
+   设置妥。
+
+4. packaged_task 允许我们建立一个"带着 shared state"的 object, 但我们必须明确写出何时启动该线程
+
+5. 若是使用std::async(), 我们无须关心线程何时真正启动。我们唯一确知的是当需要结果时就调用 get()
+
+
+
+// !! Shared State
+
+
+如你所见, 上述几乎所有性质都用到一个中心概念: shared state。它允许"启动及控制后台机能"的 object (一个 promise、packaged task 或是 async()) 能够和"处
+理其结果"的  object (一个 future 或  shared future) 相互沟通。因此, shared state 必须能够持有被启动之目标函数以及某些状态 (state) 和结果(一个返回值
+或一个异常)
+
+Shared state 如果持有其函数运行结, 我们说它是 ready (也就是返回值或异常已备妥待取)。Shared state 通常被实现为一个 reference-counted object——当它被
+最后一个使用者释放时即被销毁。
+
+
+
+
+// !! 细说 async()
 
 
