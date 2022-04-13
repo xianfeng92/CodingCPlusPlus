@@ -988,4 +988,241 @@ Shared state 如果持有其函数运行结, 我们说它是 ready (也就是返
 
 // !! 细说 async()
 
+一般而言, std::async() 是个辅助函数, 用来在分离线程中启动某个函数(如果可能的话)。因此, '如果低层平台支持多线程, 你可以让函数并发运转'; 如果低层平台不支持,
+也没有任何损失。
+
+然而 async() 的真实行为复杂得多, 且高度取决于 launch(发射) 策略,后者可作为第一实参。基于这个因素, 以下便以应用程序开发者的角度描述 async() 的三个标准调
+用形式。
+
+future async(std::launch::async, F func, args...);
+
+1. 尝试启动 func 并给予实参 args, 形成一个异步任务(asynchronous task; 一个并行线程)
+
+2. 如果以上办不到, 就抛出 std::system_error 异常, 带着差错码 std::errc::resource_unavailable_try_again
+
+3. 被启动的线程保证在程序结束前完成, 除非程序中途失败(abort)
+
+以下情况会结束线程(完成工作):
+
+1. 对返回的 future 调用 get() 或 wait()
+
+2. 如果最后一个指向"返回之 future 所代表的 shared stat"的 object 被销毁
+
+3. 这意味着对 async() 的调用会造成停滞 (block) 直到 func 完成---如果 async() 的返回值未被使用的话
+
+
+future async(std::launch::deferred, F func, args...);
+
+
+1. 传递 func 并夹带实参 args, 形成一个推迟任务(deferred task)。当我们对返回的 future 调用 wait() 或 get(), 那个推迟任务即被同步调用
+   (synchronously called)
+
+
+2. 如果未曾如上调用 wait() 和 get(), 那个推迟任务(deferred task) 绝不会启动
+
+
+
+future async(F func, args...);
+
+1. 相当于调用 async() 并携带 std::launch::async 和 std::launch::deferred 组合而成的 launch 策略。系统会根据当前形势选择其中一个发射策略。也就是说,
+   如果"立即发射"策略行不通的话, 会造成 func 被推迟调用
+
+2. 也就是说, 如果 async() 可以为 func 启动一个新线程, 就那么做, 否则 func 就会被推迟, 直到我们对返回的 future 调用 get() 或 wait()
+
+3. 如果没有对返回的 future 调用 get() 或 wait(), func 有可能永不被调用
+
+4. 注意,如果无法异步调用 func, 本形式的 async() 不会抛出 system_error 异常(但有可能因为其他原因而抛出 system error)
+
+
+'所有 async() 形式都只要求 func 是个 callable object (不论 function、member function、function object、lambda 都可以)'
+
+将发射策略 std::launch::async|std::launch::deferred 传递给 async(), 其后果和不传递任何发射策略是一样的。发射策略设为 0 会导致不可预期的行为(C++ 标
+准库未涵盖此情况, 不同的实现可能行为互异)
+
+
+
+// !! 细说 Future
+
+'Class future<> 用来表现某一操作的成果(outcome): 可能是个返回值或是一个异常, 但不会二者都是'。
+
+
+这份成果被管理于一个 shared state 内, 后者可被 std::async() 或一个 std::packaged_task 或一个 promise 创建出来。这份成果也许尚未存在, 因此 future
+持有的也可能是"生成该成果"的每一件必要东西。
+
+如果 future 是被 async() 返回且其相关的 task 受到推迟, 对它调用 get() 或 wait() 会同步启动该 task。注意, wait_for() 和 wait_until() 都不会令一个
+被推迟任务(deferred task)启动。
+
+成果只能被取出一次。因此 future 可能处于 valid 或 invalid 状态: 有效意味着"某一操作的成果或爆发的异常"尚未被取出。
+
+
+'class future<> 可用的操作'
+
+
+future f;// Default 构造函数, 建立一个 future,带着无效状态
+
+future f(rv);// Move constructor, 取 rvalue rv 的内容建立一个新的 future, 并令 rv 带着无效状态
+f = rv;
+
+f.valid();// 如果 f 具备有效状态返回 true 否则返回 false
+
+f.get();// block 直到后台任务执行完成, 它会迫使被 deferred 的线程同步启动
+f.wait();//block 直到后台任务执行完成, 它会迫使被 deferred 的线程同步启动
+
+f.wait_for(dur);// block dur 时间段, 或直到后台任务完成.但被推迟的线程并不会强制启动 
+f.wait_until(dur);// block dur 时间段, 或直到后台任务完成.但被推迟的线程并不会强制启动
+
+f.shared();// 产生一个 shared_future 带着当前状态, 并令 f 的状态失效
+
+
+注意, get() 的返回值取决于 future<> 的特化类型。
+
+1. 如果它是 void, get() 获得的就是 void 也就是"无物"
+
+2. 如果 future 的 template 参数是个 reference 类型, get() 便返回一个 reference 指向返回值
+
+3. 否则 get() 返回返回值的一份 copy, 或是对返回值进行 move assign 动作---取决于返回类型是否支持 move assignment 语义
+
+
+注意, 只可调用 get()  一次, 因为 get() 会令 future 处于无效状态。
+
+
+
+// !! 细说 Shared Future
+
+
+// !! 细说 class std::packaged_task
+
+class std::packaged_task<> 被用来同时持有目标函数及其"成果"(也就是所谓的 shared state)。"成果" 也许是个返回值或是目标函数所触发的异常。你可以拿相应
+的目标函数来初始化 packaged task, 而后通过对 packaged task 实施 operator() 调用该目标函数。最后, 你可以对此 packaged task 取一个 future 以便处理
+其成果。
+
+'下面列出了 class packaged_task 的操作函数'。
+
+packaged_task pt;// Default 构造函数, 建立一个 packaged_task, 不带 shared state 也不带 stored result
+
+packaged_task pt(f);// 为 task f 建议一个对象
+
+packaged_task pt(alloc, f);// 为 task f 建议一个对象, 使用分配器 alloc
+
+pt.~packaged_task();// 销毁 *this
+
+swap(pt1, pt2);// 两个 packaged_task 互换
+
+pt.valid();// 如何 pt 有一个 shared state, 就返回 true
+
+pt.get_future();//产生一个 future object,用来取回 share state
+
+pt(args);// 调用 task 并令 shared state 成为 ready
+
+pt.make_ready_at_thread_exit();//调用 task 并令 线程退出时令 shared state 成为 ready
+
+pt.reset();// 为 pt 建立一个新的 shared state 
+
+由于此 task 之构造函数而发生的任何异常, 例如"缺乏可用内存", 也会被存放于 shared state。
+
+如果调用 task 或调用 get_future() 却没有可用状态, 会抛出 std::future_error 异常并带着差错码 std::future_errc::no_state。
+
+第二次调用 get_future() 会抛出 std::future_error 异常并带着差错码 std::future_errc::future_already_retrieved。
+
+析构函数和 reset() 会抛弃 shared state, 意思是 packaged task 会释放 shared state, 并且如果 shared state 尚未 ready 就令它变成 ready, 然后将一个
+std::future_error 异常并夹带差错码 std::future_errc::broken_promise 存储起来当作成果。
+
+一如往常, make_ready_at_thread_exit() 函数用来确保在 task 的成果被处理之前, 终结该 task 的线程的局部对象(local object)和其他材料会先被妥善清理。
+
+
+
+
+// !! 细说 class std::thread
+
+class std::thread, 其对象用来启动和表现线程。这些对象和操作系统提供的线程呈现一对一映射关系。
+
+
+
+'class thread 的操作函数'
+
+
+thread t;// Default 构造函数, 建立一个 nonjoinable thread object
+
+thread t(f,...);// 创建一个 thread object, 表示 f 将被启动在一个线程中
+
+thread t(rv);// Move constructor, 创建一个新的 thread object, 取 rv 的状态并令 rv 变成 nonjoinable
+
+t.~thread();// 销毁 *this; 如果线程是 joinable 则调用 terminate() 
+
+t.joinable();// 如果 t 关联一个线程(也就是说它是 joinable)便产生 true
+
+t.join();// 等待关联线程完成工作, 然后令此 object 变成 nonjoinable
+
+t.detach();// 解除 t 与线程之间的关联并且让线程继续运行,并令 object 变成 nonjoinable
+
+t.get_id()
+
+t.native_handle();// 返回一个依赖于平台的类型 native_handle_type, 用于不具可移植性的扩展
+
+
+'Thread object 和线程之间的关联始于您将一个 callable object 指派为初值(或是 move copy/assign) 给它, 并夹带可能有的实参'。
+
+这个关联的结束有两个情况:'一是由于 join() (它将等待线程成果) 或是由于 detach() (它将明确失去对线程的关联)'。不论哪一个函数都必须在 thread object 生命
+结束前或在一个新的 thread object 被 move assigned 之前被调用, 否则程序就会因 std::terminate() 而中止。
+
+'如果 thread object 关联至某个线程, 它就是所谓 joinable'。此情况下调用 joinable() 会获得 true, 调用 get_id() 会获得 thread ID, 其值不同于
+std::thread::id() 所得。
+
+
+Thread ID 有自己的类型 std::thread::id。其 default 构造函数会产出一个独一无二的 ID 用以表示"非线程"。如果没有任何线程被关联, 调用 thread::get_id()
+获得的便是那个特殊值, 如果 thread object 关联至某个线程(也就是 joinable), 调用 thread::get_id() 便会获得另一个独一无二的 ID。
+
+
+唯一可对 thread ID 执行的操作是对它们进行比较, 或是将它们写至一个 output stream。
+
+
+注意, detached thread 不应该访问生命已结束的 object。这意味着当我们结束程序时, 必须确定 detached thread 不会访问 global/static object。
+
+
+此外, class std::thread 还提供一个 static 成员函数, 用来查询并行线程的可能数量(只是一个参考值):
+
+unsigned int std::thread::hardware_concurrency();
+
+
+. 返回可能的线程数量
+· 该数量只是个参考值, 不保证准确
+· 如果数量不可计算或不明确, 返回值是0。
+
+
+
+
+// !! Namespace this_thread
+
+针对任何线程(包括主线程 main thread), <thread> 声明一个命名空间 std::this_thread, 用以提供线程专属的 global 函数。
+
+
+'命名空间 std::this_thread 提供的线程专属操作'
+
+this_thread::get_id(); // 获取当前线程的 id
+this_thread::sleep_for(dur);// 将某个线程阻塞(block) dur 时间段
+this_thread::sleep_until(tp);// 将某个线程阻塞(block) 直到时间点 tp
+this_thread::yield();// 建议释放控制以便重新调度让先一个线程能够执行
+
+
+注意, 当处理系统时间调整(system-time adjustment)时, sleep_for() 和 sleep_until() 往往不同
+
+函数this_thread::yield() 用来告诉系统, 放弃当前线程的时间切片(time slice) 余额是有好处的, 这将使运行环境得以重新调度(reschedule)以便允许其他线程执行。
+
+
+"放弃控制"的一个典型例子是, 当等待或轮询(wait or poll)另一线程, 或等待或轮询"某个 atomic flag 被另一线程设定"
+
+while(!readFlag){
+    std::this_thread::yield();
+}
+
+另一个例子是, 当你尝试锁定多个 lock/mutex 却无法取得其中一个 lock 或 mutex, 那么在尝试不同次序的 lock/mutex 之前你可以使用 yield(), 这会让你的程序更
+快些。
+
+
+
+// !! 线程同步化与 Concurrency(并发)问题
+
+
+
+
 
