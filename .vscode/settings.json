@@ -93,6 +93,7 @@
         "pfct",
         "rpos",
         "Unord",
+        "unsynchronized",
         "xforg"
     ]
 }
