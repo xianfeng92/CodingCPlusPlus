@@ -1487,6 +1487,453 @@ object 的组合。为了获得独占式的资源访问能力, 相应的线程�
 
 // !! 使用  Mutex 和 Lock
 
+我们打算保护"许多地方都会用到的" object val 的并发访问动作(concurrent access):
+
+int val;
+
+将 concurrent access 同步化的一个粗浅做法是, 引入 mutex, 用来赋予独占性并加控制:
+
+
+int val;
+std::mutex val_mutex;
+
+
+此后每次访问都必须锁定这个 mutex 以求独占。例如某个线程可能会这么做(注意这是低劣做法，我们正是要改善它):
+
+
+val_mutex.lock();
+if(val > 0){
+    foo(val);
+}else{
+    f(-val);
+}
+val_mutex.unlock();
+
+
+另一个线程可能这样访问同一资源:
+
+val_mutex.lock();
+val ++;
+val_mutex.unlock();
+
+'有一点很重要: 凡是可能发生 concurrent access 的地方都该使用同一个 mutex, 不论读或写皆如此'。
+
+这个简单的办法有可能演变得十分复杂。举个例子,你应该确保异常--它会终止独占--解除(unlock) 相应的 mutex, 否则资源就有可能被永远锁住。此外也可能出现
+deadlock 情景:'两个线程在释放它们自己的 lock 之前彼此等待对方的 lock'。
+
+C++ 标准库试图处理这些问题(但目前仍无法从概念上根本解决)。举个例子, 面对异常你不该自己 lock/unlock mutex, 应该使用 RAII 守则(Resource Acquisition Is 
+Initialization),构造函数将获得资源, 而析构函数——甚至当"异常造成生命期结束"它也总是会被调用--则负责为我们释放资源。为了这个目的, C++ 标准库提供了
+class std::lock_guard
+
+
+int val;
+std::mutex val_mutex;// control exclusive access to val
+...
+
+std::lock_guard<std::mutex> lg(val_mutex);// lock and automatically unlock
+if(val > 0){
+    foo(val);
+}else{
+    foo(-val);
+}
+
+'然而请注意, 这样的 lock 应该被限制在可能之最短周期内', 因为它们会阻塞(block)其他代码的并行运行机会。由于析构函数会释放这个 lock, 你或许会想明确安插大括
+号, 令 lock 在更进一步语句被处理前先被释放:
+
+
+int val;
+std::mutex val_mutex;
+...
+{
+   std::lock_guard<std::mutex> lg(val_mutex);
+   if(val >= 0){
+       foo(val);
+   }else{
+       foo(-val);
+   }
+}// ensure that lock get release here
+
+
+
+// !! Mutex 和 Lock 的第一个完整用例
+
+#include <future>
+#include <mutex>
+#include <iostream>
+#include <string>
+
+
+std::mutex print_mutex;
+
+void print(const std::string& message){
+    std::lock_guard<std::mutex> lg(print_mutex);
+    for(char c: message){
+        std::cout.put(c).flush();
+    }
+    std::cout << std::endl;
+}
+
+
+int main(int argc, char* argv[]){
+    auto f1 = std::async(std::launch::async, print,"hello world");
+
+    auto f2 = std::async(std::launch::async, print, "hello world");
+
+    auto f3 = std::async(std::launch::async, print, "hello world");
+
+    return 0;
+}
+
+
+所谓将输出同步化(synchronize) 就是令每次对 print() 的调用都独占地写出所有字符, 为此我们引入一个 mutex 给 print() 使用, 以及一个 lock guard 用来锁
+定被保护区:
+
+std::mutex print_mutex;
+...
+void print(const std::string& message){
+    std::lock_guard<std::mutex> lg(print_mutex);
+    for(char c : message){
+        std::cout.put(c).flush();
+    }
+    std::cout << std::endl;
+}
+
+在这里, lock guard 的构造函数会调用 mutex 的 lock(), 如果资源(亦即 mutex) 已被取走, 它会 block(阻塞), 直到"对保护区的访问"再次获得允许。然而 lock 的
+次序仍旧不明确，因此上述三行输出有可能以任何次序出现。
+
+
+
+// !! 递归的（Recursive） Lock
+
+有时候, 递归锁定(to lock recursively)是必要的, 典型例子是 active object 或 monitor, 它们在每个 public 函数内放一个 mutex 并取得其 lock, 用以防止
+data race 腐蚀对象的内部状态。例如一个数据库接口可能像这样:
+
+
+class DatabaseAccess{
+private:
+    std::mutex db_mutex;
+    ...
+public:
+    void createTable(...){
+        std::lock_guard<std::mutex> lg(db_mutex);
+        ...
+    }
+
+    void insertTable(...){
+        std::lock_guard<std::mutex> lg(db_mutex);
+        ...
+    }
+
+
+};
+
+当我们引入一个  public 成员函数而它可能调用其他 public 成员函数, 情况变得复杂:
+
+
+void createTableAndInsert(...){
+    std::lock_guard<std::mutex> lg(db_mutex);
+    ...
+    createTable();//Error deadlock because db_mutex is lock again
+}
+
+调用 createTableAndInsertData() 会造成 deadlock, 因为它锁住 dbMutex 之后调用 createTable(), 造成后者尝试再次 lock dbMutex, 那将会
+block 直到 dbMutex 变为可用, 而这绝不会发生, 因为 createTableAndInsertData() 会 block 直到 createTable() 完成。
+
+如果平台侦测到类似上述的 deadlock, C++  标准库允许第二次 lock 抛出异常 std::system_error 并带差错码  resource_deadlock_would_occur。但这并非必然
+而且情况往往不是如此。
+
+借着使用 recursive_mutex, 上述行为不再有问题。这个 mutex 允许同一线程多次锁定, 并在最近一次(last)相应的 unlock() 时释放 lock:
+
+
+class DatabaseAccess{
+private:
+    std::recursive_mutex db_mutex;
+    ...
+public:
+    void insertData(...){
+        std::lock_guard<std::recursive_mutex> lg(db_mutex);
+        ...
+    }
+
+    void createTable(...){
+        std::lock_guard<std::recursive_mutex> lg(db_mutex);
+        ...
+    }
+
+    void createTableAndInsertData(...){
+        std::lock_guard<std::recursive_mutex> lg(db_mutex);
+        ...
+        createTable();
+    }
+
+    ...
+};
+
+
+// !! 尝试性的 Lock 以及带时间性的 Lock
+
+有时候程序想要获得一个 lock 但如果不可能成功的话它不想永远 block 。针对这种情况, mutex 提供成员函数 try_lock(), 它试图取得一个 lock, 成功就返回 true, 
+失败则返回 false。
+
+为了仍能够使用 lock_guard (使当下作用域的任何出口都会自动unlock mutex), 你可以传一个额外实参 adopt_lock 给其构造函数:
+
+std::mutex m;
+while(!m.try_lock()){
+    doSomethingOtherStuff();
+}
+
+std::lock_guard<std::mutex> lg(m, std::adopt_lock);
+...
+
+注意, try_lock() 有可能假性失败, 也就是说即使 lock 并未被他人拿走它也有可能失败(返回 false)。 
+
+为了等待特定长度的时间, 你可以选用(带时间性的)所谓 timed mutex。有两个特殊 mutex class std::timed_mutex 和 std::recursive_timed_mutex 额外允许你
+调用 try_lock_for() 或 try_lock_until(), 用以等待某个时间段或直至抵达某个时间点。这对于实时需求(real-time requirement)或避免可能的 deadlock 或许有
+帮助。
+
+
+std::timed_mutex m;
+
+if(m.try_lock_for(std::chrono::seconds(1)) == false){
+    std::lock_guard<std::mutex> lg(m, std::adopt_lock);
+    ...
+}else{
+    couldNotGetTheLock();
+}
+
+
+// !! 处理多个 Lock
+
+'通常一个线程一次只该锁定一个 mutex, 然而有时候必须锁定多个 mutex'(例如为了传送数据, 从一个受保护资源到另一个)。
+
+这种情况下若以目前介绍过的 lock 机制来应付, 可能变得复杂且具风险: 你或许取得第一个 lock 却拿不到第二个 lock, 或许发生 deadlock--如果以不同的次序去锁住
+相同的 lock。
+
+
+C++ 标准库为此提供了若干便捷函数, 让你锁定多个 mutex。例如:
+
+
+std::mutex m1;
+std::mutex m2;
+
+...
+{
+    std::lock(m1, m2);// lock both mutex
+    std::lock_guard<std::mutex> lockM1(m1, std::adopt_lock);
+    std::lock_guard<std::mutex> lockM2(m2, std::adopt_lock);
+    ...
+}
+
+
+全局函数 std::lock() 会锁住它收到的所有 mutex, 而且 blocking 直到所有 mutex 都被锁定或直到抛出异常。
+
+如果是后者, 已被成功锁定的 mutex 都会被解锁。一如以往, 成功锁定之后你可以并且应该使用 lock guard, 并以 adopt_lock 作为初始化的第二实参,确保任何情况下这
+些 mutex 在离开作用域时会被解锁。'注意这个 lock() 提供了一个 deadlock 回避机制, 但那也意味着多个 lock 的锁定次序并不明确'。
+
+
+以此相同方式你可以尝试"取得多个 lock"且"若并非所有 lock 都可用也不至于造成 blocking"。
+
+
+std::mutex m1;
+std::mutex m2;
+int idx = std::try_lock(m1, m2);
+if(idx < 0){// both lock success
+    std::lock_guard<std::mutex> lockM1(m1, std::adopt_lock);
+    std::lock_guard<std::mutex> lockM2(m2, std::adopt_lock);
+    ...
+}else{
+    std::cerr << "cannot lock mutex m" << std::endl;
+}
+
+
+注意, 这个 try_lock() 不提供 deadlock 回避机制, 但它保证以出现于实参列的次序来试着完成锁定。
+
+
+
+虽然代码看起来好像建立了"离开作用域时会自动解锁"的 lock, 其实并非如此, 那些 mutex 仍然保持锁定:
+
+
+std::mutex m1;
+std::mutex m2;
+...
+{
+    std::try_lock(m1, m2);
+    ...
+}
+
+// Oops, mutex are still lock
+
+
+// !! Class unique_lock
+
+
+'除了 class lock_guard<>, C++ 标准库还提供了 class unique_lock<>, 它对付 mutex 更有弹性'。Class unique_lock<> 提供的接口和 class 
+lock_guard<> 相同, 而又允许明确写出"何时"以及"如何"锁定或解锁其 mutex。
+
+与 class lock_guard 相较, class unique_lock 添加了以下三个构造函数:
+
+1. 你可以传递 try_to_lock 表示企图锁定 mutex 但不希望 blocking:
+
+std::unique_lock<std::mutex> lock(mutex, std::try_to_lock);
+...
+if(lock){// if lock was successfully
+    ...
+}
+
+
+2. 你可以传递一个时间段或时间点给构造函数, 表示尝试在一个明确的时间周期内锁定:
+
+std::unique_lock<std::mutex> lock(mutex, std::chrono::seconds(1));
+
+
+3. 你可以传递 defer_lock, 表示初始化这一 lock object 但尚未打算锁住 mutex:
+
+std::unique_lock<std::mutex> lock(mutex, std::defer_lock);
+...
+lock.lock();
+...
+
+上述的 defer_lock flag 可以用来建立一或多个 lock 并于稍后才锁住它们:
+
+
+std::mutex m1;
+std::mutex m2;
+
+std::unique_lock<std::mutex> lockM1(m1, std::defer_lock);
+std::unique_lock<std::mutex> lockM2(m2, std::defer_lock);
+
+...
+
+std::lock(m1, m2);// lock both mutex(or none if possible)
+
+
+此外, class unique_lock  提供  release() 用来释放 mutex, 或是将其 mutex 拥有权转移给另一个 lock。
+
+
+有了 lock_guard 和 unique_lock  作为工具, 现在我们可以实现一个粗浅例子, 以轮询(polling) 某个 ready flag 的方式,令一个线程等待另一个线程:
+
+
+#include <mutex>
+
+bool readyFlag;
+std::mutex readyFlagMutex;
+
+void thread1(){
+    ...
+    std::lock_guard<std::mutex> lock(readyFlagMutex);
+    readyFlag = true;
+}
+
+void thread2(){
+    std::unique_lock<std::mutex> ul(readyFlagMutex);
+    while(!readyFlag){
+        ul.unlock();
+        std::this_thread::yield();
+        std::this_thread::sleep_for(std::chrono::seconds(1));
+        ul.lock();
+    }
+}// release lock
+
+
+面对这段代码可能会有的典型疑虑, 我有以下两点解释:
+
+1.  如果你惊讶为什么我使用 mutex 来控制 readyFlag 的读和写, 请回忆本章一开始介绍的准则:任何"带有至少一个 write"的并发处理(concurrent access)都应
+该被同步化。
+
+
+2. 如果你惊讶为什么声明 readyFlag 时竟不需要 volatile (如此便是允许 thread2() 中对其多次读取可被优化掉), 那么请注意:这些"对 readyFlag 的读取"发生在
+critical section 内(也就是在某个 lock  的设立和解除之间)。这样的代码不得以"读/写动作被移出 critical section 之外"的形式被优化。
+
+
+尽管如此, 这样对于"某一满足条件"的轮询(polling)通常不是好办法。更好的做法是使用 condition variable (条件变量)。
+
+
+// !! 细说 Mutex 和 Lock
+
+// !! 细说 Mutex
+
+C++ 标准库提供了以下 mutex class
+
+1. Class std::mutex, 同一时间只可被一个线程锁定。如果它被锁住, 任何其他 lock() 都会阻塞(block), 直到这个 mutex 再次可用, 且 try_lock() 会失败。
+
+2. Class std::recursive_mutex, 允许在同一时间多次被同一线程获得其 lock。其典型应用是: 函数捕获一个 lock 并调用另一函数而后者再次捕获相同的 lock。
+
+3. Class std::timed_mutex 额外允许你传递一个时间段或时间点, 用来定义多长时间内它可以尝试捕捉一个 lock。为此它提供了  try_lock_for() 和
+   try_lock_until()。
+
+4. Class std::recursive_timed_mutex 允许同一线程多次取得其 lock,可指定期限。
+
+
+mutex  的操作函数:
+
+mutex m;// Default 构造函数, 建立一个未锁定的 mutex
+m.~mutex();
+m.lock();// 尝试锁住 mutex(可能会造成阻塞)
+m.try_lock();// 尝试锁住 mutex,如果锁定成功返回 true
+m.try_lock_for(dur);//尝试在时间段 dur  内锁住,如果锁定成功返回 true
+m.try_lock_until(tp);// 尝试在时间点 tp 之前锁住.如果锁定成功返回 true
+m.unlock();//解除 mutex。如果它未曾被锁住, 行为不明确
+m.native_handle();//
+
+
+lock() 有可能抛出 std::system_error 并夹带以下差错码:
+
+1. operation_not_permitted--如果线程的特权级(privilege)不足以执行此操作
+
+2. resource_deadlock_would_occur -- 如果平台侦测到有个 deadlock 即将发生
+
+3. device_or_resource_busy--如果 mutex 已被锁定而又无法形成阻塞(blocking)
+
+
+如果程序解除 unlock 一个并非它所拥有的 mutex object, 或是销毁一个被任何线程拥有的 mutex object, 或是线程拥有 mutex object 但却结束了生命,将导致不明
+确的行为。
+
+
+// !! 细说 Class lock_guard
+
+
+class std::lock_guard 提供了一个很小的接口, 用以确保一个 locked mutex 在离开作用域时总是会被释放。它的整个生命期间总是与一个  lock 相关联 associated
+--也许是被明白申请, 也许是在构造期间接受(adopted)。
+
+Class lock_guard 的操作函数:
+
+
+lock_guard lg(m);// 为 mutex 建立一个 lock_guard 并锁定之
+lock_guard lg(m, std::adopt_lock);// 为已经锁定的 mutex 建立一个 lock_guard
+lg.~lock_guard();
+
+
+// !! 细说 Class unique_lock
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
