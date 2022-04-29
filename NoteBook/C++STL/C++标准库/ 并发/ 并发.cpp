@@ -1905,6 +1905,277 @@ lg.~lock_guard();
 
 // !! 细说 Class unique_lock
 
+class std::unique_lock, 为一个不一定得锁定(或拥有)的 mutex 提供一个 lock guard。如果它在析构期间仍旧锁定(或拥有)mutex, 它会调用 unlock()。但你可以
+明确控制是否它有一个关联的 mutex 以及是否这个 mutex 被锁住。你也可以限期或无限期地尝试锁定 mutex。
+
+
+unique_lock l;// Default 构造函数, 建立一个 lock 但不关联任何 mutex
+
+unique_lock l(m);// 为 mutex m 建立一个 lock_guard,并锁定它
+unique_lock l(m, std::adopt_lock);// 为已锁定的 mutex 建立一个 lock_guard
+unique_lock l(m, std::defer_lock);// 为 mutex 建立一个 lock_guard,但不锁定它
+unique_lock l(m, std::try_lock;// 为 mutex 建立一个 lock_guard,并尝试锁定它
+
+unique_lock l(m,dur);// 为 mutex 建立一个 lock_guard 并试图在时间段 dur 内尝试锁住它
+unique_lock l(m,tp);
+
+l.~unique_lock();// 解锁 mutex(如果它被锁定的话),并销毁 lock_guard
+unique_lock l = rv;
+
+
+
+
+// !! 只调用一次
+
+有时候某些机能初次被某个线程使用过后, 其他线程再也不需要它。典型例子是 lazy initialization  : 第一次某个线程需要某数据而该数据必须备妥, 于是此时处理它
+(但不在先前处理, 因为你想节省时间;如果非必要的话就不处理它)。
+
+
+单线程环境中的习惯做法很简单: 以一个 bool flag 表示此机能是否已被调用。
+
+bool initialized = false;// global flag
+...
+if(!initialized){
+    initialize();
+    initialized = true;
+}
+
+或者
+
+static std::vector<std::string> staticData;
+void foo() {
+    if(staticData.empty()){
+        staticData = initializeStaticData();
+    }
+}
+
+
+但是这样的代码在多线程环境下行不通, 因为如果两个或多个线程检查初始化是否尚未发生然后启动初始化, 就可能发生 data race。你必须针对 concurrent access
+保护"检查及初始化"程序区。
+
+
+一如既往,你可以使用 mutex, 但 C++ 标准库为此提供了一个特殊解法。只需使用一个 std::once_flag 以及调用 std::call_once(它也由<mutex>提供):
+
+std::once_flag oc;
+...
+
+std::call_once(oc, initialize);
+
+
+或者
+
+static std::vector<std::string> staticData;
+void foo() {
+    std::once_flag oc;
+    std::call_once(oc, [](){
+        staticData = initializeStaticData();
+    });
+}
+
+
+
+如你所见, 传给 call_once() 的第一实参必须是相应的 once_flag。下一个实参代表可调用对象 callable object, 如 function、member function、
+function object 或 lambda, 还可再加上其他实参给被调用的函数使用。
+
+
+因此, 多线程环境中的缓式初始化 lazy initialization 应该像这样:
+
+
+class X{
+private:
+    mutable std::once_flag initDataFlag;
+    void initData() const;
+public:
+    data  getData() const{
+        std::call_once(oc,&X::initData,this);
+        ...
+    }
+};
+
+原则上你可以使用同一个 once flag  调用不同的函数。之所以把 once flag 当作第一实参传给 call_once() 就是为了确保传入的机能只被执行一次。因此,如果第
+一次调用成功, 下一次调用又带着相同的 once flag, 传入的机能就不会被调用---即使该机能与第一次有异。
+
+被调用函数所造成的任何异常会被 call_once() 抛出。此情况下第一次调用被视为不成功, 因此下一次 call_once() 还可以再调用它所接受的机能。
+
+
+// !!  Condition Variable 条件变量
+
+有时候, 被不同线程执行的 task 必须彼此等待。所以对"并发操作"实现同步化除了 data race 之外还有其他原因。
+
+
+你可能会争辩说我们已经引入这样一个机制:Future 允许你停下来(to block)直到另一线程提供某笔数据或直到另一线程结束。然而 future 从某线程传递数据到另一线程只能
+一次。事实上 future 的主要目的是处理线程的返回值或异常。
+
+
+// !! Condition Variable (条件变量)的意图
+
+
+"让某线程等待另一线程"的一个粗浅办法,就是使用 ready flag 之类的东西。当某线程已有准备, 或它已经为另一线程提供了某个东西, 上述 flag 就发出信号。这通常意味
+着等待中的线程(waiting thread)需要轮询(poll)其所需要的数据或条件是否已达到:
+
+
+bool readyFlag = false;
+std::mutex readyFlagMutex;
+{
+    std::unique_lock<std::mutex> ul(readyFlagMutex);
+    while (!readyFlag){
+        ul.unlock();
+        std::this_thread::yield();
+        std::this_thread::sleep_for(std::chrono::milliseconds(100));
+        ul.lock();
+    }
+}
+
+
+然而这样"针对目标条件而轮询"的动作通常不是好的解决办法。
+
+等待中的线程(waiting thread)消耗宝贵的 CPU 时间重复检验 flag, 且当它锁住  mutex 时"负责设置 ready flag"的那个线程会被阻塞 blocked。此外我们也很难
+找出适当的 sleep 周期: 两次检查若间隔太短则线程仍旧太浪费 CPU 时间于检查动作上, 若太长则也许等待的 task 已完成而线程却还继续 sleeping,导致发生延误。
+
+一个较好的做法是使用 condition variable (条件变量), C++  标准库在 <condition_variable> 中提供了它。它是个变量, 借由它, 一个线程可以唤醒 wake up一
+或多个其他等待中的线程 waiting thread。
+
+
+原则上, condition variable 运作如下:
+
+1.  你必须同时包含 <mutex> 和 <condition_variable>, 并声明一个 mutex 和一个 condition variable:
+
+#include <mutex>
+#include <condition_variable>
+
+std::mutex readyMutex;
+std::condition_variable readyConVar;
+
+2. 那个激发"条件终于满足"的线程 (或多线程之一) 必须调用
+
+readyConVar.notify_one();
+
+或者
+
+readyConVar.notify_all();
+
+
+3. 那个"等待条件被满足"的线程必须调用
+
+std::unique_lock<std::mutex> l(readyMutex);
+readyConVar.wait(l);
+
+
+因此,"提供或准备某东西"的那个线程只需对 condition variable 调用 notify_one() 或 notify_all(), 便会唤醒一个或所有等待中的线程 waiting thread。
+
+目前为止一切都好, 听起来很简单。但是还有更多需要注意。首先, 为了等待这个 condition variable, 你需要一个 mutex 和一个 unique_lock 。lock_guard
+是不够的, 因为等待中的函数(waiting function) 有可能锁定或解除 mutex。
+
+
+此外, condition variable  也许有所谓假醒(spurious wakeup)。也就是某个 condition variable 的 wait 动作有可能在该 condition variable 尚未
+被 notified 时便返回。
+
+
+因此, 发生 wakeup 不一定意味着线程所需要的条件已经掌握了。更确切地说, 在 wakeup 之后你仍然需要代码去验证"条件实际已达成"。因此我们必须检查数据是否真正备妥,
+或是我们仍需要诸如 ready flag 之类的东西。为了设立和查询他端供应的数据或 ready flag, 可使用同一个 mutex。
+
+
+
+// !! Condition Variable（条件变量）的第一个完整例子
+
+
+#include <condition_variable>
+#include <mutex>
+#include <future>
+#include <iostream>
+
+bool readyFlag = false;
+std::mutex readyMutex;
+std::condition_variable readyConVar;
+
+void thread1(){
+    std::cout << "<return>" << std::endl;
+    std::cin.get();
+    {
+        std::lock_guard<std::mutex> lg(readyMutex);
+        readyFlag = true;
+    }
+    readyConVar.notify_one();
+}
+
+void thread2(){
+    {
+        std::unique_lock<std::mutex> ul(readyMutex);
+        readyConVar.wait(ul,[](){return readyFlag;});
+    }
+    std::cout << "done" << std::endl;
+}
+
+int  main(int argc, char** argv){
+    auto f1 = std::async(std::launch::async, thread1);
+    auto f2 = std::async(std::launch::async, thread2);
+
+    return 0;
+}
+
+
+在包含必要的头文件之后, 我们需要三个东西以便在线程之间通信:
+
+1. 一个"用以存放待处理数据"的对象, 或一个"用以表示条件真的满足了"的 flag(也就是此处的 readyFlag)
+
+2. 一个 mutex (这里是 readyMutex)
+
+3. 一个 condition variable (这里是 readyCondVar)
+
+
+数据供应者(线程) thread1() 锁住 mutex readyMutex, 更新条件(也就是更新数据或更新 ready flag), 解锁 mutex, 然后通知 condition variable:
+
+{
+    std::lock_guard<std::mutex> lg(readyMutex);
+    readyFlag = true;
+}//  release lock
+
+readyConVar.notify_one();
+
+注意, 通知动作不需要被安排在 lock 保护区内。
+
+
+等待者 (线程)则是以一个 unique_lock 锁住 mutex,一面检查条件一面等待被通知, 然后释放锁:
+
+{
+    std::unique_lock<std::mutex> ul(readyMutex);
+    readyConVar.wait(ul, []() { return readyFlag;});
+}// release lock
+
+
+在这里, condition variable 的 wait() 成员函数是这么被使用的: 你把 mutex readyMutex 的 lock ul 当作第一实参, 把一个 lambda 当作第二实参,用来二次
+检测条件是否真的满足。其效果是 wait() 内部会不断调用该第二实参, 直到它返回 true。因此这段代码的效果相当于以下代码, 其中的循环很明显是用来处理假醒
+(spurious wakeups)的:
+
+{
+    std::unique_lock<std::mutex> ul(readyMutex);
+    while(!readyFlag){
+        readyConVar.wait(ul);
+    }
+}//release lock
+
+'再次提醒, 这里必须使用 unique_lock, 不可使用 lock_guard, 因为 wait() 的内部会明确地对 mutex 进行解锁和锁定'。
+
+
+// !!  使用 Condition Variable（条件变量）实现多线程 Queue
+
+本例中, 三个线程都把数值推入 (push) 某个 queue, 另两个线程则是从中读取数据:
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
