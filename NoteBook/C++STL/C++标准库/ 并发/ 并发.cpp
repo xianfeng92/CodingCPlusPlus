@@ -2161,6 +2161,345 @@ readyConVar.notify_one();
 
 本例中, 三个线程都把数值推入 (push) 某个 queue, 另两个线程则是从中读取数据:
 
+#include <condition_variable>
+#include <mutex>
+#include <future>
+#include <thread>
+#include <iostream>
+#include <queue>
+
+std::queue<int> queue;
+std::mutex queue_mutex;
+std::condition_variable queue_condition_variable;
+
+void provider(int val) {
+  for (int i = 0; i < 6; i++) {
+    {
+      std::lock_guard<std::mutex> lock(queue_mutex);
+      queue.push_back(i + val);
+    } // release lock
+    queue_condition_variable.notify_one();
+    std::this_thread::sleep_for(std::chrono::milliseconds(val));
+  }
+}
+
+
+void consumer(int num){
+    while(true){
+        int val;
+        {
+            std::unique_lock<std::mutex> ul(queue_mutex);
+            queue_condition_variable.wait(ul, [](){return !queue.isEmpty();})
+            val = queue.front();
+            queue.pop();
+        }// release lock
+        std::cout << "consumer " <<  num << val << std::endl;
+    }
+}
+
+
+int main(int argc, char** argv){
+
+    auto p1 = std::async(std::launch::async, provider, 100);
+    auto p2 = std::async(std::launch::async, provider, 300);
+    auto p3 = std::async(std::launch::async, provider, 400);
+
+    auto c1 = std::async(std::launch::async, consumer, 1);
+    auto c2 = std::async(std::launch::async, consumer, 2);
+}
+
+
+这里我们有一个 global queue 被并发使用, 它被一个 mutex 和一个 condition variable 保护着:
+
+std::queue<int> queue;
+std::mutex queue_mutex;
+std::condition_variable queue_condition_variable;
+
+
+其中 mutex 确保读和写是 atomic, 而 condition variable 用来在"有新元素可用"时激发和唤醒另一个线程:
+
+
+现在, 三个线程各自提供数值推入 queue 之中:
+
+{
+    std::lock_guard<std::mutex> lock(queue_mutex);
+    queue.push_back(i + val);
+}//   release lock
+
+queue_condition_variable.notify_one();
+
+借由 notify_one(), 它们唤醒了某一个等待者(线程), 让对方处理。再请注意这个调用不需要位于保护区内,所以我们先封闭了先前"声明 lock guard"的那个区域。
+
+下面这个线程等待新值然后处理:
+
+int val;
+{
+    std::unique_lock<std::mutex> ul(queue_mutex);
+    queue_condition_variable.wait(ul, [](){return !queue.isEmpty();});
+    val = queue.front();
+    queue.pop();
+}// release lock
+
+根据 queue 的接口, 我们需要三个调用才能从 queue 手中取得下一个值: empty() 负责检查是否还有可用数值。调用 empty() 是个两次检查的动作，用以对付 wait() 
+可能出现的假醒。front() 询问下一个值, pop()移除该值。这三个函数都在 unique lock ul 所形成的保护区内，而对 front() 返回值的处理则放在更后面, 为的是将
+lock 的持续时段最小化。
+
+如果有多个 consumer 必须处理相同数据,你也可以调用 notify_all()。
+
+典型的例子是事件驱动系统(event-driven system), 其事件  (event) 必须被发布给所有曾经登录的 consumer。
+
+
+也请注意, condition variable 也提供给你一个接口允许你等待某个最大时间量: wait_for() 用来等待一个时间段, wait_until() 用来等待直到某个时间点。
+
+
+
+// !! 细说 Condition Variable（条件变量）
+
+头文件 <condition_variable> 针对 condition variable 提供了两个对应的 class, 分别是 class condition_variable 和 class condition_variable_any。
+
+
+
+// !! Class condition_variable
+
+'class std::condition_variable 由 C++ 标准库提供, 用来唤醒一或多个等待某特定条件获得满足的线程'。多个线程可等待同一条件发生。一旦条件满足,线程就可以通
+知 (notify) 所有(或某个)等待者(线程)。
+
+'由于可能发生假醒, 当条件满足, 仅仅通知是不够的, 等待者(线程)还必须在苏醒(wakeup)之后两次检查该条件'。
+
+
+C++ 标准库为 class condition_variable 提供的接口细节。另一个 class condition_variable_any 提供相同的接口但不含  native_handle()和
+notify_all_at_thread_exit()。
+
+
+condvar cv;// Default 构造函数, 建立一个 condition variable
+cv.~condvar();// 销毁 condition variable
+
+cv.notify_one();// 唤醒一个等待者线程--如果有的话
+cv.notify_all(); // 唤醒所有的等待者线程
+
+cv.wait(ul);// 使用 unique_lock ul 来等待通知
+cv.wait(ul, pred);// 使用 unique_lock ul 来等待通知, 并且直到 pred 在一次唤醒之后结果为 true
+
+cv.wait_for(ul, duration);
+cv.wait_for(ul, duration, pred);// 使用 unique_lock ul 来等待通知, 等待期限是 duration 或 直到 pred 在一次唤醒之后结果为 true
+
+cv.wait_until(ul, timepoint);
+cv.wait_until(ul, timepoint, pred);
+
+cv.native_handle(); // 返回一个因平台而异的类型
+
+
+所有通知 (notification) 都会被自动同步化, 所以并发调用 notify_one() 和 notify_all() 不会带来麻烦。
+
+
+所有等待某个 condition variable 的线程都必须使用相同的 mutex; 当 wait() 家族的某个成员被调用时该 mutex 必须被 unique_lock 锁定,否则会发生不明确的行为。
+
+
+注意, condition variable 的消费者总是在"被锁住的 mutex"基础上操作。只有等待函数(waiting function)会执行以下三个  atomic 步骤暂时解除 mutex:
+
+
+1. 解除 (unlocking) mutex然后进入等待状态 waiting state
+
+
+2. 解除因等待而造成的阻塞(Unblocking the wait)
+
+3. 再次锁住 mutex
+
+
+这意味着传给 wait 函数的那个判断式(predicate)总是在 lock 情况下被调用, 所以它们可以安全地处理受 mutex 保护的对象。用来将 mutex 锁定和解锁(lock and u
+nlock) 的动作有可能抛出对应的异常
+
+// !!  Atomic
+
+
+在 condition variable 的第一个例子中我们使用  bool readyFlag 让任意线程激发, 表示某件事情已为另一线程备妥或提供。你也许会惊讶为什么仍然需要 mutex。如
+果我们有个 bool 值, 为什么不能并发地让某线程改变它而让另一线程检验它? 在供应端(线程)将 bool 设为 true 的那个时刻, 观测端(线程)应能够看到它并执行随之发生的
+处理才是。
+
+这里我们需要面对两个问题:
+
+1. 一般而言, 即使面对基本数据类型, 读和写也不是 atomic(不可切割的)。因此本例你可能读到一个被写一半的 bool 值, C++standard 说这会带来不明确的行为。
+
+
+2. 编译器生成的代码有可能改变操作次序, 所以供应端(线程)有可能在供应数据之前就先设置 ready flag, 而消费端(线程)亦有可能在侦测 ready flag 之前就处理该数据。
+
+
+借由 mutex, 两个问题迎刃而解, 但是从必要的资源和潜藏的独占访问来看, mutex也许是个相对昂贵的操作, 所以也许值得以 atomic 取代 mutex 和 lock。
+
+
+
+本节中首先介绍 atomic 的高层接口, 它所提供的操作将使用默认保证, 不论内存访问次序如何。这个默认保证提供了顺序一致性(sequential consistency),意思是在线程
+之中 atomic 操作保证一定"像代码出现的次序"那样地发生。
+
+
+// !!Atomic 用例
+
+#include <atomic>// for atomic types
+
+std::atomic<bool> readyFlag(false);
+
+void thread1(){
+    // do something thread2 need as preperation
+    ...
+    readyFlag.store(true);
+}
+
+void thread2(){
+    while(!readyFlag.load()){
+        std::this_thread::sleep_for(std::chrono::milliseconds(100));
+    }
+
+    ...
+}
+
+
+首先必须包含头文件 <atomic>, 其内声明了 atomic
+
+#include <atomic>
+
+
+然后使用 std::atomic<> class template 声明一个 atomic object:
+
+std::atomic<bool> readyFlag;
+
+
+原则上你可以使用任何一般类型、整数类型 或 pointer 类型作为 template 参数。
+
+
+注意你总是应该将 atomic object 初始化,因为其 default 构造函数并不完全初始化它(倒不是其初值不明确,而是其 lock 未被初始化)。面对一个 static-duration 
+atomic 对象, 你应该使用一个常量作为初值。如果只使用 default 构造函数, 接下来唯一允许的操作是如
+
+std::atomic<bool> readFlag;
+...
+
+std::atomic_init(&readFlag,false);
+
+这种初始化方式之所以出现, 是为了让你写出 C 编译器可接受的代码。
+
+
+
+处理 atomic 的两个最重要语句是 store() 和 load():
+
+1. store() 赋予一个新值
+
+2. load() 取当前值
+
+
+重点是, 这些操作都保证是 atomic, 所以我们不需要像以前那样"需要 mutex 的保护才能设置 ready flag"。
+
+
+于是, 第一线程中不再这么写
+
+
+{
+    std::lock_guard<std::mutex> lg(m_mutex);
+    readFlag = true;
+}
+
+而是简单写成这样:
+
+readFlag.store(true);
+
+
+第二线程中不再这么写:
+
+{
+    std::unique_lock<std::mutex> ul(m_mutex);
+    while(!readyFlag){
+        ul.unlock();
+        std::this_thread::sleep_for(std::chrono::milliseconds(100));
+        ul.lock();
+    }
+}// release lock
+
+
+而是简单写成这样:
+
+while(!readyFlag.load()){
+    std::this_thread::sleep_for(std::chrono::milliseconds(100);
+}
+
+
+然而, 使用 condition variable 时我们仍然需要 mutex 才能保护对 condition variable 的消费(即使它现在是个 atomic object)
+
+{
+    std::unique_lock<std::mutex> ul(m_mutex);
+    readyCondVar.wait(ul,[](){
+        return readyFlag.load();
+    });
+}//release lock
+
+
+对于 atomic 类型, 你可以继续使用有用而寻常的操作,像是赋值、自动转换为整型、递增、递减等
+
+
+std::atomic<bool> ab(false);
+ab = true;
+if(ab){
+    ...
+}
+
+std::atomic<int> ai(0);
+int x = ai;
+ai = 10;
+ai ++;
+ai -= 17;
+
+
+
+让我们看一个使用 atomic 的完整例子
+
+#include <atomic>
+#include <future>
+#include <thread>
+#include <chrono>
+#include <iostream>
+
+long data;
+std::atomic<bool> readyFlag(false);
+
+void provider(){
+    std::cout << "[return]" << std::endl;
+    std::cin.get();
+
+    data = 42;
+
+    readyFlag.store(true);
+}
+
+void consumer(){
+    while(!readyFlag.load()){
+        std::cout.put('.').flush();
+        std::this_thread::sleep_for(std::chrono::milliseconds(100));
+
+    }
+    std::cout << "data value: " << data << std::endl;
+}
+
+int main(){
+    auto p = std::async(std::launch::async, provider);
+    auto c = std::async(std::launch::async, consumer);
+
+    return 0;
+}
+
+这里, 线程 provider() 首先提供若干数据, 然后使用 store() 表示数据已提供:
+
+data = 42;
+readyFlag.store(true);
+
+store() 会对影响所及的内存区执行一个所谓 release 操作, 确保此前所有内存操作(all prior memory operations)不论是否为 atomic, 在 store 发挥效用之前
+都变成"可被其他线程看见"。
+
+
+
+
+
+
+
+
+
+
 
 
 
