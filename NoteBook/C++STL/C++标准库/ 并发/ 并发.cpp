@@ -2491,9 +2491,23 @@ readyFlag.store(true);
 store() 会对影响所及的内存区执行一个所谓 release 操作, 确保此前所有内存操作(all prior memory operations)不论是否为 atomic, 在 store 发挥效用之前
 都变成"可被其他线程看见"。
 
+与此相关, 线程 consumer() 不断执行 load() 然后处理 data:
+
+while (!readyFlag.load()){
+    std::this_thread::sleep_for(std::chrono::milliseconds(100));
+}
+
+
+load() 会对影响所及的内存区执行一个所谓 acquire 操作, 确保随后所有内存操作(all following memory operations) 不论是否为 atomic, 在 load 之后都变
+成"可被其他线程看见"。
+
+
+于是, 由于 data 的设值发生在 provider() 将 readyFlag 存储(store)为 true 之前, 而对 data 的处理发生在 consumer() 将 true 载入(loaded)放进
+readyFlag 之后, 因此对 data 的处理保证发生在 data 已提供之后。
 
 
 
+// !! 细说 Atomic 及其高级接口
 
 
 
