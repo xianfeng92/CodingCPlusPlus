@@ -87,6 +87,7 @@
         "custmap",
         "custset",
         "fopow",
+        "iofile",
         "myfunc",
         "mylib",
         "nocase",
