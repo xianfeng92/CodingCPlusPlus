@@ -93,6 +93,8 @@
         "nocase",
         "pfct",
         "rpos",
+        "sval",
+        "svec",
         "Unord",
         "unsynchronized",
         "xforg"
