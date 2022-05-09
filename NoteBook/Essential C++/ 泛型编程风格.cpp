@@ -503,8 +503,471 @@ binary_search() 要求, 其作用对象必须经过排序 sorted, 这一责任�
 
 // !! 如何设计一个泛型算法
 
-
 How to Design a Generic Algorithm
+
+下面是我们的新任务。用户给予一个整数 vector, 我们必须返回一个新的  vector, 其中内含原  vector 之中小于 10 的所有数值。
+
+一个快速但缺乏弹性的解法是:
+
+vector<int> less_than_10(vector<int> &vec){
+    vector<int> nvec;
+    for(int i = 0; i < vec.size(); i++){
+        if(vec[i] < 10){
+            nvec.push_back(ival[i]);
+        }
+    }
+    return nvec;
+}
+
+如果用户想找到所有小于 11 的元素, 我们要么得建立一个新函数, 要么就得将此函数通用化, 让用户得以指定某个上限值,像下面这样:
+
+vector<int> less_than(const vector<int> &vec, int less_than_value){
+    //...
+}
+
+下一个任务难度颇高。我们必须允许用户指定不同的比较操作, 像是大于、小于，等等。
+
+如何才能将"比较操作"参数化呢?
+
+有一个解法: 以函数调用来取代 less-than 运算符。
+
+加入第三个参数 pred, 用它来指定一个函数指针, 其参数列表有两个整数, 返回值为 bool。至此, less_than() 的名称已不再适当,让我们称它为 filter() 吧:
+
+vector<int> filter(vector<int> &vec, int filter_value, bool(*pred)(int,int));
+
+站在用户的角度来考虑,为方便起见, 我们同时定义了许多可传给 filter() 的关系(relational)比较函数:
+
+bool less_than(int v1,  int v2) {
+    return v1 < v2 ? true : false;
+}
+
+bool greater_than(int v1,  int v2){
+    return v1 > v2 ? true : false;
+}
+
+调用 filter() 时, 用户亦可传入上述函数,或其他自定义的关系比较函数。'唯一一个限制就是, 这些函数必须返回 bool, 而且参数列表中只接受两个整数'。
+
+
+以下是 filter() 的使用方式:
+
+vector<int> big_vec;
+int value;
+vector<int> lt_10 = filter(big_vec, value, less_than);
+
+
+vector<int> filter(vector<int> &vec, int filter_value, bool(*pred)(int, int)){
+    vector<int> nvec;
+    for(int i = 0; i < vec.size(); i++){
+        if(vec[i] < filter_value){
+            nvec.push_back(vec[i]);
+        }
+    }
+    return nvec;
+}
+
+这个 filter() 使用 for 循环遍历每个元素。
+
+现在让我们以泛型算法 find_if() 来取代 for 循环的使用。我将 find_if() 反复作用于数列身上, 找出符合条件的每一个元素——所谓"条件"则由用户指定的函数指针定义。
+这要怎么做到呢?
+
+以下程序代码中, count_occurs() 说明如何在"不对任一元素进行两次以上的查看"前提下, 反复地在容器身上进行 find():
+
+int count_occurs(const vector<int> &vec, int val){
+    vector<int>::const_iterator iter = vec.begin();
+    int occurs_count = 0;
+    while((iter = find(iter, vec.end(), val)) != vec.end()) {
+        ++occurs_count;
+        ++iter;
+    }
+}
+
+我们在 while 循环之内将 find() 的返回值设给 iter。find() 返回一个 iterator, 指向元素值为 val 的元素。如果没有找到任何符合条件的元素, 就返回一个等同于
+vec.end() 的 iterator。一旦  iter 等同于 vec.end(), 循环即终止。
+
+
+// !! Function Object
+
+重新实现 filter() 以便支持 find_if() 之前,让我们先看看标准库预先定义好的许多 function object。'所谓 function object 是某种 class 的实例对象,这类
+class 对 function call 运算符做了重载操作, 如此一来可使 function object 被当成一般函数来使用'。
+
+function object 实现了我们原本可能以独立函数加以定义的事物。但又何必如此呢? 
+
+主要是为了效率。我们可以令 call 运算符成为 inline, 从而消除"通过函数指针来调用函数"时需付出的额外代价。
+
+
+标准库事先定义了一组 function object, 分为算术运算(arithmetic)、关系运算(relational) 和逻辑运算(logical)三大类。
+
+1. 六个算术运算: plus<type>, minus<type>, negate<type>, multiplies<type>, divides<type>, modules<type>
+
+2. 六个关系运算: less<type>, less_equal<type>, greater<type>, greater_equal<type>, equal_to<type>, not_equal_to<type>
+
+3. 三个逻辑运算，分别对应于 &&、||、!运算符: logical_and<type>, logical_or<type>, logical_not<type>
+
+
+欲使用事先定义的function object,首先得包含相关头文件:
+
+#include <functional>
+
+举个例子, 默认情形下, sort() 会使用底部元素的类型所提供的 less_than 运算符, 将元素升序排序。如果我们传入 greater_than function object, 元素就会以降序
+排序:
+
+std::vector<int> svec;
+// fill the vector with elements
+std::sort(svec.begin(), svec.end(), std::greater<int>());
+
+其中的:
+
+greater<int>
+
+会产生一个未命名的 class template object, 传给 sort()。
+
+
+binary_search() 期望其搜索对象先经过 less_than 运算符排序。为了正确搜索 vector, 我们现在必须传给它某个 function object object, 供 vector 排序使用:
+
+
+std::binary_search(vec.begin(), vec.end(),value, std::less<int>());
+
+
+
+
+// !! Function Object Adapter
+
+上述的 function object 并不那么恰好符合 find_if() 的需求。举个例子, function object less<type> 期望外界传入两个值, 如果第一个值小于第二个值就返回
+true。本例中, 每个元素都必须和用户所指定的数值进行比较。理想情形下, 我们需要做的就是将 less<type> 转化为一个一元运算符。这可通过"将其第二个参数绑定 bind 至
+用户指定的数值"完成。
+
+这么一来 less<type> 便会将每个元素拿出来一一与用户指定的数值比较。真的可以做到这样吗? 是的, 标准库提供的所谓 adapter 便应此而生。
+
+function object adapter 会对 function object 进行修改操作。
+
+所谓 binder adapter 会将 function object 的参数绑定至某特定值, 使 binary  function object 转化为 unary function object。
+
+标准库提供了两个 binder adapter: bind1st 会将指定值绑定至第一操作数, bind2nd 则将指定值绑定至第二操作数。以下是修改后的  filter(), 使用了
+bind2nd adapter:
+
+vector<int> filter(const vector<int> &vec, int value, std::less<int> &le){
+    vector<int> nvec;
+    vector<int>::const_iterator iter = vec.begin();
+    std::bind2nd(less<int>, value);
+    while((iter = std::find(vec.begin(), vec.end(), value)) != vec.end()){
+        nvec.push_back(*iter);
+        ++iter;
+    }
+    return nvec;
+}
+
+接下来如何消除 filter() 与 vector 元素类型, 以及 filter() 与 vector 容器类型的依赖关系, 以使 filter() 更加泛型化呢? 为了消除它和元素类型间的依赖性,
+我们将 filter() 改为 function template, 并将元素类型加入 template 的声明中。为了消除它和容器类型间的依赖性, 我们传入一对 iterator [first,last),
+并在参数列表中增加另一个 iterator, 用以指定从何处开始复制元素。
+
+
+template<typename InputIterator, typename OutputIterator, typename elemType, typename comp>
+OutputIterator filter(InputIterator first, InputIterator last, OutputIterator output, const elemType &value, const comp &pred) {
+    while((first = find_if(first, last,bind2nd(pred, value))) != last) {
+        cout << "find value " << *first << " ";
+        *output = *first;
+    }
+    return output;
+}
+
+
+
+一开始我写了一个函数, 它可以找出 vector 内小于 10 的所有元素。然而函数过于死板, 没有弹性。
+
+接下来, 我为函数加上了一个数值参数, 让用户得以指定某个数值, 以此和 vector 中的元素做比较。
+
+接着, 我又加上了一个新参数: 一个函数指针, 让用户得以指定比较方式。
+
+然后, 我引入 function object 的概念, 使我们得以将某组行为传给函数, 此法比函数指针的做法效率更高。
+
+最后, 我将函数以 function template 的方式重新实现。
+
+为了支持多种容器, 我传入了一对 iterator, 标示出一组元素范围; 为了支持多种元素类型, 我将元素类型参数化, 也将应用于元素上的"比较操作"参数化, 以便得以同时支持
+函数指针和 function object 两种方式。
+
+现在, 我们的函数和元素类型无关, 也和比较操作无关, 更和容器类型无关。简单的说,我们已经将最初的函数转化为一个泛型算法了。
+
+
+// !! 使用 Map
+
+Using a Map
+
+map 被定义为一对 pair 数值, 其中的 key 通常是个字符串, 扮演索引的角色, 另一个数值是 value。字典便是 map 的一个不错实例。
+
+如果要编写一个能对文章内每个字眼的出现次数加以分析的程序,  可以建立一份 map, 带有 string key 和 int value (前者表现单字, 后者表示出现次数)
+
+
+#include <map>
+#include <string>
+
+std::map<string, int> words;
+words["version"] = 10;
+
+std::string twodee;
+while(cin >> twodee)
+{
+    words[twodee]++;
+}
+
+其中：
+
+words[twodee]
+
+会取出与 twodee 相应的 value。如果 twodee  不在 map  内, 它便会因此被放到 map 内, 并获得默认值 0。稍后出现的 increment 运算符会将其值递增 1。
+
+
+以下的  for  循环会打印出所有单字及其出现次数:
+
+map<string,int>::const_iterator it = words.begin();
+while (it != words.end()){
+    cout << (*it).first << "occurs" << (*it).second << endl;
+}
+
+map 对象有一个名为 first 的 member, 对应于 key, 本例中便是单字字符串。另有一个名为 second 的 member, 对应于 value, 本例中便是单字的出现次数。
+
+欲查询 map 内是否存在某个 key, 有三种方法。最直觉的做法就是把 key 当成索引使用:
+
+int count = 0;
+if(!(count - words["tee"])){
+    // tee 并不存在与 map 中
+}
+
+这种写法的缺点是,如果我们用来索引的 key 并不存在于 map 内, 这个 key 会自动被加入 map 中, 而其相应的 value 会被设置为所属类型的默认值。
+
+
+第二种 map 查询法是利用 map 的 find() 函数, 我们将 key 传入 find()并调用:
+
+words.find("tee") != words.end()
+
+任何一个 key 值在 map 内最多只会有一份。如果我们需要储存多份相同的 key 值, 就必须使用 multimap。
+
+
+
+// !! 使用 Set
+
+Using a Set
+
+'set 由一群 key 组合而成。如果我们想知道某值是否存在于某个集合内, 就可以使用 set'。
+
+例如, 在 graph traversal (图形遍历)算法中, 我们可以使用 set 储存每个遍历过的节点 node。在移至下一节点前, 我们可以先查询 set,判断该节点是否已经遍历过。
+
+以前一节的字数统计程序为例, 它可能不想统计一般中性词汇的出现次数。为实现此目的, 我们定义一个用来记录"排除字眼"的 set, 元素类型为 string:
+
+#include <set>
+#include <string>
+
+std::set<std::string> excluded_word;
+
+程序将某个单字放进 map 之前, 应该先检查它是否存在于 word_exclusion set 中:
+
+while (cin >> word){
+    if(excluded_word.find(word) != excluded_word.end()){
+        continue;
+    }
+    //okay
+    words[word]++;
+}
+
+其中的 continue 语句会跳出当前迭代。
+
+对于任何 key 值, set 只能储存一份。如果要储存多份相同的 key 值, 必须使用 multiset。
+
+
+默认情形下, set 元素皆依据其所属类型默认的 less_than 运算符进行排列。例如, 如果给定:
+
+int ia[10] = {0, 1, 21, 3, 41, 5, 16,7, 18, 9};
+
+vector<int> vec(ia, ia + 10);
+set<int> s(vec.begin(), vec.end());
+
+如果要为 set 加入单一元素, 可使用单一参数的 insert():
+
+s.insert(22);
+
+如果要为 set 加入某个范围的元素, 可使用双参数的 insert():
+
+s.insert(vec.begin(), vec.end());
+
+
+在set身上进行迭代, 其形式和你所预期的一致:
+
+set<int>::const_iterator it = s.begin();
+while(it != s.end()){
+    cout << it->first << endl;
+    ++it;
+}
+
+
+// !! 如何使用 Iterator Inserter
+
+How to Use Iterator Inserters
+
+回到先前对 filter() 的实现, 我们将源端(容器)中每一个符合条件的元素一一赋值(assign)至目的端(容器):
+
+while((first = find_if(first, last, bind2nd(pred, value))) != vec.end()){
+    *output++ = *first++;
+}
+
+这种形式下, 目的端的容器必须够大, 以储存被赋值进来的每个元素。filter() 没有办法知道每次对 output 递增之后, output 是否仍指向一个有效的容器位置。
+
+"确保 output 所指目的端容器的空间够大", 这是程序员的责任。
+
+在测试程序中, 我们设定了目的端容器的大小, 使它等于源端容器的大小, 借此方式来确保以上条件:
+
+这个解法的问题在于, 大部分情形下, 目的端容器的大小显然太大了。
+
+另一种解法是先定义一个空容器, 而后每当有元素被插入进来, 再加以扩展。不幸的是, filter() 目前的实现是将元素赋值至某个已存在的容器位置上, 如果我们重新以插入方式
+实现 filter(), 那对我们目前已有的应用程序会产生什么影响呢? 此外, 我们又应该提供什么样的插入操作呢?
+
+所有"会对元素进行复制行为"的泛型算法, 例如 copy()、copy_backwards()、remove_copy()、replace_copy()、unique_copy() 等等, 都和 filter() 的实现极
+为相似。每个算法都接受一个 iterator, 标示出复制的起始位置。每复制一个元素, 都会被赋值 assigned, iterator 则会递增至下个位置。'我们必须保证在每一次复制操作
+中, 目的端容器都足够大, 可以储存这些被赋值进来的元素'。既然有了这些算法, 我们实在不需要重新写一个。
+
+这意味着我们必须总是传入某个固定大小的容器至上述算法吗? 这绝对不符合 STL 的精神。标准库提供了三个所谓的 insertion adapter, 这些 adapter 让我们得以避免使
+用容器的 assignment 运算符:
+
+1. 'back_inserter() 会以容器的 push_back() 函数取代 assignment 运算符'。对 vector 来说, 这是比较适合的 inserter。传入 back_inserter 的参数, 应该
+    就是容器本身
+
+   vector<int> result_vector;
+   std::unique_copy(ivec.begin(), ivec.end(), std::back_inserter(result_vector));
+
+2. inserter() 会以容器的 insert() 函数取代 assignment 运算符。inserter() 接受两个参数: 一个是容器,  另一个是  iterator, 指向容器内的插入操作起点。
+   以 vector 而言, 我们会这么写:
+
+   vector<string> svec_result;
+   std::unique_copy(vec.begin(), vec.end(),inserter(svec_result, svec_result.end()));
+
+
+3. front_inserter() 会以容器的 push_front() 函数取代 assignment 运算符。这个 inserter 只适用于 list 和  deque:
+
+    list<int> i_list;
+    std::copy(l.begin(),l.end(), std::front_inserter(i_list));
+
+欲使用上述三种 adapter, 首先必须包含 iterator 头文件:
+
+#include <iterator>
+
+然而这些 adapter 并不能用在 array 上, array 并不支持元素插入操作。
+
+
+
+
+// !! 使用 iostream Iterator
+
+Using the iostream Iterators
+
+想象我们的新任务如下: 从标准输入设备读取一串 string 元素, 将它们存到 vector 内, 并进行排序，最后再将这些字符串写回标准输出设备。
+
+一般的解法看起来像下面这样:
+
+#include <iostream>
+#include <string>
+#include <vector>
+#include <algorithm>
+
+using namespace std;
+
+int main(int argc, char* argv[]){
+    string word;
+    vector<string> text;
+    while(cin >> word) {
+        text.push_back(word);
+    }
+
+    sort(text.begin(), text.end());
+
+    for(int i = 0; i < text.size(); i++) {
+        cout << text << endl;
+    }
+}
+
+标准库定义有供输入及输出使用的 iostream iterator 类, 称为 istream_iterator 和 ostream_iterator, 分别支持单一类型的元素读取和写入。使用这两个
+iterator class 之前, 先得包含 iterator 头文件:
+
+#include <iterator>
+
+现在让我们看看如何利用 istream_iterator 从标准输入设备读取字符串。就像所有的 iterator 一样, 我们需要一对 iterator first 和 last,用来标示元素范围。
+
+
+istream_iterator<string> is(cin);
+
+为我们提供了一个 first iterator, 它将 is 定义为一个"绑至标准输入设备"的 istream_iterator。我们还需要一个 last iterator, 表示"要读取的最后一个元素的
+下一位置"。
+
+对标准输入设备而言, end-of-file 即代表 last。这该如何表示呢? 噢, 只要在定义 istream_iterator 时不为它指定 istream 对象, 它便代表了 end-of-file。
+例如:
+
+istream_iterator<string> eof;
+
+我们应该如何使用这对 iterator 呢? 
+
+下面的例子中, 我将它们和储存字符串元素的 vector,  一起传给泛型算法 copy()。由于不知道该为 vector 保留多少空间, 所以我选用了 back_inserter:
+
+std::copy(is, eof, std::back_inserter(text));
+
+
+现在我还需要一个 ostream_iterator, 标示字符串元素的输出位置。一旦不再有任何元素需要输出, 我就停止输出操作。
+
+ostream_iterator<string> os(cout, " ");
+
+上述第二个参数可以是 C-style 字符串, 也可以是字符串常量。'它用来表示各个元素被输出时的分隔符'。默认情形下, 输出的各个元素之间并无任何分隔符。
+
+本例我选择在各输出字符串之间以空格加以分隔。以下便是可能的使用方式:
+
+std::copy(text.begin(), text.end(), os);
+
+copy() 会将储存在 text 中的每个元素一一写到由 os 所表示的 ostream 上。
+
+#include <iostream>
+#include <iterator>
+#include <algorithm>
+#include <string>
+#include <vector>
+
+using namespace std;
+
+int main(int argc, char** argv){
+    istream_iterator<string> is(cin);
+    istream_iterator<string> eof;
+    vector<string> text;
+
+    copy(is, eof, back_inserter(text));
+
+    ostream_iterator<string> os(cout, " ");
+    copy(text.begin(), text.end(), os);
+}
+
+然而, 我们常常并不是要从标准输入设备读数据, 也不是要写到标准输出设备去, 而是希望从文件中读取, 写到文件去。
+
+这该如何办到? 啊, 只需将 istream_iterator 绑定至 ifstream object, 将  ostream_iterator 绑定至 ofstream object 即可:
+
+#include <iostream>
+#include <iterator>
+#include <algorithm>
+#include <string>
+#include <vector>
+#include <fstream>
+
+using namespace std;
+
+int main(int argc, char* *argv){
+    ifstream infile("input.txt");
+    ofstream outfile("output.txt");
+    if(!infile.is_open() || !outfile.is_open()){
+        return -1;
+    }
+
+    istream_iterator<string> is(infile);
+    istream_iterator<string> eof;
+    copy(is, eof, back_inserter(text));
+
+    sort(text.begin(), text.end());
+
+    ostream_iterator<string> os(outfile, " ");
+    copy(text.begin(), text.end(), os);
+    return 0;
+}
 
 
 
