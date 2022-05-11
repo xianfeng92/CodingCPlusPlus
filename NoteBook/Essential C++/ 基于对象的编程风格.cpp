@@ -433,6 +433,230 @@ private:
 
 // !! 什么是 this 指针
 
+What Is the this Pointer ?
+
+我们得设计一个 copy() 成员函数, 才能够以 Triangular class object 作为另一个 Triangular class object 的初值。
+
+假设有以下两个对象:
+
+Triangular tri1(8);
+Triangular tri2(8, 3);
+
+调用:
+
+tri1.copy(tri2);
+
+
+会将 tri2 的长度及起始位置赋值给 tri1。copy() 必须返回被复制出来的对象。
+
+本例中, tri1 不仅是复制的目标, 也用来接收复制的结果。这该如何完成呢 ? 以下是 copy() 的一份实现:
+
+Triangular& Triangular::copy(const Triangular& rhs){
+  length_ = rhs.length();
+  beg_pos_ = rhs.beg_pos();
+  next_ = rhs.next();
+  return ???;// 应该返回什么呢？
+}
+
+
+其中 rhs (right hand side 的缩写)被绑定至 tri2, 而以下这个赋值操作:
+
+length_ = rhs.length();
+
+length_ 指向 tri1 内的相应成员。'我们还需要一种可以指向 tri1 整个对象的方法, 所谓 this 指针便扮演了这样的角色'。
+
+this 指针系在 member function 内用来指向其调用者(一个对象)。本例中, this 指向 tri1。这是怎么办到的呢? 内部工作过程是, 编译器自动将 this 指针加到每一个
+member function 的参数列表, 于是 copy() 被转换为以下形式:
+
+
+Triangular& Triangular::copy(Triangular *this, const Triangular& rhs) {
+  length_ = rhs.length();
+  beg_pos_ = rhs.beg_pos();
+  next_ = rhs.next();
+  return *this;
+}
+
+整个转换过程还需要另一个配合:每次调用 copy() 都需要提供两个参数。为此, 原始调用方式:
+
+tri1.copy(tri2);
+
+会被转换为:
+
+copy(&tri1, tri2);
+
+'在 member function 内, this 指针可以让我们访问其调用者的一切'。
+
+欲以一个对象复制出另一个对象, 先确定两个对象是否相同是个好习惯。这必须再次运用 this 指针:
+
+Triangular& Triangular::copy(Triangular *this, const Triangular& rhs){
+  if(this == &rhs){
+    return *this;
+  }
+  length_ = rhs.length();
+  beg_pos_ = rhs.beg_pos();
+  next_ = rhs.next();
+  return *this;
+}
+
+
+
+// !! 静态类成员
+
+Static Class Members
+
+static data member 用来表示唯一的、可共享的 member。
+
+它可以在同一类的所有对象中被访问。例如以下这份定义, 我们声明  elems_ 是 Triangular class 的一个 static data member:
+
+
+class Triangular{
+public:
+private:
+  static vector<int> elems_;
+};
+
+对 class 而言, static data member 只有唯一的一份实体, 因此我们必须在程序代码文件中提供其清楚的定义。这种定义看起来很像全局对象 global object 的定义。
+唯一的差别是, 其名称必须附上 class scope 运算符:
+
+vector<int> Triangular::elem_;
+
+
+如果要在 class member function 内访问 static data member, 其方式有如访问一般 non-static 数据成员
+
+
+// !! Static Member Function (静态成员函数)
+
+考虑以下的 is_elem(), 给定某值, 它会依据该值是否在 Triangular 数列内而返回 true 或 false:
+
+bool Triangular::is_elem(int value){
+  if(!elem_.size() || elem_.size() - 1 < value )
+  gen_elems_to_value(value);
+  vector<int>::iterator found_it;
+  vector<int>::iterator end_it  = elem_.end();
+  found_it = find(elem_begin(), end_it, value);
+  return found_it != end_it;
+}
+
+
+一般情形下, member function 必须通过其类的某个对象来调用。这个对象会被绑定至该 member function 的 this 指针。
+
+有了 this 指针, member function 才能够访问储存于每个对象中的 non-static data member。
+
+然而, 上述的 is_elem() 并未访问任何 non-static data member。它的工作和任何对象都没有任何关联, 因而应该可以很方便地以一般 non-member function 的方式
+来调用。
+
+
+但是我们不能这样写:
+
+if(is_elem(8))
+
+
+因为这样一来就没有办法让编译器或程序阅读者知道我们想调用的究竟是哪一个 is_elem()。class scope 运算符可以解决这种令人混淆的问题:
+
+if(Triangular::is_elem(8))
+
+于是 static member function 便可以在这种与任何对象都无瓜葛的情形之下被调用。
+
+
+注意, member function 只有在不访问任何 non-static member 的条件下才能够被声明为 static, 声明方式是在声明之前加上关键字 static:
+
+
+class Triangular{
+public:
+  static bool is_elem(int value);
+  static void get_elements(int value);
+  static void gen_elems_to_value(int value);
+private:
+  static vector<int> elems_;
+};
+
+
+当我们在 class 主体外部进行 member function 的定义时, 无须重复加上关键字 static。
+
+
+
+
+// !! 打造一个 Iterator Class
+
+Building an Iterator Class
+
+为了说明如何对 class 进行运算符重载操作, 让我们体验一下如何实现一个 iterator class。我们必须提供以下操作方式:
+
+
+Triangular tri(8);
+Triangular::iterator it = tri.begin();
+Triangular::iterator end = tri.end();
+
+while(it != end){
+  cout << *it << " ";
+  ++it;
+}
+
+为了让上述程序代码得以工作, 我们必须为此 iterator class 定义 !=、*、++ 等运算符。这应如何办到呢?
+
+我们可以像定义 member function 那样来定义运算符。运算符函数看起来很像普通函数, 唯一差别是它不用指定名称, 只需在运算符前加上关键字 operator 即可。
+例如:
+
+class Triangular_iterator{
+public:
+  Triangular_iterator(int index) : index_(index) {}
+  bool operator--(const Triangular_iterator&) const;
+  bool operator!=(const Triangular_iterator&) const;
+  int operator*() const;
+  Triangular_iterator& operator++();
+  Triangular_iterator operator++(int);
+private:
+  int index_;
+  void check_integrity() const;
+};
+
+Triangular_iterator 维护一个索引值, 用以索引 Triangular 中用来储存数列元素的那个 static data member, 也就是_elems。为了达到这个目的, Triangular
+必须赋予 Triangular_iterator 的 member function 特殊的访问权限。
+
+如果两个 Triangular_iterator 对象的 index_ 相等, 我们便说这两个对象相等:
+
+inline Triangular_iterator::operator==(const Triangular_iterator& rhs) const {
+  return index_ == rhs.index_;
+}
+
+
+所谓运算符, 可以直接作用于其 class object:
+
+if(tri1 == tri2){
+
+}
+
+如果我们希望将运算符作用于指针所指的对象, 就得先提领该指针, 取出其所指对象:
+
+if(*ptri1 == *ptri2)
+
+以下是运算符重载的规则:
+
+● 不可以引入新的运算符。除了 .、.*、 ::、 ?: 四个运算符, 其他的运算符皆可被重载。
+
+● 运算符的操作数个数不可改变。每个二元运算符都需要两个操作数, 每个一元运算符都需要恰好一个操作数。因此, 我们无法定义出一个 equality 运算符, 并令它接受两个以
+  上或两个以下的操作数
+
+● 运算符的优先级 (precedence) 不可改变
+
+● 运算符函数的参数列表中，必须至少有一个参数为 class 类型
+
+
+Non-member 运算符的参数列表中, 一定会比相应的 member 运算符多出一个参数, 也就是 this  指针。对 member 运算符而言, 这个 this 指针隐式代表左操作数。
+
+
+// !! 嵌套类型 (Nested Type)
+
+
+
+
+
+
+
+
+
+
+
 
 
 
