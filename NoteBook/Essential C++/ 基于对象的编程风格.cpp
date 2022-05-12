@@ -647,6 +647,103 @@ Non-member 运算符的参数列表中, 一定会比相应的 member 运算符�
 
 // !! 嵌套类型 (Nested Type)
 
+typedef 可以为某个类型设定另一个不同的名称。其通用形式为:
+
+typedef exiting_type new_type;
+
+其中的 existing_type 可以是任何一个内置类型、复合类型或 class 类型。在我们的例子中, 我令 iterator 等同于 Triangular_iterator, 以简化其使用形式。以下
+是定义一个 iterator object 的语法:
+
+Triangular::iterator it = tri.begin();
+
+我们得使用 class scope 运算符来指引编译器, 让它在面对 iterator 这个字眼时, 查看 Triangular 内部提供的定义。
+
+
+如果我们只是写:
+
+iterator it = tri.begin();
+
+编译器就不知道在面对 iterator 这个字时该查看 Triangular 的内容, 于是以上声明出现错误。
+
+如果将 iterator 嵌套放在每个"提供 iterator 抽象概念"的 class 内, 我们就可以提供有着相同名称的多个定义。但是这样的声明语法有些复杂:
+
+Triangular::iterator it = tri.begin();
+vector<int>::iterator it = vec.begin();
+string::iterator it = str.begin();
+
+
+
+// !! 合作关系必须建立在友谊的基础上
+
+Collaboration Sometimes Requires Friendship
+
+以下的 non-member operator*()  会直接访问 Triangular 的 private elems_ 以及 Triangular_iterator 的 private check_integrity():
+
+inline int operator*(const Triangular &rhs) {
+  rhs.check_integrity();
+  return Triangular::elems_(rhs.index());
+}
+
+为什么上述程序直接访问 private member 却可以通过编译呢? 因为任何 class 都可以将其他 function  或 class 指定为朋友(friend)。'而所谓 friend, 具备了与
+class member function 相同的访问权限, 可以访问 class 的 private member'。
+
+
+为了让 operator*() 通过编译, 不论 Triangular 或 Triangular_iterator 都必须将 operator*() 声明为"朋友":
+
+
+class Triangular{
+friend int  operator*(const Triangular& rhs);
+//...
+};
+
+
+class Triangular_iterator{
+friend int operator*(const Triangular & rhs);
+};
+
+'只要在某个函数的原型 prototype 前加上关键字 friend, 就可以将它声明为某个 class 的 friend'。
+
+这份声明可以出现在 class 定义的任意位置上, 不受  private  或 public 的影响。如果你希望将数个重载函数都声明为某个 class 的 friend, 你必须明确地为每个函数
+加上关键字 friend。
+
+
+Triangular_iterator 内的 operator*()  和  check_integrity() 都需要直接访问 Triangular 的 private member, 因此我们将两者都声明为 Triangular 的
+friend:
+
+
+class Triangular{
+  friend int Triangular_iterator::operator*();
+  friend int Triangular_iterator::check_integrity();
+};
+
+为了让上述定义成功通过编译,我们必须在上述两行之前,先提供 Triangular_iterator 的定义让 Triangular 知道。否则编译器就没有足够的信息可以确定上述两个函数
+原型是否正确,也无法确定它们是否的确是 Triangular_iterator 的 member function。
+
+
+我们也可以令  class A 与 class B 建立 friend 关系, 借此让 class A 的所有 member function 都成为 class B 的 friend。
+
+
+class Triangular{
+public:
+  friend class Triangular_iterator;
+  //...
+};
+
+
+如果以这种形式来声明 class 间的友谊, 就不需要在友谊声明之前先显现 class 的定义。
+
+
+不过, 我们也并非一定得以 friend 方式达到目的。如果 Triangular 提供一个 public member function 来访问 max_elems_, 以及另一个 public member functions
+来返回 elems_ 的当前大小, 那么 check_integrity() 就不再需要主动建立友谊。
+
+友谊的建立, 通常是为了效率考虑。
+
+
+
+// !!  实现一个 copy assignment operator
+
+Implementing a Copy Assignment Operator
+
 
 
 
