@@ -745,6 +745,146 @@ public:
 Implementing a Copy Assignment Operator
 
 
+默认情况下, 当我们将某个 class object 赋值给另一个, 像下面这样:
+
+Triangular tri1(8), tri2(3,2);
+tri1 = tri2;
+
+class data member 会被依次复制过去。在我们的例子中, length_、beg_pos_、next_ 都会从 tri2 被复制到 tri1 去。这称为 default memberwise copy
+(默认的成员逐一复制操作)
+
+以 Triangular 为例, default memberwise copy 即已足够, 我们不需要另做其他事情。
+
+
+只要 class 设计者明确提供了 copy assignment operator, 它就会被用来取代 default memberwise copy 行为。
+
+
+// !! 实现一个 function object
+
+Implementing a Function Object
+
+所谓 function object 乃是一种提供有 function call 运算符的 class。
+
+
+当编译器在编译过程中遇到函数调用, 例如:
+
+It(ival);
+
+lt 可能是函数名称, 可能是函数指针, 也可能是一个提供了 function call 运算符的 function object。
+
+如果  lt 是个 class object, 编译器便会在内部将此语句转换为:
+
+It.operator(ival) // 内部转换结果
+
+function call 运算符可接受任意个数的参数: 零个、一个、两个或更多。
+
+下面就来实现一个 function call 运算符, 测试传入值是否小于某指定值。将此 class 命名为 LessThan, 其每个对象都必须被初始化为某基值。此外，也提供该基值的读取
+及写入操作。实现如下:
+
+class LessThan{
+public:
+  LessThan(int val) : val_(val){}
+  int comp_val() const { return val_; }
+  void comp_val(int val) { val_ = val; }
+  bool operator()(int val) const;
+private:
+  int val_;
+};
+
+
+其中的 function call 运算符实现如下:
+
+
+inline bool LessThan::operator()(int val) const{
+  return val < val_;
+}
+
+
+定义 LessThan object 的方式和定义一般对象并没有两样:
+
+LessThan l10(10);
+
+将 function call 运算符应用于对象身上, 便可以调用 function call 运算符:
+
+int count_less_than(const std::vector<int> &vec, int comp){
+  LessThan l(comp);
+  int count = 0;
+  for(int i=0; i<vec.size(); i++>){
+    if(l(vec[i])){
+      count++;
+    }
+  }
+  return count;
+}
+
+
+通常我们会把 function object 当作参数传给泛型算法。
+
+
+
+
+// !! 重载 iostream  运算符
+
+Providing Class Instances of the iostream Operators
+
+我们常常会希望对某个 class object 进行读取和写入操作。如果我们想要显示 tri 对象的内容,可能会希望这样写:
+
+cout << tri << endl;
+
+为了支持上述形式, 我们必须另外提供一份重载的 output 运算符:
+
+
+ostream& operator<<(ostream & os, const Triangular& rhs){
+  os << ": " << rhs.begin_pos() << ", " << rhs.length() << endl;
+  rhs.display(rhs.length(), rhs.begin_pos(), os);
+  return os;
+}
+
+
+传入函数的 ostream 对象又被原封不动地返回, 如此一来我们便得以串接多个 output 运算符。
+
+参数列表中的两个对象皆以传址 (by reference)方式传入。其中的 ostream 对象并未声明为 const, 因为每个 output 操作都会更改 ostream 对象的内部状态。
+
+
+至于 rhs 这种将被输出的对象, 就会被声明为 const——因为这里之所以使用传址方式, 是基于效率考虑而非为了修改其对象内容。
+
+为什么不把 output 运算符设计为一个 member function 呢 ? 
+
+因为作为一个 member function, 其左操作数必须是隶属于同一个 class 的对象。
+
+如果 output 运算符被设计为 tri class member function, 那么 tri object 就必须被放在 output 运算符的左侧:
+
+tri << cout << " ";
+
+这种奇怪的形式必定对 class 用户造成困惑!
+
+
+// !! 指针,指向 Class Member Function
+
+Pointers to Class Member Functions
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
