@@ -1,8 +1,7 @@
 // !! 关于对象
 
-在 C 语言中, "数据"和"处理数据的操作(函数)" 是分开来声明的, 也就是说, 语言本身并没有支持"数据和函数"之间的关联性。
-
-我们把这种程序方法称为程序性的(procedural), 由一组"分布在各个以功能为导向的函数中"的算法所驱动, 它们处理的是共同的外部数据。
+在 C 语言中, "数据"和"处理数据的操作(函数)" 是分开来声明的, 也就是说, 语言本身并没有支持"数据和函数"之间的关联性。我们把这种程序方法称为程序性的
+(procedural), 由一组"分布在各个以功能为导向的函数中"的算法所驱动, 它们处理的是共同的外部数据。
 
 举个例子, 如果我们声明一个 struct Point3d , 像这样:
 
@@ -17,7 +16,7 @@ typedef struct point3d
 
 void Point3d_print(const Point3d& point)
 {
-    cout << point.x << ", " << point.y << point.z << endl;
+    cout << point.x << ", " << point.y << ", "<< point.z << endl;
 }
 
 或者, 如果要更有效率一些, 就定义一个宏:
@@ -32,7 +31,7 @@ void my_foo()
 {
     Point3d* pd = get_a_point();
     ...
-     cout << pd->x << ", " << pd->y << pd->z << endl;
+    cout << pd->x << ", " << pd->y << pd->z << endl;
 }
 
 同样的道理, 某个点的特定坐标值可以直接存取:
@@ -50,15 +49,12 @@ pt.y = 12;
 x(pt,100);
 
 
-在 C++ 中, Point3d 有可能采用独立的"抽象数据类型(abstract data type,ADT)" 来实现:
+在 C++ 中, Point3d 有可能采用独立的"抽象数据类型(abstract data type, ADT)" 来实现:
 
 class Point3d
 {
 public:
-    Point3d(float x = 0.0, float y = 0.0, float z = 0.0):x_(x), y_(y),z_(x)
-    {
-
-    }
+    Point3d(float x = 0.0, float y = 0.0, float z = 0.0) : x_(x), y_(y),z_(x){}
 
     float x() const { return x_; }
 
@@ -156,9 +152,9 @@ protected:
 };
 
 
+'更进一步来说, 不管哪一种形式, 它们都可以被参数化'。
 
-更进一步来说, 不管哪一种形式, 它们都可以被参数化。可以是坐标类型的参数化:
-
+可以是坐标类型的参数化:
 
 template<typename type>
 class Point3d
@@ -182,7 +178,8 @@ private:
     type z_;
 };
 
-也可以是坐标类型和坐标个数两者都参数化:
+
+'也可以是坐标类型和坐标个数两者都参数化':
 
 template<typename type, int dim>
 class Point
@@ -195,7 +192,6 @@ public:
             coords_[i] = coords[i];
         }
     }
-
 
     type& operator[](int index)
     {
@@ -222,19 +218,19 @@ ostream& operator<<(ostream& os, const Point<type, int>& pt)
 }
 
 
-很明显, 不只在程序风格上有显著的不同, 在程序的思考上也有明显的的差异。有许多令人信服的讨论告诉我们, 从软件工程的眼光来看, 为什么"一个 ADT 或 
-class hierarchy 的数据封装" 比 "在 C 程序中程序性地使用全局数据" 好。但是这些讨论往往被那些"被要求快速让一个应用程序上马应战, 并且执行起来又快
-又有效率" 的程序员所忽略。'毕竟 C 的吸引力就在于它的精瘦和简易'(相对于 C++ 而言)。
+'很明显, 不只在程序风格上有显著的不同, 在程序的思考上也有明显的的差异'。
 
+有许多令人信服的讨论告诉我们, 从软件工程的眼光来看, 为什么"一个 ADT 或 class hierarchy 的数据封装" 比 "在 C 程序中程序性地使用全局数据" 好。但是这些讨论往
+往被那些"被要求快速让一个应用程序上马应战, 并且执行起来又快又有效率" 的程序员所忽略。'毕竟 C 的吸引力就在于它的精瘦和简易'(相对于 C++ 而言)。
 
 '在 C++ 中实现 3D 坐标点, 比在 C 中复杂, 尤其是使用 template 的情况下'。但这并不意味着 C++ 就不更有威力, 或是(唔,从软件工程的眼光来看)更好。
-当然啦, 更有威力或是更好, 也不意味着使用上就更容易。
 
+'当然啦, 更有威力或是更好, 也不意味着使用上就更容易'。
 
 
 // !! 加上封装后的布局成本（Layout Costs for Adding Encapsulation）
 
-程序员看到 Point3d 转换到 C++ 之后, 第一个可能会问的问题就是: '加上了封装之后, 布局成本增加了多少'?
+程序员看到 Point3d 转换到 C++ 之后, 第一个可能会问的问题就是:'加上了封装之后, 布局成本增加了多少'?
 
 答案是 class Point3d 并没有增加成本。
 
@@ -242,27 +238,28 @@ class hierarchy 的数据封装" 比 "在 C 程序中程序性地使用全局数
 
 2. 而 member functions 虽然含在 class 的声明之内, 却不出现在 object 之中
 
-3. 每一个 non-inline member function 只会诞生一个函数实例
-
-4. 至于每一个"拥有零个或一个定义" 的 inline function 则会在其每一个使用者(模块) 身上产生一个函数实例。Point3d 支持封装性质, 这一点并未带给它任
-    何空间或执行期的不良后果
+3. 每一个 non-inline member function 只会诞生一个函数实例; 至于每一个"拥有零个或一个定义" 的 inline function 则会在其每一个使用者(模块) 身上产生一个
+   函数实例。Point3d 支持封装性质, 这一点并未带给它任何空间或执行期的不良后果
 
 
-你即将看到, C++ 在布局以及存取时间上主要的额外负担是由 virtual 引起的, 包括:
+你即将看到, 'C++ 在布局以及存取时间上主要的额外负担是由 virtual 引起的', 包括:
 
-1. virtual function 机制 用以支持一个有效率的"执行期绑定"(runtime binding)
+1. virtual function 机制用以支持一个有效率的"执行期绑定" (runtime binding)
 
 2. virtual base class 用以实现多次出现在继承体系中的 base class, 有一个单一而被共享的实例
 
-此外还有一些多重继承下的额外负担, 发生在一个 derived class 和其第二或后继之 base class 的转换之间。然而, 一般而言, 并没有什么天生的理由说 C++
- 程序一定比其 C 兄弟庞大或迟缓。
+此外还有一些多重继承下的额外负担, 发生在一个 derived class 和其第二或后继之 base class 的转换之间。
+
+然而, 一般而言, 并没有什么天生的理由说 C++ 程序一定比其 C 兄弟庞大或迟缓。
 
 
 // !! C++对象模式（The C++ Object Model）
 
-// !! 加上封装后的布局成本（Layout Costs for Adding Encapsulation）
+// !! 加上封装后的布局成本 
 
-在 C++ 中, 有两种 class data members: static 和 nonstatic, 以及三种 class member functions: static、nonstatic 和 virtual。
+Layout Costs for Adding Encapsulation
+
+在 C++ 中, 有两种 class data members : static 和 nonstatic, 以及三种 class member functions: static、nonstatic 和 virtual。
 
 
 class Point
@@ -280,39 +277,44 @@ private:
     static int point_count_;
 };
 
-这个 class Point 在机器中将会被怎么样表现呢 ? 也就是说, 我们如何模塑(modeling) 出各种 data members 和 function members 呢 ?
+这个 class Point 在机器中将会被怎么样表现呢？ 也就是说, 我们如何模塑 (modeling) 出各种 data members 和 function members 呢？
 
 
-// !! 简单对象模型（A Simple Object Model）
+// !! 简单对象模型
 
-我们的第一个模型十分简单。它可能是为了尽量减低 C++ 编译器的设计复杂度而开发出来的, 赔上的则是空间和执行期的效率。
+A Simple Object Model
 
-在这个简单模型中, 一个 object 是一系列的 slots, 每一个 slot 指向一个 members。Members 按其声明顺序, 各被指定一个 slot。
+我们的第一个模型十分简单，它可能是为了尽量减低 C++ 编译器的设计复杂度而开发出来的, 赔上的则是空间和执行期的效率。
 
-每一个 data member 或 function member 都有自己的一个 slot。
+
+在这个简单模型中, 一个 object 是一系列的 slots, 每一个 slot 指向一个 members。Members 按其声明顺序, 各被指定一个 slot。每一个 data member 或 
+function member 都有自己的一个 slot。
 
 在这个简单模型下, members 本身并不放在 object 之中。只有指向 member 的指针才放在 object 内。这么做可以避免 members 有不同的类型, 因而需
 要不同的存储空间所招致的问题。
 
 Object 中的 members 是以 slot 的索引值来寻址, 本例之中 _x 的索引是 6, _point_count 的索引是是 7。
 
-一个 class object 的大小很容易计算出来: 指针大小, 乘以 class 中所声明的 members 个数便是。
+一个 class object 的大小很容易计算出来:// !! 指针大小, 乘以 class 中所声明的 members 个数便是。
 
 虽然这个模型并没有被应用于实际产品上, 不过关于索引或 slot 个数的观念, 倒是被应用到 C++ 的指向成员的指针(pointer-to-member)观念之中
 
 
-// !! 表格驱动对象模型（A Table-driven Object Model）
+// !! 表格驱动对象模型
+
+A Table-driven Object Model
 
 为了对所有 classes 的所有 objects 都有一致的表达方式, 另一种对象模型是把所有与 members 相关的信息抽出来, 放在一个 data member table 和一个
 member function table 之中, class object 本身则内含指向这两个表格的指针。
 
-Member function table 是一系列的 slots, 每一个 slot 指出一个 member function; Data member table 则直接持有 data 本身。
+Member function table 是一系列的 slots, 每一个 slot 指向一个 member function; Data member table 则直接持有 data 本身。
 
-虽然这个模型也没有实际应用于真正的 C++ 编译器身上,但 member function table 这个观念却成为支持 virtual functions 的一个有效方案。
+虽然这个模型也没有实际应用于真正的 C++ 编译器身上,但 'member function table 这个观念却成为支持 virtual functions 的一个有效方案'。
 
 
+// !! C++ 对象模型
 
-// !! C++ 对象模型（The C++ Object Model）
+The C++ Object Model
 
 Stroustrup 当初设计(目前仍占有优势)的 C++ 对象模型是从简单对象模型派生而来的, 并对内存空间和存取时间做了优化。
 
@@ -326,15 +328,18 @@ Stroustrup 当初设计(目前仍占有优势)的 C++ 对象模型是从简单�
 
    a: 每一个 class 产生出一堆指向 virtual functions 的指针, 放在表格之中。这个表格被称为 virtual table(vtbl)
 
-   b: 每一个 class object 被安插一个指针, 指向相关的 virtual table。通常这个指针被称为 vptr。 vptr 的设定(setting)和重置(resetting) 都由每一个
-      class 的 constructor、destructor 和 copy assignment 运算符自动完成。每一个 class 所关联的 type_info object(用以支持 runtime type 
-      identification, RTTI) 也经由 virtual table 被指出来, 通常放在表格的第一个 slot
+   b: 每一个 class object 被安插一个指针, 指向相关的 virtual table。通常这个指针被称为 vptr。vptr 的设定(setting)和重置(resetting) 都由每一个
+      class 的 constructor、destructor 和 copy assignment 运算符自动完成。
+      
+   c. 每一个 class 所关联的 type_info object(用以支持 runtime type identification, RTTI) 也经由 virtual table 被指出来, 通常放在表格的第一个 
+      slot
 
-
-这个模型的主要优点在于它的空间和存取时间的效率; 主要缺点则是, 如果应用程序代码本身未曾改变, 但所用到的 class objects 的 nonstatic data members 有所
+这个模型的主要优点在于它的空间和存取时间的效率; 主要缺点则是,如果应用程序代码本身未曾改变, 但所用到的 class objects 的 nonstatic data members 有所
 修改(可能是增加、移除或更改), 那么那些应用程序代码同样得重新编译。
 
 关于此点,前述的双表格模型就提供了较大的弹性, 因为它多提供了一层间接性, 不过它也因此付出了空间和执行效率两方面的代价。
+
+
 
 // !! 加上继承(Adding Inheritance)
 
@@ -348,14 +353,16 @@ C++ 也支持多重继承:
 
 class iostream : public ostream, public istream{};
 
-甚至, 继承关系也可以指定为虚拟(virtual, 也就是共享的意思):
+甚至, 继承关系也可以指定为虚拟 (virtual, 也就是共享的意思):
 
 class istream : virtual public ios{};
 
 class ostream : virtual public ios{};
 
-在虚拟继承的情况下, base class 不管在继承串链中被派生(derived) 多少次, 永远只会存在一个实例(称为 subobject)。例如 iostream 之中就只有
-virtual ios base class 的一个实例。
+'在虚拟继承的情况下, base class 不管在继承串链中被派生 (derived) 多少次, 永远只会存在一个实例(称为 subobject)'。
+
+例如 iostream 之中就只有 virtual ios base class 的一个实例。
+
 
 一个 derived class 如何在本质上模塑其 base class 的实例呢 ?
 
@@ -375,23 +382,24 @@ virtual ios base class 的一个实例。
 如果在 derived class 内复制一个指针, 指向继承串链中的每一个 base class, 倒是可以获得一个永远不变的存取时间。当然这必须付出代价, 因为需要额外的空间来
 放置额外的指针。
 
-C++ 最初采用的继承模型并不运用任何间接性: base class subobject 的 data members 被直接放置于 derived class object 中。这提供了对 
-base class members 最紧凑而且最有效率的存取。缺点呢 ? 当然就是: base class members 的任何改变, 包括增加、移除或改变类型等等, 都使得所有用到
-"此 base class 或其 derived class 之 objects" 者必须重新编译。
+C++ 最初采用的继承模型并不运用任何间接性: base class subobject 的 data members 被直接放置于 derived class object 中。这提供了对 base class 
+members 最紧凑而且最有效率的存取。缺点呢? 当然就是: base class members 的任何改变, 包括增加、移除或改变类型等等, 都使得所有用到"此 base class 或其 
+derived class 之 objects" 者必须重新编译。
 
 自 C++2.0 起才新导入的 virtual base class, 需要一些间接的 base class 表现方法。virtual base class 的原始模型是在 class object 中为每一个有关
 联的 virtual base class 加上一个指针。其他演化出来的模型则要不是导入一个 virtual base class table, 就是扩充原已存在的 virtual table, 以便维护每
 一个 virtual base class 的位置。
 
 
-// !! 对象模型如何影响程序（How the Object Model Effects Programs）
+// !! 对象模型如何影响程序
+
+How the Object Model Effects Programs
 
 这对程序员带来什么意义呢 ? 喔, 不同的对象模型, 会导致"现有的程序代码必须修改"以及 "必须加入新的程序代码" 两个结果。
 
 例如下面这个函数, 其中 class X 定义了一个 copy constructor、一个 virtual destructor 和一个 virtual function foo:
 
-X foobar() 
-{
+X foobar() {
     X xx;
     X* px = new X();
 
@@ -400,7 +408,6 @@ X foobar()
     px->foo();
 
     delete px;
-    
     return xx;
 }
 
@@ -408,17 +415,14 @@ X foobar()
 
 // 可能的内部转换结果
 // 虚拟 C++ 代码
-
-void foobar(X& _result)
-{
+void foobar(X& _result) {
     // 构造 _result
     // _result 用来取代 local xx
     _result.X::X();
 
     // 扩展 X* px = new X();
-    px = _now(sizeof(X));
-    if(px != 0)
-    {
+    px = _new(sizeof(X));
+    if(px != 0){
         px->X::X();
     }
 
@@ -430,12 +434,10 @@ void foobar(X& _result)
     (*px->vtbl[2])(px);
 
     // 扩展 delete px
-    if(px != 0)
-    {
+    if(px != 0) {
         (*px->vtbl[1])(px);// destructor
         _delete(px);
     }
-
     // 无需使用 named return statement
     // 无需摧毁 local object xx
     return;
@@ -446,24 +448,25 @@ void foobar(X& _result)
 一边玩弄你的手指头, 一边说 喔欧,是的,当然, 同时奇怪你怎么会曾经迷惘过。
 
 
-// !! 关键词所带来的差异（A Keyword Distinction）
+// !! 关键词所带来的差异
 
-如果不是为了努力维护与 C 之间的兼容性, C++ 远可以比现在更简单些。
+A Keyword Distinction
+
+'如果不是为了努力维护与 C 之间的兼容性, C++ 远可以比现在更简单些'。
 
 举个例子, 如果没有 8 种整数需要支持的话, overloaded function 的解决方式将会简单得多。同样道理, 如果 C++ 丢掉 C 的声明语法, 就不需要花脑筋去判断下面
-这一行其实是 pf 的一个函数调用操作(invocation) 而不是其声明:
+这一行其实是 pf 的一个函数调用操作 (invocation) 而不是其声明:
 
 // 不知道下面是个声明还是函数调用
 // 直到看到整数常量 1024 才能决定
 int(*pf)(1024);
 
-而在下面这个声明中, 像上面那样的 向前预览(lookahead) 甚至起不了作用:
+而在下面这个声明中, 像上面那样的向前预览 (lookahead) 甚至起不了作用:
 
 // pf 是一个声明而不是调用
 int(*pf)();
 
-当语言无法区分那是一个声明还是一个表达式(expression) 时, 我们需要一个超越语言范围的规则, 而该规则会将上述式子判断为一个"声明"。
-
+'当语言无法区分那是一个声明还是一个表达式 (expression) 时, 我们需要一个超越语言范围的规则, 而该规则会将上述式子判断为一个"声明"'。
 
 同样地, 如果 C++ 并不需要支持 C 原有的 struct, 那么 class 的观念可以借由关键词 class 来支持。但绝对令你惊讶的是, 从 C 迁徙到 C++, 除了效率, 
 另一个最常被程序员询问的问题就是:什么时候一个人应该在 C++ 程序中以 struct 取代 class ?
@@ -474,21 +477,21 @@ int(*pf)();
 那么, 让我重新问一次: 什么时候一个人应该使用 struct 取代 class ?  答案之一是: 当它让一个人感觉比较好的时候。
 
 虽然这个答案并没有达到高技术水平, 但它的确指出了一个重要的特性: 关键词 struct 本身并不一定要象征其后随之声明的任何东西。我们可以使用 struct 代替 class,
-但仍然声明 public、protected、private 等等存取区段与一个完全 public 的接口, 以及 virtual functions 和单一继承、多重继承、虚拟继承……早期, 似乎每个
-人都得在一小时的 C++ 简介中花费整整 10 分钟看清楚以下两者的相同:
+但仍然声明 public、protected、private 等等存取区段与一个完全 public 的接口, 以及 virtual functions 和单一继承、多重继承、虚拟继承……
 
-class c_plusplus_keyword
-{
+早期, 似乎每个人都得在一小时的 C++ 简介中花费整整 10 分钟看清楚以下两者的相同:
+
+class c_plusplus_keyword {
 public:
 // number
 };
 
 和其 C 对等品:
 
-struct c_keyword
-{
+struct c_keyword {
 // the same number
 };
+
 
 当人们以及在教科书中说到 struct 时, 他们的意思是一个数据集合体, 没有 private data, 也没有 data 的相应操作。亦即纯然的 C 用法。这种用途应该和 C++
 的"使用者自定义类型"(user-defined type) 用法区别开来。
