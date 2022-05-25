@@ -107,6 +107,7 @@
         "sval",
         "svec",
         "Unord",
+        "unparser",
         "unsynchronized",
         "xforg"
     ]

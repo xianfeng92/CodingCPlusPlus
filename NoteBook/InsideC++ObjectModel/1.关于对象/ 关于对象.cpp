@@ -516,19 +516,22 @@ protected:
 
 事实上你可以说上面那东西是个 struct, 也可以说它是个 class。这两种声明的观念上的意义取决于对“声明”本身的检验。
 
-举个例子, 在 cfront 之中, 上述两个关键词在语意分析器(parser) 中是以共享的 AGGR 替换的。而在 Foundation 项目中, Rob Murray的 ALF 层次结构保留了程
-序员真正使用的关键词。然而这份信息并未在更内层的编译器中被使用, 倒是可以被一个 unparser 工具用来还原程序的 ASCII 面貌。
-
-你可能会争辩说, 如果这个语言只支持一个关键词, 可以省掉许多混淆与迷惑。但你要知道, 如果 C++ 要支持现存的 C 程序代码, 它就不能不支持 struct。
+举个例子, 在 cfront 之中, 上述两个关键词在语意分析器 (parser) 中是以共享的 AGGR 替换的。而在 Foundation 项目中, Rob Murray的 ALF 层次结构保留了程
+序员真正使用的关键词。然而这份信息并未在更内层的编译器中被使用, 倒是可以被一个 unparser 工具用来还原程序的 ASCII 面貌。你可能会争辩说, 如果这个语言只支持一个
+关键词, 可以省掉许多混淆与迷惑。但你要知道, 如果 C++ 要支持现存的 C 程序代码, 它就不能不支持 struct。
 
 好的, 那么它需要引入新的关键词 class 吗 ? 真的需要吗 ? 不 ! 但引入它的确非常令人满意, 因为这个语言所引入的不只是关键词, 还有它所支持的封装和继承的哲学。
 
 你甚至可以主张说它的用途只是为了方便 C 程序员迁徙至 C++ 部落。
 
 
-// !! 策略性正确的 struct（The Politically Correct Struct）
+// !! 策略性正确的 struct
 
-C 程序员的巧计有时候却成为 C++ 程序员的陷阱。例如把单一元素的数组放在一个 struct 的尾端, 于是每个 struct objects 可以拥有可变大小的数组:
+The Politically Correct Struct
+
+C 程序员的巧计有时候却成为 C++ 程序员的陷阱。
+
+例如把单一元素的数组放在一个 struct 的尾端, 于是每个 struct objects 可以拥有可变大小的数组:
 
 struct mumble
 {
@@ -538,10 +541,8 @@ char pc[1];
 
 // 从文件或者标准输入中取得一个字符串
 // 然后为 struct 本身和这个字符串分配足够的空间
-
-struct mumble* p1 = (numble*)malloc(sizeof(struct mumble) + strlen(string) + 1);
-
-strcpy(&numble.pc, string);
+struct mumble* p1 = (mumble*)malloc(sizeof(struct mumble) + strlen(string) + 1);
+strcpy(&mumble.pc, string);
 
 如果我们改用 class 来声明, 而该 class 是:
 
@@ -549,7 +550,7 @@ strcpy(&numble.pc, string);
 
 2. 内含数据
 
-3. 从另一个 class派生而来
+3. 从另一个 class 派生而来
 
 4. 定义了一个或多个 virtual functions
 
@@ -559,10 +560,18 @@ C++ 中凡处于同一个 access section 的数据, 必定保证以其声明顺�
 在下面的声明中, 前述的 C 伎俩或许可以有效运行, 或许不能, 需视 protected data members 被放在 private data members 的前面或后面而定(译注:放在前面
 才可以):
 
+class stumble{
+public:
+  //operations
+protected:
+  //protected stuff
+private:
+ //private stuff
+ char pc[1];
+};
 
 
-组合(composition), 而非继承, 才是把 C 和 C++ 结合在一起的唯一可行方法:
-
+'组合(composition), 而非继承, 才是把 C 和 C++ 结合在一起的唯一可行方法':
 
 struct C_point{};
 
@@ -575,44 +584,45 @@ private:
 };
 
 
-C struct 在 C++ 中的一个合理用途, 是当你要传递一个复杂的 class object 的全部或部分 到某个 C 函数去时, struct 声明可以将数据封装起来,
-并保证拥有与 C 兼容的空间布局。然而这项保证只在组合(composition) 的情况下才存在。
+'C struct 在 C++ 中的一个合理用途, 是当你要传递一个复杂的 class object 的全部或部分到某个 C 函数去时, struct 声明可以将数据封装起来,并保证拥有与 C 兼容
+的空间布局'。然而这项保证只在组合(composition) 的情况下才存在。
 
 
-// !! 对象的差异（An Object Distinction）
+// !! 对象的差异 
 
-C++ 程序设计模型直接支持三种 programming paradigms(程序设计范式):
+An Object Distinction
+
+'C++ 程序设计模型直接支持三种 programming paradigms(程序设计范式)':
 
 1. 程序模型(procedural model)。就像 C一样, C++ 当然也支持它。字符串的处理就是一个例子, 我们可以使用字符数组以及 str* 函数族群(定义在标准的 C 函数库中)
 
-char boy[] = "Danny";
-char * p_son;
+    char boy[] = "Danny";
+    char * p_son;
 
-p_son = new char[strlen(boy) + 1];
-strcpy(p_son, boy);
+    p_son = new char[strlen(boy) + 1];
+    strcpy(p_son, boy);
 
 2. 抽象数据类型模型(abstract data type model, ADT)。'此模型所谓的抽象是和一组表达式(public 接口)一起提供的',那时其运算定义仍然隐而未明。
 
-string girl = "xforg";
-string daughter;
-...
-// string::operator=()
-daughter = girl;
+    string girl = "xforg";
+    string daughter;
+    ...
+    // string::operator=()
+    daughter = girl;
+    ...
+    // string::operator==()
+    if(daughter == girl){
 
-...
-// string::operator==()
-if(daughter == girl)
-{
+    }
 
-}
+3. 面向对象模型(object-oriented model)。在此模型中有一些彼此相关的类型, 通过一个抽象的 base class (用以提供共同接口)被封装起来
 
-
-3. 面向对象模型(object-oriented model)。在此模型中有一些彼此相关的类型, 通过一个抽象的 base class(用以提供共同接口)被封装起来
-
+纯粹以一种 paradigm 写程序, 有助于整体行为的良好稳固。然而如果混合了不同的 paradigms, 就可能会带来让人吃惊的后果, 特别是在没有谨慎处理的情况下。
 
 在 OO paradigm 之中, 程序员需要处理一个未知实例, 它的类型虽然有所界定, 却有无穷可能。这组类型受限于其继承体系, 然而该体系理论上没有深度和广度的限制。
-原则上, 被指定的 object 的真实类型在每一个特定执行点之前, 是无法解析的。在 C++ 中, 只有通过 pointers 和 references 的操作才能够完成。相反地,在
-ADT paradigm 中, 程序员处理的是一个拥有固定而单一类型的实例, 它在编译时期就已经完全定义好了。
+原则上, 被指定的 object 的真实类型在每一个特定执行点之前, 是无法解析的。在 C++ 中, 只有通过 pointers 和 references 的操作才能够完成。
+
+在 ADT paradigm 中, 程序员处理的是一个拥有固定而单一类型的实例, 它在编译时期就已经完全定义好了。
 
 虽然对于 object 的多态操作要求此 object 必须可以经由一个 pointer 或 reference 存取, 然而 C++ 中的 pointer 或 reference 的处理却不是多态的必要
 结果。想想下面的情况:
@@ -623,32 +633,31 @@ void *pv;// 没有语言所支持的多态
 
 X *px;// okay
 
-在 C++, 多态只存在于一个个的 public class 体系中。举个例子, px 可能指向某个类型的 object, 或指向根据 public 继承关系派生而来的一个子类型
-。Nonpublic 的派生行为以及类型为 void* 的指针可以说是多态的, 但它们并没有被语言明确地支持, 也就是说它们必须由程序员通过显式的转换操作来管理。
-
-
+在 C++, 多态只存在于一个个的 public class 体系中。举个例子, px 可能指向某个类型的 object, 或指向根据 public 继承关系派生而来的一个子类型。Nonpublic 
+的派生行为以及类型为 void* 的指针可以说是多态的, 但它们并没有被语言明确地支持, 也就是说它们必须由程序员通过显式的转换操作来管理。
 
 C++ 以下列方法支持多态:
 
 1. 经由一组隐式的转化操作。例如把一个 derived class 指针转化为一个指向其 public base type 的指针:
 
-shared *ps = new Cycle();
+    shared *ps = new Cycle();
 
 2. 经由 virtual function 机制
 
-ps->retate();
+    ps->rotate();
 
 3. 经由 dynamic_cast 和 typeid 运算符
 
-if(cycle *pc = dynamic_cast<cycle*>(ps))
-{
+    if(cycle *pc = dynamic_cast<cycle*>(ps)){
 
-}
+    }
 
 '多态的主要用途是经由一个共同的接口来影响类型的封装, 这个接口通常被定义在一个抽象的 base class 中'。
 
 
-需要多少内存才能够表现一个 class object ? 一般而言要有:
+'需要多少内存才能够表现一个 class object' ? 
+
+一般而言要有:
 
 1. 其 nonstatic data members 的总和大小
 
@@ -656,8 +665,8 @@ if(cycle *pc = dynamic_cast<cycle*>(ps))
 
 3. 加上为了支持 virtual 而由内部产生的任何额外负担(overhead)
 
-// !! 一个指针, 不管它指向哪一种数据类型, 指针本身所需的内存大小是固定的
 
+// !! 一个指针, 不管它指向哪一种数据类型, 指针本身所需的内存大小是固定的
 
 // !! 指针的类型（The Type of a Pointer）
 
@@ -667,7 +676,7 @@ ZooAnimal *pz;
 int *pi;
 Array<string> *pa;
 
-以内存需求的观点来说, 没有什么不同! 它们三个都需要有足够的内存来放置一个机器地址 (通常是个 word )。
+以内存需求的观点来说, 没有什么不同! '它们三个都需要有足够的内存来放置一个机器地址 (通常是个 word )'。
 
 指向不同类型之各指针间的差异, 既不在其指针表示法不同, 也不在其内容(代表一个地址)不同, 而是在其所寻址出来的 object 类型不同。
 // !! 也就是说, 指针类型会教导编译器如何解释某个特定地址中的内存内容及其大小。
@@ -680,20 +689,20 @@ Array<string> *pa;
 
 嗯, 那么, 一个指向地址 1000 而类型为 void* 的指针, 将涵盖怎样的地址空间呢 ?
 
-是的, 我们不知道! 这就是为什么一个类型为 void* 的指针只能够持有一个地址, 而不能够通过它操作所指之 object 的缘故。
+是的, 我们不知道! '这就是为什么一个类型为 void* 的指针只能够持有一个地址, 而不能够通过它操作所指之 object 的缘故'。
+
+所以, '转换 (cast) 其实是一种编译器指令'。
+
+'大部分情况下它并不改变一个指针所含的真正地址,它只影响被指出之内存的大小和其内容的解释方式'。
 
 
-所以, '转换 (cast) 其实是一种编译器指令'。大部分情况下它并不改变一个指针所含的真正地址,它只影响"被指出之内存的大小和其内容" 的解释方式。
+// !! 加上多态之后 
 
-
-// !! 加上多态之后（Adding Polymorphism）
-
+Adding Polymorphism
 
 现在, 让我们定义一个 Bear, 作为一种 ZooAnimal。当然, 经由 "public 继承"可以完成这项任务:
 
-
-class Bear: public ZooAnimal
-{
+class Bear : public ZooAnimal {
 public:
     Bear();
     ~Bear();
@@ -718,7 +727,6 @@ b、pb、rb 会有怎样的内存需求呢 ?
 加上 Bear 所带来的 8 bytes。
 
 好, 假设我们的 Bear object 放在地址 1000 处, 一个 Bear 指针和一个 ZooAnimal 指针有什么不同?
-
 
 Bear b;
 ZooAnimal *pz = &b;
