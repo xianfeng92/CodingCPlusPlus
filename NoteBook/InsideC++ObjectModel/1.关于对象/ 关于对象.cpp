@@ -738,18 +738,15 @@ ZooAnimal subobject。
  
 除了 ZooAnimal subobject 中出现的 members, 你不能够使用 pz 来直接处理 Bear 的任何 members。
 
-
 pz->cell_book; // 不合法,cell_book 不是 ZooAnimal 的一个 member; 虽然我们知道 pz 现在指向一个 Bear Object
 
 (static_cast<Bear *>(pz))->cell_book;// ok:经过一个显示 downcast 就没问题了
 
-// 下面的会更好，但它是一个 rumtime-operation, 成本较高
+// 下面的会更好，但它是一个 runtime-operation, 成本较高
 
-if(Bear *bp2 = dynamic_cast<Bear *>(pz))
-{
+if(Bear *bp2 = dynamic_cast<Bear *>(pz)) {
     bp2->cell_book;
 }
-
 
 当我们写:
 
@@ -777,8 +774,8 @@ za.rotate();// 调用 ZooAnimal::rotate()
 1. 第二个问题的答案是, 编译器在初始化(1)及指定(2)(assignment)操作(将一个 class object 指定给另一个 class object) 之间做出了仲裁。编译器必须确保如
    果某个 object 含有一个或一个以上的 vptrs, 那些 vptrs 的内容不会被 base class object 初始化或改变。
 
-2. 至于第一个问题的答案是: za 并不是一个 Bear, 它是一个 ZooAnimal。'多态所造成的"一个以上的类型"的潜在力量, 并不能够实际发挥在"直接存取 objects"这件
-   事情上'。有一个似是而非的观念: OO 程序设计并不支持对 object 的直接处理。
+2. 至于第一个问题的答案是: za 并不是一个 Bear, 它是一个 ZooAnimal。
+   '多态所造成的"一个以上的类型"的潜在力量, 并不能够实际发挥在直接存取 objects 这件事情上'。有一个似是而非的观念: OO 程序设计并不支持对 object 的直接处理。
    
    举个例子, 下面这一组定义:
 
@@ -792,9 +789,8 @@ za.rotate();// 调用 ZooAnimal::rotate()
 
    其可能的内存布局:
 
-
 1. 将 za 或 b 的地址, 或 pp 所含的内容(也是个地址), 指定给 pza, 显然不是问题。'一个 pointer 或一个 reference 之所以支持多态, 是因为它们并不引发
-   内存中任何"与类型有关的内存委托操作(type-dependent commitment)"'; 会受到改变的, 只有它们所指向的内存的"大小和内容解释方式"而已。
+   内存中任何"与类型有关的内存委托操作(type-dependent commitment)"'。会受到改变的, 只有它们所指向的内存的"大小和内容解释方式"而已。
 
 2. 然而, 任何人如果企图改变 object za 的大小, 会违反其定义中受契约保护的"资源需求量"。如果把整个 Bear object 指定给 za, 则会溢出它所配置得到的内存。
    执行结果当然也就不对了。
@@ -803,20 +799,18 @@ za.rotate();// 调用 ZooAnimal::rotate()
    base type 内存中, derived type 将没有留下任何蛛丝马迹。多态于是不再呈现, 而一个严格的编译器可以在编译时期解析一个"通过此 object 而触发的
    virtual function 调用操作", 因而回避 virtual 机制。如果 virtual function 被定义为 inline, 则更有效率上的大收获。
 
-
 总而言之, 多态是一种威力强大的设计机制, 允许你继一个抽象的 public 接口之后, 封装相关的类型。我所举的 Library_materials 体系就是一例。需要付出的代价就
-是额外的间接性---不论是在"内存的获得"或是在"类型的决断"上。C++ 通过 class 的 pointers 和 references 来支持多态, 这种程序设计风格就称为"面向对象"。
+是额外的间接性---不论是在"内存的获得"或是在"类型的决断"上。
 
+C++ 通过 class 的 pointers 和 references 来支持多态, 这种程序设计风格就称为"面向对象"。
 
 C++ 也支持具体的 ADT 程序风格, 如今被称为 object-based(OB)。例如 String class, 一种非多态的数据类型。String class 可以展示封装的非多态形式; 
 它提供一个 public 接口和一个 private 实现品, 包括数据和算法, 但是不支持类型的扩充。
 
-'一个 OB 设计可能比一个对等的 OO 设计速度更快而且空间更紧凑'。速度快是因为所有的函数调用操作都在编译时期解析完成,对象建构起来时不需要设置 virtual 机制;
+'一个 OB 设计可能比一个对等的 OO 设计速度更快而且空间更紧凑'。速度快是因为所有的函数调用操作都在编译时期解析完成, 对象建构起来时不需要设置 virtual 机制;
 
 空间紧凑则是因为每一个 class object 不需要负担传统上为了支持 virtual 机制而需要的额外负荷。不过, OB 设计比较没有弹性。
-
 
 OO 和 OB 设计策略都有它们的拥护者和批评者。
 
 // !! 在弹性 (OO) 和 效率 (OB) 之间常常存在着取与舍。一个人能够有效选择其一之前, 必须先清楚了解两者的行为和应用领域的需求。
-
