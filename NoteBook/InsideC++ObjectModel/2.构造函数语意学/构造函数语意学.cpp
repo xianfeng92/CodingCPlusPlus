@@ -370,9 +370,248 @@ void bar(){
 
 以及当函数传回一个 class object 时, 例如:
 
+X foo_bar(){
+    X xx;
+    return xx;
+}
+
+
+假设 class 设计者显式定义了一个 copy constructor, 像下面这样:
+
+
+X::X(const X& x);
+Y::Y(const Y& y, int = 0);
+
+那么在大部分情况下, 当一个 class object 以另一个同类实例作为初值, 上述的 constructor 会被调用。这可能会导致一个临时性  class object 的产生或导致程序代
+码的蜕变(或两者都有)。
 
 
 
+// !! Default Memberwise Initialization
+
+
+如果 class 没有提供一个 explicit copy constructor 当如何? 
+
+当 class object 以相同 class 的另一个 object 作为初值, 其内部是以所谓的 default memberwise initialization 手法完成的, 也就是把每一个内建的或派生的
+data member 的值, 从某个 object 拷贝一份到另一个 object 身上。不过它并不会拷贝其中的 member class object, 而是以递归的方式施行 memberwise 
+initialization。
+
+
+例如, 考虑下面这个 class 声明:
+
+class String{
+public:
+  //...
+private:
+  char* str;
+  int len;
+};
+
+一个 String object 的 default memberwise initialization 发生在这种情况之下:
+
+String noun = "Book";
+String verb = noun;
+
+其完成方式就好像个别设定每一个 members 一样:
+
+verb.str = noun.str;
+verb.len = noun.len;
+
+
+如果一个 String object 被声明为另一个 class 的 member, 像这样:
+
+
+class Word{
+public:
+  //...
+private:
+  int occurs_;
+  String word_;
+};
+
+那么一个 Word object 的 default memberwise initialization 会拷贝其内建的 member occurs_, 然后再于 String member object word_ 身上递归实施 
+memberwise initialization。
+
+这样的操作实际上如何完成? ARM 告诉我们:
+
+概念上而言, 对于一个 class X, 这个操作是被一个 copy constructor 实现出来的……
+
+其中主要的字眼是“概念上”。这个注释又紧跟着一些解释:
+
+一个良好的编译器可以为大部分 class objects 产生 bitwise copies, 因为它们有 bitwise copy semantics……
+
+也就是说, 如果一个 class 未定义出 copy constructor, 编译器就自动为它产生出一个这句话不对, 而是应该像 ARM 所说:
+
+Default constructors 和 copy constructors 在必要的时候才由编译器产生出来。
+
+这个句子中的"必要"意指当 class 不展现 bitwise copy semantics 时。
+
+一个 class object 可用两种方式复制得到, 一种是被初始化, 另一种是被指定(assignment)。从概念上而言, 这两个操作分别是以 copy constructor 和
+copy assignment operator 完成的。
+
+
+和以前一样, C++Standard 把 copy constructor 区分为 trivial 和 nontrivial 两种。只有 nontrivial 的实例才会被合成于程序之中。
+
+决定一个 copy constructor 是否为 trivial 的标准在于 class 是否展现出所谓的 bitwise copy semantics。
+
+// !! Bitwise Copy Semantics (位逐次拷贝)
+
+在下面的程序片段中:
+
+#include "Word.h"
+
+Word noun("Book");
+void foo(){
+    Word verb = noun;
+    //...
+}
+
+很明显 verb 是根据 noun  来初始化的。但是在尚未看过class Word 的声明之前, 我们不可能预测这个初始化操作的程序行为。
+
+
+如果 class Word 的设计者定义了一个 copy constructor, verb 的初始化操作会调用它。但如果该 class 没有定义 explicit copy constructor, 那么是否会有一
+个编译器合成的实例被调用? 这就得视该 class 是否展现 bitwise copy semantics 而定了。
+
+举个例子, 已知下面的 class Word 声明:
+
+class Word{
+public:
+  Word(const char *);
+  ~Word(){
+      delete[] str;
+  }
+private:
+  int cnt;
+  char *str;
+};
+
+这种情况下并不需要合成出一个 default copy constructor, 因为上述声明展现了 default copy semantics, 而 verb 的初始化操作也就不需要以一个函数调用收场。
+
+然而, 如果 class Word 是这样声明:
+
+class Word{
+public:
+  Word(const String&);
+  ~Word();
+private:
+  String str;
+};
+
+
+其中 String 声明了一个 explicit copy constructor:
+
+class String{
+public:
+  String(const char*);
+  String(const String&);
+  ~String();
+};
+
+
+这种情况下, 编译器必须合成出一个copy constructor, 以便调用 member class String object 的 copy constructor
+
+
+inline Word::Word(const Word& wd){
+    str.String::String(wd.str);
+    cnt = wd.cnt;
+}
+
+有一点很值得注意: 在这被合成出来的 copy constructor 中, 如整数、指针、数组等等的 non class members 也都会被复制, 正如我们所期待的一样。
+
+
+// !! 不要 Bitwise Copy Semantics
+
+
+什么时候一个 class 不展现出 bitwise copy semantics  呢? 有 4 种情况:
+
+1. 当 class 内含一个 member object 而后者的 class 声明有一个 copy constructor 时
+
+2. 当 class 继承自一个 base class 而后者存在一个 copy constructor 时
+
+3. 当 class 声明了一个或多个 virtual functions 时
+
+4. 当 class 派生自一个继承串链, 其中有一个或多个 virtual base classes 时
+
+
+在前两种情况中, 编译器必须将 member 或 base class 的 copy constructors 调用操作安插到被合成的 copy constructor 中。
+
+
+// !! 重新设定 Virtual Table 的指针
+
+回忆编译期间的两个程序扩张操作(只要有一个 class 声明了一个或多个 virtual functions 就会如此):
+
+■ 增加一个 virtual function table (vtbl), 内含每一个有作用的 virtual function 的地址
+
+■ 一个指向 virtual function table 的指针(vptr), 安插在每一个 class object 内
+
+
+很显然, 如果编译器对于每一个新产生的 class object 的 vptr 不能成功而正确地设好其初值, 将导致可怕的后果。因此, 当编译器导入一个 vptr 到 class 之中时,该
+ class 就不再展现 bitwise semantics 了。
+
+现在, 编译器需要合成出一个 copy constructor 以求将 vptr 适当地初始化, 下面是个例子。
+
+
+首先, 我定义两个 class, ZooAnimal 和 Bear:
+
+class ZooAnimal{
+public:
+  ZooAnimal();
+  virtual ~ZooAnimal();
+  virtual void animate();
+  virtual void draw();
+  //...
+private:
+  //...
+};
+
+
+class Bear: public ZooAnimal{
+public:
+  Bear();
+  void animate();
+  void draw();
+  virtual void dance();
+  //...
+private:
+  //...
+};
+
+ZooAnimal class object 以另一个 ZooAnimal class object 作为初值, 或 Bear class object 以另一个 Bear class object 作为初值, 都可以直接靠
+bitwise copy semantics 完成。
+
+举个例子:
+
+Bear yogi;
+Bear winnie = yogi;
+
+yogi 会被 default Bear constructor 初始化。而在 constructor 中, yogi 的 vptr 被设定指向 Bear class 的 virtual table (靠编译器安插的代码完成)。
+因此,  把 yogi 的 vptr 值拷贝给 winnie 的 vptr 是安全的。
+
+
+当一个 base class object 以其 derived class 的 object 内容做初始化操作时, 其 vptr 复制操作也必须保证安全,例如:
+
+ZooAnimal franny = yogi;
+
+franny 的 vptr 不可以被设定指向 Bear class 的 virtual table (但如果 yogi 的 vptr 被直接 bitwise copy 的话, 就会导致此结果), 否则当下面程序片段中
+的 draw() 被调用而 franny 被传进去时, 就会炸毁(blow up):
+
+void draw(const ZooAnimal& za){
+    za.draw();
+}
+
+void foo(){
+    draw(yogi);
+    draw(franny);
+}
+
+
+也就是说, 合成出来的 ZooAnimal copy constructor 会显式设定 object 的 vptr 指向 ZooAnimal class  的 virtual table, 而不是直接从右手边的
+class object 中将其 vptr 现值拷贝过来。
+
+
+// !! 处理 Virtual Base Class Subobject
+
+// !! 程序转化语意学
 
 
 
