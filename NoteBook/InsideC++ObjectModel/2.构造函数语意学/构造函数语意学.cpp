@@ -613,6 +613,556 @@ class object 中将其 vptr 现值拷贝过来。
 
 // !! 程序转化语意学
 
+Program TransformationSemantics
+
+已知下面的程序片段:
+
+#include "X.h"
+
+X foo(){
+  X xx;
+  //...
+  return xx;
+}
+
+
+一个人可能会做出以下假设:
+
+1. 每次 foo() 被调用, 就传回 xx 的值
+
+2. 如果 class X 定义了一个 copy constructor, 那么当 foo() 被调用时, 保证该 copy constructor 也会被调用
+
+第一个假设的真实性, 必须视 class X 如何定义而定。第二个假设的真实性, 虽然也部分地必须视 class X 如何定义而定, 但最主要的还是视你的 C++  编译器所提供的进取
+性优化层级(degree of aggressive optimization) 而定。
+
+一个人甚至可以假设在一个高质量的 C++ 编译器中, 上述两点对于 class X 的 nontrivial definitions 都不正确。
+
+
+// !! 显式的初始化操作（Explicit Initialization）
+
+
+已知有这样的定义:
+
+X x0;
+
+面的三个定义, 每一个都明显地以 x0 来初始化其 class object:
+
+void foo_bar() {
+  X x1(x0);
+  X x2 = x0;
+  X x3 = X(x0);
+  //...
+}
+
+必要的程序转化有两个阶段:
+
+
+1. 重写每一个定义, 其中的初始化操作会被剥除 (这里所谓的"定义"是指上述的 x1, x2, x3 三行; 在严谨的 C++ 用词中, "定义"是指"占用内存"的行为)
+
+2. class的 copy constructor 调用操作会被安插进去
+
+
+举个例子, 在明确的双阶段转化之后, foo_bar() 可能看起来像这样:
+
+void foo_bar() {
+
+  // 重写每一个定义,其中的初始化操作会被剥除
+  X x1;
+  X x2;
+  X x3;
+
+  // 编译器安插  X copy construction 的调用操作
+  x1.X::X(x0);
+  x2.X::X(x0);
+  x3.X::X(x0);
+  return 0;
+}
+
+其中的:
+
+x1.X::X(x0);
+
+就表现出对以下的 copy constructor 的调用:
+
+X::X(const X& x){
+
+}
+
+
+
+// !! 参数的初始化 (Argument Initialization)
+
+
+C++Standard 说, 把一个 class object 当做参数传给一个函数(或是作为一个函数的返回值), 相当于以下形式的初始化操作:
+
+X xx = arg;
+
+其中 xx 代表形式参数(或返回值), 而 arg 代表真正的参数值。因此, 若已知这个函数:
+
+void foo(X xx);
+
+下面这样的调用方式:
+
+X xx;
+foo(xx);
+
+
+将会要求局部实例(local instance) x0 以 memberwise 的方式将 xx 当做初值。
+
+在编译器实现技术上, 有一种策略是导入所谓的临时性 object, 并调用 copy constructor 将它初始化, 然后将此临时性 object 交给函数。
+
+例如将前一段程序代码转换如下:
+
+//  C++ 伪代码
+// 编译器所产生出来的临时性对象
+X __temp0;
+
+// 编译器对 Copy constructor 的调用
+__temp0.X::X(xx);
+
+// 重新改写函数的调用, 以便使用上述临时对象
+foo(__temp0);
+
+然而这样的转换只做了一半功夫而已。你看出遗留问题了吗?  问题出在 foo() 的声明上。临时性 object 先以 class X 的 copy constructor 正确地设定了初值, 然后再
+以 bitwise 方式拷贝到 x0 这个局部实例中。噢, 真讨厌, foo() 的声明因而也必须被转化, 形式参数必须从原先的一个 class X object 改变为一个 class X 
+reference, 像这样:
+
+void foo(const X& x);
+
+其中 class X 声明了一个 destructor,  它会在 foo() 函数完成之后被调用, 对付那个临时性的 object。
+
+
+另一种实现方法是以"拷贝建构"(copy construct) 的方式把实际参数直接建构在其应该的位置上, 此位置视函数活动范围的不同, 记录于程序堆栈中。在函数返回之前,局部对
+象(local object) 的 destructor 会被执行。Borland C++ 编译器就是使用此法, 但它也提供一个编译选项,用以指定前一种做法, 以便和其早期版本兼容。
+
+
+// !! 返回值的初始化 (Return Value Initialization)
+
+已知下面这个函数定义:
+
+X bar() {
+  X xx;
+  // 处理 xx
+  return xx;
+}
+
+
+你可能会问 bar() 的返回值如何从局部对象 xx 中拷贝过来?
+
+
+Stroustrup 在 cfront 中的解决做法是一个双阶段转化:
+
+1. 首先加上一个额外参数,类型是 class object 的一个 reference。这个参数将用来放置被"拷贝建构(copy constructed)"而得的返回值
+
+2. 在 return 指令之前安插一个 copy constructor 调用操作, 以便将欲传回之 object 的内容当做上述新增参数的初值
+
+真正的返回值是什么? 最后一个转化操作会重新改写函数, 使它不传回任何值。根据这样的算法, bar() 转换如下:
+
+// 函数转换
+// 以反映出 Copy Constructor 的应用
+// C++ 伪代码
+
+void bar(X& _result) {// 加了一个额外参数
+  X xx;
+  // 编译器所产生的的 Default Constructor 的调用
+  xx.X::X();
+  //...
+  // 编译器所产生的 Copy Constructor 的调用
+  _result.X::X(xx);
+  return;
+}
+
+现在编译器必须转换每一个 bar() 调用操作, 以反映其新定义。例如:
+
+X xx = bar();
+
+将被转换为下列两个指令句:
+
+X xx;
+bar(xx);
+
+而:
+
+bar().memfunc();
+
+可能被转换为:
+
+// 编译器所产生的的临时性对象
+X _temp0;
+(bar(_temp0), temp0).memfunc();
+
+
+同理, 如果程序声明了一个函数指针, 像这样:
+
+X(*pf)();
+pf = bar();
+
+它也必须被转化为:
+
+void(*Pf)(X);
+pf = bar();
+
+
+
+// !! 在使用者层面做优化（Optimization at the User Level）
+
+我相信始作俑者是 Jonathan Shopiro! 他对于像 bar() 这样一个函数, 最先提出"程序员优化"的观念: 定义一个"计算用"的 constructor。
+换句话说程序员不再写:
+
+X bar(const T& y, const T& z){
+  X xx;
+  // 以 y 和 x 来处理 xx
+  return xx;
+}
+
+那会要求 xx 被"memberwise"地拷贝到编译器所产生的 _result 之中。
+
+Jonathan 定义另一个 constructor, 可以直接计算 xx 的值:
+
+X bar(const T& y, const T& z){
+  return X(y, z);
+}
+
+于是当 bar() 的定义被转换之后, 效率会比较高:
+
+// C++ 伪代码
+void bar(X& _result){
+  _result.X::X(y, z);
+  return;
+}
+
+
+_result 被直接计算出来, 而不是经由 copy constructor 拷贝而得!
+
+不过, 这种解决方法受到某种批评, 怕那些特殊计算用途的 constructor 可能会大量扩散。在这个层面上, class 的设计是以效率考虑居多, 而不是以"支持抽象化"为优先。
+
+
+// !! 在编译器层面做优化 (Optimization at the Compiler Level)
+
+在一个像 bar() 这样的函数中, 所有的 return 指令传回相同的具名数值, 因此编译器有可能自己做优化, 方法是以 result 参数取代 named return value。
+
+X bar(){
+  X xx;
+  //...
+  return xx;
+}
+
+编译器把其中的 xx 以 _result 取代:
+
+void bar(X& _result){
+  _result.X::X();
+  //... 直接处理 _result
+  return;
+}
+
+这样的编译器优化操作, 有时候被称为 Named Return Value (NRV)优化。
+
+NRV 优化如今被视为标准  C++ 编译器的一个义不容辞的优化操作——虽然其需求其实超越了正式标准之外。为了对效率的改善有所感觉, 请你想想下面的代码:
+
+class test{
+  friend test_foo(double);
+public:
+  test(){
+    memset(array, 0, 100*sizeof(double));
+  }
+private:
+  double array[100];
+};
+
+同时请考虑以下函数, 它产生、修改并传回一个 test class object。
+
+test foo(double val) {
+  test local;
+
+  local.array[0] = val;
+  local.array[99] = val;
+  return local;
+}
+
+有一个 main() 函数调用上述 foo() 函数 1000 万次:
+
+int main(int argc, char* argv[]){
+  for(int i = 0; i < 1000000; i++){
+    test t = foo(double(i));
+  }
+  return 0;
+}
+
+
+一般而言, 面对"以一个 class object 作为另一个 class object 的初值"的情形, 语言允许编译器有大量的自由发挥空间。其利益当然是导致机器码产生时有明显的效
+率提升。缺点则是你不能够安全地规划你的 copy constructor 的副作用, 必须视其执行而定。
+
+
+// !! Copy Constructor: 要还是不要?
+
+已知下面的 3D 坐标点类:
+
+class Point3d{
+public:
+  Point3d(float x, float y, float z);
+  //...
+private:
+  float x_, y_, z_;
+};
+
+这个 class 的设计者应该提供一个 explicit copy constructor 吗?
+
+上述 class 的 default copy constructor 被视为 trivial。它既没有任何  member (或base) class objects 带有 copy constructor, 也没任何的
+virtual base class 或 virtual function。
+
+
+所以, 默认情况下, 一个 Point3d class object 的  memberwise 初始化操作会导致"bitwise copy"。这样的效率很高, 但安全吗?
+
+答案是 yes。三个坐标成员是以数值来存储的。bitwise copy 既不会导致 memory leak, 也不会产生 address aliasing。因此,它既快速,又安全。
+
+那么, 这个 class 的设计者应该提供一个 explicit copy constructor 吗?
+
+你将如何回答这个问题? 答案当然很明显是 no。没有任何理由要你提供一个 copy constructor 函数实例, 因为编译器自动为你实施了最好的行为。
+
+比较难以回答的是, 如果你被问及是否预见 class 需要大量的 memberwise 初始化操作,例如以传值的方式传回 objects? 如果答案是 yes, 那么提供一个
+copy constructor 的 explicit inline 函数实例就非常合理——在"你的编译器提供 NRV 优化"的前提下。
+
+
+例如, Point3d 支持下面一组函数:
+
+Point3d operator+(const Point3d&, const Point3d&);
+Point3d operator-(const Point3d&, const Point3d&);
+Point3d operator*(const Point3d&);
+
+所有那些函数都能够良好地符合 NRV template:
+{
+  Point3d result;
+  //...
+  return result;
+}
+
+
+实现 copy constructor 的最简单方法像这样:
+
+Point3d::Point3d(const Point3d& rhs){
+  x_ = rhs.x_;
+  y_ = rhs.y_;
+  z_ = rhs.z_;
+}
+
+这没问题, 但使用 C++library 的 memcpy() 会更有效率:
+
+Point3d::Point3d(const Point3d& rhs){
+  memcpy(this, &rhs, sizeof(Point3d));
+}
+
+
+然而不管使用 memcpy() 还是 memset(), 都只有在 classes 不含任何由编译器产生的内部 members 时才能有效运行。
+
+如果 Point3d class 声明一个或一个以上的 virtual functions 或内含一个 virtual base class, 那么使用上述函数将会导致那些被编译器产生的内部 members的初值
+被改写。
+
+例如, 已知下面的声明:
+
+class Shape{
+public:
+  // 这会改变内部的 vptr
+  Shape(){
+    memset(this, 0, sizeof(Shape));
+  }
+  ~Shape();
+  //...
+};
+
+编译器为此 constructor 扩张的内容看起来像这样:
+
+// 扩张后的 constructor
+// C++ 伪代码
+Shape::Shape(){
+  _vptr_Shape = _vbtl_Shape;
+
+  // memset 会将 vptr 清 0
+  memset(this, 0, sizeof(Shape));
+}
+
+如你所见, 若要正确使用 memset() 和 memcpy(), 则需要掌握某些 C++Object Model 的语意学知识！
+
+
+// !! 摘要
+
+copy constructor 的应用, 迫使编译器多多少少对你的程序代码做部分转化。尤其是当一个函数以传值的方式传回一个 class object, 而该 class 有一个
+copy constructor 时。
+
+这将导致深奥的程序转化——不论在函数的定义上还是在使用上。此外，编译器也将 copy constructor 的调用操作优化，以一个额外的第一参数(数值被直接存放于其中)取代
+NRV。程序员如果了解那些转换, 以及 copy constructor 优化后的可能状态, 就比较能够控制其程序的执行效率。
+
+
+// !! 成员们的初始化队伍 (Member Initialization List)
+
+当你写下一个 constructor 时, 就有机会设定 class members 的初值。要不是经由 member initialization list, 就是在 constructor 函数本体之内。除了 4 
+种情况, 你的任何选择其实都差不多。
+
+本节之中, 我首先要澄清何时使用 initialization list 才有意义, 然后解释 list 内部的真正操作是什么, 然后我们再来看看一些微妙的陷阱。
+
+在下列情况下, 为了让你的程序能够被顺利编译, 你必须使用 member initialization list:
+
+1. 当初始化一个 reference member 时
+
+2. 当初始化一个 const member 时
+
+3. 当调用一个 base class 的 constructor, 而它拥有一组参数时
+
+4. 当调用一个 member class 的 constructor, 而它拥有一组参数时
+
+
+在这 4 种情况下, 程序可以被正确编译并执行, 但是效率不高。例如:
+
+class Word{
+private:
+  string name_;
+  int cnt_;
+public:
+  Word() {
+    name_ = 0;
+    cnt_ = 0;
+  }
+};
+
+在这里, Word constructor 会先产生一个临时性的 String object, 然后将它初始化, 之后以一个 assignment 运算符将临时性 object 指定给 name_, 随后再摧毁
+那个临时性 object。这是故意的吗? 不大可能。编译器会产生一个警告吗? 我不知道!
+
+以下是 constructor 可能的内部扩张结果:
+// C++ 伪代码
+Word::Word() {
+  // 调用 string 的 default constructor
+  name_.string::string();
+
+  // 产生临时性对象
+  string temp = string(0);
+
+  // memberwise copy
+  name_.string::operator=(temp);
+
+  // 摧毁临时性对象
+  temp_.string::~string();
+
+  cnt_ = 0;
+}
+
+对代码反复审查并修正, 得到一个明显更有效率的实现方法:
+
+// 较佳的方式
+Word::Word() : name_(0){
+  cnt_ = 0;
+}
+
+
+它会被扩张成这个样子:
+
+Word::Word(){
+  name_.string::string(0);
+  cnt_ = 0;
+}
+
+顺带一提, 陷阱最有可能发生在这种形式的 template code 中:
+
+template<typename T>
+foo<T>::foo(T t){
+  t_ = t;
+}
+
+这会引导某些程序员十分积极进取地坚持所有的 member 初始化操作必须在 member initialization list 中完成, 甚至即使是一个行为良好的 member, 如 cnt_:
+
+Word::Word() : name_(0), cnt_(0){
+
+}
+
+在这里我们不禁要提出一个合理的问题: member initialization list 中到底会发生什么事情? 许多 C++ 新手对于 list 的语法感到迷惑, 他们误以为它是一组函数调
+用。当然它不是！
+
+'编译器会一一操作 initialization list, 以适当顺序在 constructor 之内安插初始化操作, 并且在任何 explicit user code 之前'。
+
+
+例如, 先前的 Word constructor 被扩充为:
+
+Word::Word(){
+  name_.string.string(0);
+  cnt_ = 0;
+}
+
+嗯……嗯, 它看起来很像是在 constructor 中指定 cnt_ 的值。
+
+事实上, 有一些微妙的地方要注意: 'list 中的项目顺序是由 class 中的 members 声明顺序决定的, 不是由 initialization list 中的排列顺序决定的'。
+
+在本例的 Word class 中, name_ 被声明于 cnt_ 之前, 所以它的初始化也比较早。
+
+"初始化顺序"和"initialization list"中的项目排列顺序之间的外观错乱, 会导致下面意想不到的危险:
+
+class X{
+private:
+  int i;
+  int j;
+public:
+  X(int val): j(val), i(j) {
+
+  }
+};
+
+上述程序代码看起来像是要把 j 设初值为 val, 再把 i 设初值为 j。问题在于, 由于声明顺序的缘故, initialization list 中的 i(j) 其实比 j(val) 更早执行。
+
+这里还有一个有趣的问题, initialization list 中的项目被安插到 constructor 中, 会继续保存声明顺序吗?
+
+X::X(int val) : j(val){
+  i = j;
+}
+
+j 的初始化操作会被安插在 explicit user assignment 操作 (i=j) 之前还是之后 ? 如果声明顺序继续被保存, 则这份代码大大不。然而这份代码其实是正确的, 因为 
+initialization list 的项目被放在 explicit user code 之前。
+
+另一个常见的问题是, 你是否能够像下面这样, 调用一个 member function 以设定一个 member 的初值:
+
+X::X(int val) : i(foo(val)), j(val){
+
+}
+
+其中 foo() 是 X 的一个 member function。答案是 yes, 但是……唔……之所以加上但是, 是因为我要给你一个忠告: 请使用存在于 constructor 体内的一个 member, 
+而不要使用存在于 member initialization list 中的 member, 来为另一个 member 设定初值。
+
+你并不知道 foo() 对 X object 的依赖性有多高, 如果你把 foo() 放在 constructor 体内, 那么对于到底是哪一个 member 在 foo() 执行时被设立初值这件事,就可
+以确保不会发生模棱两可的情况。
+
+
+Member function 的使用是合法的(当然, 我们必须不考虑它所用到的 members 是否已初始化), 这是因为和此 object 相关的 this 指针已经被建构妥当, 而 
+constructor 大约被扩充为:
+
+X::X(){
+  i = this->foo(val);
+  j = val;
+}
+
+
+最后, 如果一个 derived class member function 被调用, 其返回值被当做 base class constructor 的一个参数, 将会如何:
+
+
+class FooBar : public X{
+private:
+  int fval_;
+public:
+  int fval(){return fval_;}
+  FooBar(int val) : fval_(val), X(fval_) {
+
+  }
+  //...
+};
+
+
+你认为如何? 这是一个好主意吗? 下面是它可能的扩张结果:
+
+FooBar::FooBar(){
+  X::X(this, this->fval());
+  fval_ = val;
+}
+
+它的确不是一个好主意。
+
+
+简略地说，编译器会对 initialization list 一一处理并可能重新排序, 以反映出 members 的声明顺序。它会安插一些代码到 constructor 体内, 并置于任何 
+explicit user code 之前。
 
 
 

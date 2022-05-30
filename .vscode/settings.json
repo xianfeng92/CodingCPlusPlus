@@ -87,6 +87,7 @@
         "crend",
         "custmap",
         "custset",
+        "datademo",
         "Exupéry",
         "fibl",
         "fopow",
@@ -108,6 +109,7 @@
         "rpos",
         "Schwarz",
         "setaffinity",
+        "Shopiro",
         "subobject",
         "subobjects",
         "sval",
@@ -115,6 +117,7 @@
         "Unord",
         "unparser",
         "unsynchronized",
+        "vbtl",
         "xforg"
     ]
 }
