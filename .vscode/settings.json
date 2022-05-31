@@ -88,6 +88,7 @@
         "custmap",
         "custset",
         "datademo",
+        "demangling",
         "Exupéry",
         "fibl",
         "fopow",
@@ -117,6 +118,7 @@
         "Unord",
         "unparser",
         "unsynchronized",
+        "Usenix",
         "vbtl",
         "xforg"
     ]
