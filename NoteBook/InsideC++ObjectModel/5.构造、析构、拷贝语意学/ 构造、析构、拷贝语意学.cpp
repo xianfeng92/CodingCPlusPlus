@@ -1,28 +1,29 @@
 
-// !! 构造、析构、拷贝语意学（Semantics of Construction，Destruction，and Copy）
+// !! 构造、析构、拷贝语意学
+
+Semantics of Construction,  Destruction and Copy
+
 
 考虑下面这个 abstract base class 声明:
 
-class Abstract_base{
-    public:
-        virtual ~Abstract_base();
-        virtual void interface() = 0;
-        virtual const char* mumble() const {return mumble_;}
+class Abstract_base {
+ public:
+  virtual ~Abstract_base();
+  virtual void interface() = 0;
+  virtual const char *mumble() const { return mumble_; }
 
-    protected:
-    char* mumble_;
+ protected:
+  char *mumble_;
 };
 
 你看出了什么问题没有 ?
 
-虽然这个 class 被设计为一个抽象的 base class (其中有 pure virtual function, 使得 Abstract_base 不可能拥有实例),但它仍然需要一个显式的构造函数
+虽然这个 class 被设计为一个抽象的 base class (有 pure virtual function, 使得 Abstract_base 不可能拥有实例), 但它仍然需要一个显式的构造函数
 以初始化其 data member mumble_。
-
 
 如果没有这个初始化操作, 其 derived class 的局部性对象 mumble_ 将无法决定初值, 例如:
 
-class Concrete_derived : public Abstract_base
-{
+class Concrete_derived : public Abstract_base {
 public:
     Concrete_derived();
     //...
@@ -35,7 +36,6 @@ void foo(){
     Concrete_derived trouble;
 }
 
-
 你可能会争辩说, 也许 Abstract_base 的设计者意图让其每一个 derived class 提供 mumble_ 的初值。然而如果是这样, derived class 的唯一要求就是
 Abstract_base 必须提供一个带有唯一参数的 protected constructor:
 
@@ -44,32 +44,28 @@ Abstract_base::Abstract_base(char *mumble = 0):mumble_(mumble){}
 一般而言, class 的 data member 应该被初始化, 并且只在 constructor 中或是在 class 的其他 member functions 中指定初值。其他任何操作都将破坏封
 装性质, 使 class 的维护和修改更加困难。
 
-当然,你也可能争辩说设计者的错误并不在于未提供一个 explicit constructor, 而是他不应该在抽象的 base class 中声明 data members。这是比较强而有力的论
-点(把 interface 和 implementation 分离), 但它并不是行遍天下皆有理, 因为将"被共享的数据"抽取出来放在 base class 中, 毕竟是一种正当的设计。
+当然,你也可能争辩说设计者的错误并不在于未提供一个 explicit constructor, 而是他不应该在抽象的 base class 中声明 data members。这是比较强而有力的
+论点(把 interface 和 implementation 分离), 但它并不是行遍天下皆有理, 因为将"被共享的数据"抽取出来放在 base class 中, 毕竟是一种正当的设计。
 
 
 // !! “无继承”情况下的对象构造
 
-
-C++ 新手常常很惊讶地发现,一个人竟然可以定义和调用 (invoke) 一个 pure virtual function; 不过它只能被静态地调用 (invoked statically), 不能经由虚
+C++ 新手常常很惊讶地发现, 一个人竟然可以定义和调用 (invoke) 一个 pure virtual function, 不过它只能被静态地调用 (invoked statically), 不能经由虚
 拟机制调用。例如, 你可以合法地写下这段代码:
 
 // ok,定义 pure virtual function
 // 但只能被静态调用（invocate statically）
-inline void Abstract_base::inteface() const
-{
+inline void Abstract_base::inteface() const {
     //...
 }
 
-inline void Concrete_derived::inteface() const
-{
+inline void Concrete_derived::inteface() const {
     // ok, 静态调用（static invocation）
     Abstract_base::inteface();
     //...
 }
 
-
-要不要这样做, 全由 class 设计者决定。唯一的例外就是 pure virtual destructor: class 设计者一定得定义它。为什么?  因为每一个 derived class 
+要不要这样做, 全由 class 设计者决定。唯一的例外就是 pure virtual destructor,  class 设计者一定得定义它。为什么?  因为每一个 derived class 
 destructor 会被编译器加以扩张, 以静态调用的方式调用其 "每一个 virtual base class" 以及 "上一层 base class" 的 destructor。因此, 只要缺乏任
 何一个 base class destructors 的定义, 就会导致链接失败。
 
@@ -82,7 +78,6 @@ destructor 会被编译器加以扩张, 以静态调用的方式调用其 "每�
 
 一个比较好的替代方案就是, 不要把 virtual destructor 声明为 pure。
 
-
 // !! 虚拟规格的存在（Presence of a Virtual Specification）
 
 如果你决定把 Abstract_base::mumble() 设计为一个 virtual function, 那将是一个糟糕的选择, 因为其函数定义内容并不与类型有关, 因而几乎不会被后继的
@@ -90,14 +85,12 @@ derived class 改写。
 
 一般而言, 把所有的成员函数都声明为 virtual function, 然后再靠编译器的优化操作把非必要的 virtual invocation 去除, 并不是好的设计理念。
 
-
 // !! 虚拟规格中 const 的存在
 
 
 // !! 重新考虑 class 的声明
 
-class Abstract_base
-{
+class Abstract_base {
 public:
     virtual ~Abstract_base();
     virtual void interface() = 0;
@@ -208,8 +201,7 @@ Plain Old Data'。
 
 以下是 Point 的第二次声明, 在 public 接口之下多了 private 数据, 提供完整的封装性, 但没有提供任何 virtual function:
 
-class Point
-{
+class Point {
 public:
     Point(float x = 0.0f, float y = 0.0f, float z = 0.0f) : x_(x), y_(y), z_(z){}
     // no copy constructor, copy operator
@@ -255,9 +247,7 @@ Explicit initialization list 带来三项缺点:
 
 3. 由于编译器并没有自动施行之, 所以初始化行为的失败可能性会高一些
 
-
 那么, explicit initialization list 所带来的效率优点, 能够补偿其软件工程上的缺点吗?
-
 
 一般而言, 答案是 no。然而在某些特殊情况下又不一样。例如, 或许你以手工打造了一些巨大的数据结构如调色盘(color palette), 或是你正要把一堆常量数
 据(像是以 Alias 或 SoftImage 软件产生出来的复杂几何模型中的控制点和节点)倾倒给程序, 那么 explicit initialization list 的效率会比 inline
@@ -293,7 +283,6 @@ if(heap != nullptr){
     heap->Point::Point();
 }
 
-
 然后才又被编译器进行 inline expansion 操作。至于把 local object 赋值给 heap 指针所指向的对象:
 
 *heap = local;
@@ -313,13 +302,11 @@ delete heap;
 观念上, 我们的 Point class 有一个相关的 default copy constructor、copy operator、和 destructor。然而它们都是无关痛痒的(trivial), 而且编译
 器实际上根本没有产生它们。
 
-
 // !! 为继承做准备
 
 我们的第三个 Point 声明, 将为"继承性质"以及某些操作的动态决议(dynamic resolution)做准备。目前我们限制对 z 成员做存取操作:
 
-class Point
-{
+class Point {
 public:
     Point(float x = 0.0f, float y = 0.0f): x_(x), y_(y){}
     // no copy constructor, copy operator
@@ -330,17 +317,15 @@ protected:
 };
 
 再一次强调一下, 我并没有定义一个 copy constructor、copy operator、destructor。我们的所有 members 都以数值来存储, 因此在程序层面的默认语意之下
-,行为良好。某些人可能会争辩说, virtual functions 的导入应该总是附带着一个 virtual destructor 的声明。但是, 那么做在这个例子中对我们并无好处。
+行为良好。某些人可能会争辩说, virtual functions 的导入应该总是附带着一个 virtual destructor 的声明。但是, 那么做在这个例子中对我们并无好处。
 
-
-virtual functions的导入促使每一个Point object拥有一个 virtual table pointer。这个指针给我们提供 virtual 接口的弹性, 其成本是: 每一个 object 
+'virtual functions 的导入促使每一个 Point object 拥有一个 virtual table pointer'。这个指针给我们提供 virtual 接口的弹性, 其成本是: 每一个 object 
 需要额外的一个 word 空间。有什么重大影响吗? 视应用情况而定!
-
 
 除了每一个 class object 多负担一个 vptr 之外, virtual function 的导入也引发编译器对于我们的 Point class 产生膨胀作用:
 
 1. 我们所定义的 constructor 被附加了一些代码, 以便将 vptr 初始化。这些代码必须被附加在任何 base class constructors 的调用之后, 但必须在任何由使用
-  者(程序员)供应的代码之前。例如, 下面就是可能的附加结果:
+   者(程序员)供应的代码之前。例如, 下面就是可能的附加结果:
 
   Point* Point::Point(Point* this, float x, float y) : x_(x), y_(y){
 
@@ -358,13 +343,13 @@ virtual functions的导入促使每一个Point object拥有一个 virtual table 
 2. 合成一个 copy constructor 和一个 copy assignment operator, 而且其操作不再是 trivial(但 implicit destructor 仍然是 trivial)。如果一个
    Point object 被初始化或以一个 derived class object 赋值, 那么以位为基础(bitwise)的操作可能对 vptr 带来非法设定。
 
-inline Point* Point::Point(Point* this, const Point& rhs)
-{
-    this->__vptr_Point = __vtbl_Point;
-    // 将 rhs 坐标中的连续位拷贝到 this 对象
-    // 或是经过一个 member assignment 提供一个 member
-    return *this;
-}
+    inline Point* Point::Point(Point* this, const Point& rhs)
+    {
+        this->__vptr_Point = __vtbl_Point;
+        // 将 rhs 坐标中的连续位拷贝到 this 对象
+        // 或是经过一个 member assignment 提供一个 member
+        return *this;
+    }
 
 编译器在优化状态下可能会把 object 的连续内容拷贝到另一个 object 身上, 而不会实现一个精确地"以成员为基础(memberwise")的赋值操作。C++Standard 要求编译
 器尽量延迟 nontrivial members 的实际合成操作, 直到真正遇到其使用场合为止。
@@ -404,14 +389,13 @@ Point foobar(Point _result)
 
 如果支持 named return value (NRV)优化, 这个函数会进一步被转化为:
 
-
 Point foobar(Point _result)
 {
     _result.Point::Point(0.0,0.0);
     return;
 }
 
-一般而言, 如果你的设计之中, 有许多函数都需要以传值方式(by value) 传回一个local class object, 例如像这样形式的一个算术运算:
+'一般而言, 如果你的设计之中, 有许多函数都需要以传值方式(by value) 传回一个 local class object'。例如像这样形式的一个算术运算:
 
 T operator+(const T& t1,const T& t2)
 {
@@ -420,10 +404,8 @@ T operator+(const T& t1,const T& t2)
     return result;
 }
 
-
-那么提供一个 copy constructor 就比较合理——甚至即使 default memberwise 语意已经足够。它的出现会触发 NRV 优化。然而, 就像我在前一个例子中所展现的
+那么提供一个 copy constructor 就比较合理 -- 甚至即使 default memberwise 语意已经足够。它的出现会触发 NRV 优化。然而, 就像我在前一个例子中所展现的
 那样, NRV 优化后将不再需要调用 copy constructor, 因为运算结果已经被直接计算于"将被传回的 object"体内了
-
 
 
 // !! 5.2 继承体系下的对象构造
@@ -432,18 +414,18 @@ T operator+(const T& t1,const T& t2)
 
 T object;
 
-实际上会发生什么事情 ? 如果 T 有一个 constructor(不论是由 user 提供或是由编译器合成的), 它会被调用。这很明显, 比较不明显的是, constructor的调用真
+实际上会发生什么事情 ? 如果 T 有一个 constructor(不论是由 user 提供或是由编译器合成的), 它会被调用。这很明显, 比较不明显的是, constructor 的调用真
 正伴随了什么?
 
+Constructor 可能内含大量的隐藏码, 因为编译器会扩充每一个 constructor, 扩充程度视 class T 的继承体系而定。
 
-Constructor 可能内含大量的隐藏码,因为编译器会扩充每一个 constructor, 扩充程度视 class T 的继承体系而定。一般而言编译器所做的扩充操作
-大约如下:
+一般而言编译器所做的扩充操作大约如下:
 
 1. 记录在 member initialization list 中的 data members 初始化操作会被放进 constructor 的函数本体, 并以 members 的声明顺序为顺序
 
-2. 如果有一个 member 并没有出现在 member initialization list 之中, 但它有一个 default constructor, 那么该 default constructor  必须被调用
+2. 如果有一个 member 并没有出现在 member initialization list 之中, 但它有一个 default constructor, 那么该 default constructor 必须被调用
 
-3. 在那之前, 如果 class object 有 virtual table pointer(s), 它(们)必须被设定初值, 指向适当的 virtual table(s)
+3. 在那之前, 如果 class object 有 virtual table pointer, 它必须被设定初值, 指向适当的 virtual table
 
 4. 在那之前, 所有上一层的 base class constructors 必须被调用, 以 base class 的声明顺序为顺序:
 
@@ -455,18 +437,15 @@ Constructor 可能内含大量的隐藏码,因为编译器会扩充每一个 con
 
 5. 在那之前, 所有 virtual base class constructors 必须被调用, 从左到右, 从最深到最浅
 
-    1. 如果 class被列于 member initialization list 中, 那么如果有任何显式指定的参数, 都应该传递过去。若没有列于 list 之中, 而 class 有一个
-     default constructor, 亦应该调用之
+    1. 如果 class 被列于 member initialization list 中, 那么如果有任何显式指定的参数, 都应该传递过去。若没有列于 list 之中, 而 class 有一个
+       default constructor, 亦应该调用之
     2. 此外, class 中的每一个 virtual base class subobject 的偏移位置(offset) 必须在执行期可被存取
     3. 如果 class object 是最底层的 class, 其 constructors 可能被调用; 某些用以支持这一行为的机制必须被放进来
 
 在这一节中, 我要从"C++ 语言对 classes 所保证的语意" 这个角度, 探讨 constructors 扩充的必要性。我再次以 Point 为例, 并为它增加一个 
 copy constructor、一个copy operator、一个 virtual destructor, 如下所示:
 
-
-
-class Point
-{
+class Point {
 public:
     Point(float x = 0.0f, float y = 0.0f);
     Point(const Point &);
@@ -482,9 +461,7 @@ protected:
 
 在我开始介绍并一步步走过以 Point 为根源的继承体系之前, 我要带你很快地看看 Line class 的声明和扩充结果, 它由 _begin 和 _end 两个点构成:
 
-
-class Line
-{
+class Line {
     Point _begin, _end;
     public:
     Line(float x1 = 0.0f, float y1 = 0.0f, float x2 = 0.0f, float y2 = 0.0f);
@@ -493,43 +470,34 @@ class Line
     draw();
 };
 
-每一个 explicit constructor 都会被扩充以调用其两个 member class objects 的 constructors 。如果我们定义 constructor 如下:
+每一个 explicit constructor 都会被扩充以调用其两个 member class objects 的 constructor。如果我们定义 constructor 如下:
 
 Line::Line(const Point &begin, const Point &end):_end(end), _begin(begin){}
 
 它会被编译器扩充并转换为:
 
-
-Line* Line::Line(Line* this, const Point &begin, const Point& end)
-{
+Line* Line::Line(Line* this, const Point &begin, const Point& end) {
     this->_begin.Point::Point(begin)
     this->_end.Point::Point(end);
     return this;
 }
 
-
 由于 Point 声明了一个 copy constructor、一个 copy operator, 以及一个 destructor, 所以 Line class 的 implicit copy constructor、
-copy operator 和 destructor 都将有具体效用(nontrivia)。
-
+copy operator 和 destructor 都将有具体效用(non trivia)。
 
 当程序员写下:
 
 Line a;
 
-时, implicit Line destructor 会被合成出来(如果 Line 派生自 Point, 那么合成出来的 destructor 将会是 virtual。然而由于 Line 只是内含
-Point objects 而非继承自Point, 所以被合成出来的 destructor 只是 nontrivial 而已)。其中, 它的 member class objects 的 destructors 会被
-调用(以其构造的相反顺序):
+时, implicit Line destructor 会被合成出来。其中,它的 member class object 的 destructor 会被调用(以其构造的相反顺序):
 
-
-inline void Line::~Line(Line *this)
-{
+inline void Line::~Line(Line *this) {
     this->_end.Point::~Point();
     this->_begin.Point::~Point();
 }
 
 当然, 如果 Point destructor 是 inline 函数, 则每一个调用操作会在调用地点被扩展开来。请注意, 虽然 Point destructor 是 virtual, 但其调用操
 作(在 containing class destructor 之中) 会被静态地决议出来(resolved statically)
-
 
 类似的道理, 当一个程序员写下:
 
@@ -549,8 +517,7 @@ a = b;
 
 考虑下面这个虚拟继承(继承自我们的 Point):
 
-class Point3d : public virtual Point
-{
+class Point3d : public virtual Point {
 public:
     Point3d(float x= 0.0f, float y = 0.0f, float z = 0.0f) : Point(x), y_(y), z_(z){}
     Point3d(const Point3d &rhs) : Point(rhs.x_, rhs.y_),z_(rhs.z_){}
@@ -563,9 +530,7 @@ private:
 
 传统的"constructor 扩充现象"并没有用, 这是因为 virtual base class 的"共享性"之故:
 
-
-Point3d* Point3d::Point3d(Point3d* this, float x, float y, float z)
-{
+Point3d* Point3d::Point3d(Point3d* this, float x, float y, float z) {
     this->Point::Point(x,y);
     this->__vptr_Point3d = __vtbl_Point3d;
     this ->__vptr_Point3d_Point = __vtbl_Point3d_Point;
@@ -573,9 +538,7 @@ Point3d* Point3d::Point3d(Point3d* this, float x, float y, float z)
     return this;
 }
 
-
 你看得出上面的 Point3d constructor 扩充内容有什么错误吗?
-
 
 试着想想以下三种类的派生情况:
 
@@ -583,10 +546,11 @@ class Vertex : public virtual Point{...};
 class Vertex3d : public Point3d, public Vertex{...};
 class PVertex : public Vertex3d{...};
 
+// !! vptr 初始化语意学
 
-// !! vptr 初始化语意学（The Semantics of the vptr Initialization）
+The Semantics of the vptr Initialization
 
-当我们定义一个 PVertex object 时, constructors的调用顺序是:
+当我们定义一个 PVertex object 时, constructor 的调用顺序是:
 
 Point(x, y);
 Point3d(x,y,z);
@@ -612,13 +576,10 @@ pt->size();
 
 将传回 Point3d 的大小。
 
-
 更进一步, 我们假设这个继承体系中的每一个 constructors 内含一个调用操作, 像这样:
 
-Point3d::Point3d(float x, float y, float z) :x_(x), y_(y), z_(z)
-{
-    if(spyCn)
-    {
+Point3d::Point3d(float x, float y, float z) :x_(x), y_(y), z_(z) {
+    if(spyCn) {
         cerr << "Within Point3d::Point3d()" << "size: " << size() << endl;
     }
 }
@@ -727,7 +688,9 @@ PVertex* PVertex::PVertex(PVertex* this,bool _most_derived, float x, float y, fl
 这就完美地解决了我们所说的有关限制虚拟机制的问题。
 
 
-// !! 5.3 对象复制语意学(Object Copy Semantics)
+// !! 5.3 对象复制语意学
+
+Object Copy Semantics
 
 '当我们设计一个 class, 并将一个 class object 赋值给另一个 class object 时, 我们有三种选择':
 
@@ -737,13 +700,11 @@ PVertex* PVertex::PVertex(PVertex* this,bool _most_derived, float x, float y, fl
 
 3. 显式地拒绝把一个 class object assign 给另一个 class object
 
-
 在这一节, 我要验证 copy assignment operator 的语意, 以及它们如何被模塑出来。
 
 再一次, 我利用 Point class 来帮助讨论:
 
-class Point
-{
+class Point {
 public:
     Point(float x = 0.0f, float y = 0.0f): x_(x), y_(y) {}
     //...
@@ -752,15 +713,15 @@ protected:
 };
 
 
-'没有什么理由需要禁止拷贝一个 Point object。因此问题就变成了:默认行为是否足够'?
+'没有什么理由需要禁止拷贝一个 Point object。因此问题就变成了:  默认行为是否足够'?
 
 如果我们要支持的只是一个简单的拷贝操作,那么默认行为不但足够而且有效率,我们没有理由再自己提供一个 copy assignment operator。
 
-只有在默认行为所导致的语意不安全或不正确时, 我们才需要设计一个 copy assignment operator。好, 默认的 memberwise copy 行为对于我们的
+'只有在默认行为所导致的语意不安全或不正确时, 我们才需要设计一个 copy assignment operator'。好, 默认的 memberwise copy 行为对于我们的
 Point object 不安全吗? 不正确吗? 不, 由于坐标都内含数值, 所以不会发生"别名化(aliasing)"或"内存泄漏(memory leak)"。如果我们自己提供一个
 copy assignment operator, 程序反倒会执行得比较慢。
 
-如果我们不对 Point 供应一个 copy assignment operator, 而光是仰赖默认的 memberwise copy, 编译器会产生出一个实例吗?这个答案和 copy constructor
+如果我们不对 Point 供应一个 copy assignment operator, 而光是仰赖默认的 memberwise copy, 编译器会产生出一个实例吗? 这个答案和 copy constructor
 的情况一样: 实际上不会~ 由于此 class 已经有了 bitwise copy 语意,所以 implicit copy assignment operator 被视为毫无用处, 也根本不会被合成出来。
 
 一个 class 对于默认的 copy assignment operator, 在以下情况, 不会表现出 bitwise copy 语意:
@@ -785,22 +746,20 @@ a = b;
 
 由 bitwise copy 完成, 把 Point b 拷贝到 Point a, 其间并没有 copy assignment operator 被调用。从语意上或从效率上考虑, 这都是我们所需要的。
 
-注意, 我们还是可能提供一个 copy constructor, 为的是把 name return value (NRV) 优化打开。copy constructor 的出现不应该让我们以为也一定要提供
+注意, 我们还是可能提供一个 copy constructor 为的是把 name return value (NRV) 优化打开。copy constructor 的出现不应该让我们以为也一定要提供
 一个 copy assignment operator。
 
 现在我要导入一个 copy assignment operator, 用以说明该 operator 在继承之下的行为:
 
-
-inline Point& Point::operator=(const Point& rhs)
-{
+inline Point& Point::operator=(const Point& rhs) {
     this->x_ = rhs.x_;
     this->y_ = rhs.y_;
+    return *this;
 }
 
 现在派生一个 Point3d class (请注意是虚拟继承):
 
-class Point3d : virtual public Point
-{
+class Point3d : virtual public Point {
 public:
     Point3d(float x = 0.0f, float y = 0.0f, float z = 0.0f);
     //...
@@ -808,13 +767,10 @@ protected:
     float z_;
 };
 
-
 如果我们没有为 Point3d 定义一个 copy assignment operator, 编译器就必须合成一个。合成而得的东西可能看起来像这样:
 
 // C++ 伪代码
-
-inline Point3d* Point3d::operator=(Point3d *this, const Point &rhs)
-{
+inline Point3d* Point3d::operator=(Point3d *this, const Point &rhs) {
     // 调用 base class 的函数实例
     this->Point::operator=(rhs);
 
@@ -822,13 +778,11 @@ inline Point3d* Point3d::operator=(Point3d *this, const Point &rhs)
     z_ = rhs.z_;
 }
 
-copy assignment operator 有一个非正交性情况(nonorthogonal aspect, 意指不够理想、不够严谨的情况), 就是它缺乏一个 member assignment list
-(也就是平行于 member initialization list 的东西)
+copy assignment operator 有一个非正交性情况(意指不够理想、不够严谨的情况), 就是它缺乏一个 member assignment list
 
 因此我们不能够写:
 
-inline Point3d& Point3d::operator=(const Point3d &p3d) : Point(p3d), z(p3d.z_)
-{
+inline Point3d& Point3d::operator=(const Point3d &p3d) : Point(p3d), z(p3d.z_) {
 
 }
 
@@ -842,11 +796,9 @@ Point::operator=(p3d);
 
 缺少 copy assignment list, 看来或许只是一件小事, 但如果没有它,编译器一般而言就没有办法压抑上一层 base class 的 copy operators 被调用。
 
-
 例如, 下面是个 Vertex copy operator, 其中 Vertex 也是虚拟继承自 Point:
 
-inline Vertex& Vertex::operator=(const Vertex &rhs)
-{
+inline Vertex& Vertex::operator=(const Vertex &rhs) {
     this->Point::operator=(rhs);
     _next = rhs._next;
     return *this;
@@ -855,8 +807,7 @@ inline Vertex& Vertex::operator=(const Vertex &rhs)
 现在让我们从 Point3d 和 Vertex 中派生出 Vertex3d。下面是 Vertex3d 的 copy assignment operator:
 
 
-inline Vertex3d& Vertex3d::operator=(const Vertex3d & rhs)
-{
+inline Vertex3d& Vertex3d::operator=(const Vertex3d & rhs) {
     this->Point::operator=(rhs);
     this->Point3d::operator=(rhs);
     this->Vertex::operator=(rhs);
@@ -872,7 +823,6 @@ typedef Point3d& (Point3d::*pmfPoint3d)(const Point3d&);
 pmfPoint3d pmf = &Point3d::operator;
 
 (x.*pmf)(x);
-
 
 
 
@@ -925,12 +875,9 @@ main()
 如果 class 没有定义 destructor, 那么只有在 class 内含的 member object (抑或  class 自己的 base class) 拥有 destructor 的情况下, 
 编译器才会自动合成出一个来。否则, destructor 被视为不需要, 也就不需被合成。
 
+例如, 我们的 Point, 默认情况下并没有被编译器合成出一个 destructor -- 甚至虽然它拥有一个 virtual function:
 
-例如, 我们的 Point, 默认情况下并没有被编译器合成出一个 destructor --甚至虽然它拥有一个 virtual function:
-
-
-class Point
-{
+class Point {
 public:
     Point(float x = 0.0f, float y = 0.0f);
     Point(const Point &rhs);
@@ -960,14 +907,12 @@ Line 也不会拥有一个被合成出来的 destructor, 因为 Point 并没有 
 当我们从 Point 派生出 Point3d (即使是一种虚拟派生关系)时, 如果我们没有声明一个 destructor, 编译器就没有必要合成一个
 destructor。
 
-
 '不论 Point 还是 Point3d 都不需要 destructor, 为它们提供一个 destructor 反而是低效率的'。你应该拒绝那种被我称为"对称策略"的奇怪想法:"你已经定义了一
 个 constructor, 所以你以为提供一个 destructor 也是天经地义的事"。事实上, 你应该因为"需要"而非"感觉"来提供 destructor, 更不要因为你不确定是否需要一
 个 destructor, 于是就提供它。
 
-
-为了决定 class 是否需要一个程序层面的 destructor (或是 constructor), 请你想想一个 class object 的生命在哪里结束 (或开始) ? 需要什么操作才能保证
-对象的完整 ? 这是你写程序时比较需要了解的(或是你的 class 使用者比较需要了解的)。
+'为了决定 class 是否需要一个程序层面的 destructor (或是 constructor), 请你想想一个 class object 的生命在哪里结束 (或开始) ? 需要什么操作才能保证
+对象的完整 ? 这是你写程序时比较需要了解的'
 
 这也是 constructor 和 destructor 什么时候起作用的关键。举个例子, 已知:
 
@@ -979,10 +924,9 @@ destructor。
     delete p;
 }
 
-我们看到, pt 和 p 在作为 foo() 函数的参数之前, 都必须先初始化为某些坐标值。这时候需要一个 constructor, 否则使用者必须显式地提供坐标值
-一般而言, class 的使用者没有办法检验一个 local 变量或 heap 变量以知道它们是否被初始化。把 constructor 想象为程序的一个额外负担是错误的, 因为它们的工
-作有其必要性。如果没有它们, 抽象化(abstraction) 的使用就会有错误的倾向。
-
+我们看到, pt 和 p 在作为 foo() 函数的参数之前, 都必须先初始化为某些坐标值。这时候需要一个 constructor, 否则使用者必须显式地提供坐标值。一般而言, class 
+的使用者没有办法检验一个 local 变量或 heap 变量以知道它们是否被初始化。把 constructor 想象为程序的一个额外负担是错误的, 因为它们的工作有其必要性。如果没
+有它们, 抽象化(abstraction) 的使用就会有错误的倾向。
 
 当我们显式地 delete 掉 p, 会如何? 有任何程序上必须处理的吗? 是否需要在 delete 之前这么做:
 
@@ -990,12 +934,10 @@ p->x(0);
 p->y(0);
 
 不, 当然不需要。'没有任何理由说在 delete 一个对象之前先得将其内容清除干净。你也不需要归还任何资源'。在结束 pt 和 p 的生命之前, 没有任何"class 使用者
-层面" 的程序操作是绝对必要的, 因此, 也就不一定需要一个destructor。
-
+层面" 的程序操作是绝对必要的, 因此, 也就不一定需要一个 destructor。
 
 然而请考虑我们的 Vertex class, 它维护了一个由紧邻的"顶点"所形成的链表, 并且当一个顶点的生命结束时, 在链表上来回移动以完成删除操作。如果这(或其他语意)
 正是程序员所需要的, 那么这就是 Vertex destructor 的工作。
-
 
 当我们从 Point3d 和 Vertex 派生出 Vertex3d 时, 如果我们不供应一个 explicit Vertex3d destructor, 那么我们还是希望 Vertex destructor 被调
 用, 以结束一个 Vertex3d object。因此编译器必须合成一个 Vertex3d destructor, 其唯一任务就是调用 Vertex destructor。如果我们提供一个
@@ -1008,18 +950,9 @@ Vertex3d destructor, 编译器会扩展它, 使它调用 Vertex destructor (在�
 
 3. 如果 class 拥有 member class objects, 而后者拥有 destructors, 那么它们会以其声明顺序的相反顺序被调用
 
-4. 如果有任何直接的(上一层) nonvirtual base classes 拥有 destructor, 它们会以其声明顺序的相反顺序被调用
-
+4. 如果有任何直接的(上一层) non virtual base classes 拥有 destructor, 它们会以其声明顺序的相反顺序被调用
 
 一个 object 的生命结束于其 destructor 开始执行之时。由于每一个 base class destructor 都轮番被调用, 所以 derived object 实际上变成了一个完整的
 object。例如一个 PVertex 对象归还其内存空间之前, 会依次变成一个 Vertex3d 对象、一个 Vertex 对象,一个 Point3d 对象,最后成为一个 Point 对象。当
 我们在 destructor 中调用 member functions 时, 对象的蜕变会因为 vptr 的重新设定(在每一个 destructor 中, 在程序员所供供应的代码执行之前)而受到影
 响。
-
-
-
-
-
-
-
-
