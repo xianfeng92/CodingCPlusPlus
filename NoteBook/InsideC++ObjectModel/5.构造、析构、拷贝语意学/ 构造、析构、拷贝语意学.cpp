@@ -907,9 +907,9 @@ Line 也不会拥有一个被合成出来的 destructor, 因为 Point 并没有 
 当我们从 Point 派生出 Point3d (即使是一种虚拟派生关系)时, 如果我们没有声明一个 destructor, 编译器就没有必要合成一个
 destructor。
 
-'不论 Point 还是 Point3d 都不需要 destructor, 为它们提供一个 destructor 反而是低效率的'。你应该拒绝那种被我称为"对称策略"的奇怪想法:"你已经定义了一
-个 constructor, 所以你以为提供一个 destructor 也是天经地义的事"。事实上, 你应该因为"需要"而非"感觉"来提供 destructor, 更不要因为你不确定是否需要一
-个 destructor, 于是就提供它。
+'不论 Point 还是 Point3d 都不需要 destructor, 为它们提供一个 destructor 反而是低效率的'。你应该拒绝那种被我称为"对称策略"的奇怪想法:"你已经定义了
+一个 constructor, 所以你以为提供一个 destructor 也是天经地义的事"。事实上, 你应该因为"需要"而非"感觉"来提供 destructor, 更不要因为你不确定是否需要
+一个 destructor, 于是就提供它。
 
 '为了决定 class 是否需要一个程序层面的 destructor (或是 constructor), 请你想想一个 class object 的生命在哪里结束 (或开始) ? 需要什么操作才能保证
 对象的完整 ? 这是你写程序时比较需要了解的'
