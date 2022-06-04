@@ -743,7 +743,7 @@ long long now_in_ns() {
 
 int main(int argc, char **argv){
     std::chrono::system_clock::time_point t = std::chrono::system_clock::now();
-    std::time_t c = std::chrono::system_clock::to_time_t(t);
+    std::time_t c = std::chrono::system_clock::to_time_t(t);// UNIX 时间戳，秒
     //  %F 即 %Y-%m-%d，%T 即 %H:%M:%S，如 2011-11-11 11:11:11
     std::cout << std::put_time(std::localtime(&c), "%F %T");
     return 0;
@@ -751,5 +751,161 @@ int main(int argc, char **argv){
 
 
 
+std::chrono::duration 表示时间间隔
+
+namespace std{
+    namespace chrono {
+        using nanoseconds = duration<long long, nano>;
+        using microseconds = duration<long long, micro>;
+        using milliseconds = duration<long long, milli>
+        using seconds = duration<long long, seconds>;
+        using minutes = duration<long long, ratio<60>>;
+        using hours = duration<long long, ratio<3600>>;
+
+        //C++ 20
+        using days   = duration<int, ratio_multiply<ratio<24>, hours::period>>;
+        using weeks  = duration<int, ratio_multiply<ratio<7>, days::period>>;
+        using years  = duration<int, ratio_multiply<ratio<146097, 400>, days::period>>;
+        using months = duration<int, ratio_divide<years::period, ratio<12>>>;
+    }
+}
+
+
+C++14 在 std::literals::chrono_literals 中提供了表示时间的后缀
+
+#include <cassert>
+#include <chrono>
+
+using namespace std::literals::chrono_literals;
+
+int main() {
+  auto a = 45min;
+  assert(a.count() == 45);
+  auto b = std::chrono::duration_cast<std::chrono::seconds>(a);
+  assert(b.count() == 2700);
+  auto c = std::chrono::duration_cast<std::chrono::hours>(a);
+  assert(c.count() == 0);  // 转换会截断
+}
+
+duration 支持四则运算
+
+#include <cassert>
+#include <chrono>
+
+using namespace std::literals::chrono_literals;
+
+int main() {
+  assert((1h - 2 * 15min).count() == 30);
+  assert((0.5h + 2 * 15min + 60s).count() == 3660);
+}
+
+
+'使用 duration 设置等待时间'
+
+#include <chrono>
+#include <future>
+#include <iostream>
+#include <thread>
+
+int f(){
+    std::this_thread::sleep_for(std::chrono::seconds(1));
+    return 0;
+}
+
+
+int main(int argc, char* argv[]){
+    auto res = std::async(f);
+    if(res.wait_for(std::chrono::seconds(5)) == std::future_status::ready){
+        std::cout << res.get() << std::endl;
+    }
+    return 0;
+}
+
+
+std::chrono::time_point 是表示时间的类型, 值为从某个时间点开始计时的时间长度
+
+// 第一个模板参数为开始时间点的时钟类型, 第二个为时间单位
+std::chrono::time_point<std::chrono::system_clock, std::chrono::seconds>
+
+
+'std::chrono::time_point 可以与 duration 加减, 也可以与自身相减'
+
+#include <cassert>
+#include <chrono>
+
+int main(int argc, char* argv[]) {
+    std::chrono::system_clock::time_point a = std::chrono::system_clock::now();
+    std::this_thread::sleep_for(std::chrono::seconds(1));
+    std::chrono::system_clock::time_point b = std::chrono::system_clock::now();
+    long long diff = std::chrono::duration_cast<std::chrono::seconds>(b - a).count();
+
+    assert(diff == 60);
+    return 0;
+}
+
+
+// !! 函数式编程 (functional programming)
+
+'函数式编程是一种编程范式, 使用的函数为纯函数, 即如果函数的调用参数相同, 则永远返回相同的结果'。 纯函数不会改变外部状态，因此对于只使用纯函数的函数式编程，
+天生就不存在 race condition 的问题。
+
+Haskell 是一种常见的函数式编程语言, 以快速排序为例, Haskell 中的实现如下:
+
+quickSort :: Ord a => [a] -> [a]
+quickSort [] = []
+quickSort (x : xs) = l ++ [x] ++ r
+  where
+    l = quickSort (filter (<= x) xs)
+    r = quickSort (filter (> x) xs)
+
+main :: IO ()
+main = print (quickSort "downdemo") -- "downdemo"
+
+
+相同思路的 C++ 实现
+
+#include <algorithm>
+#include <iostream>
+#include <list>
+#include <utility>
+
+template<typename T>
+std::list<T> quick_sort(std::list<T> v){
+    if(v.empty()) return v;
+    std::list<T> res;
+    res.splice(res.begin(), v, v.begin());// 将 v 的首元素移到 res 中
+     // 将 v 按条件划分为两部分，并返回第一个不满足条件元素的迭代器
+    auto it = std::partition(v.begin(), v.end(),[&](const T& x){return x < res.front();});
+    std::list<T> low;
+    low.splice(low.end(), v, v.begin(), it);  // 转移左半部分到 low
+    auto l(quick_sort(std::move(low)));       // 递归对左半部分快速排序
+    auto r(quick_sort(std::move(v)));         // 递归对右半部分快速排序
+    res.splice(res.end(), r);                 // 右半部分移到结果后
+    res.splice(res.begin(), l);               // 左半部分移到结果前
+    return res;
+}
+
+int main() {
+  for (auto& x : quick_sort(std::list<int>{1, 3, 2, 4, 5})) {
+    std::cout << x;  // 12345
+  }
+}
+
+
+
+// !! 链式调用
+
+链式调用是函数式编程中经常使用的形式, 常见于 ReactiveX, 比如 RxJS, 当上游产生数据时交给下游处理, 将复杂的异步逻辑拆散成了多个小的操作, 只需要关注每一步操作
+并逐步转换到目标结果即可。C++20 的 ranges 使用的 range-v3 就脱胎自 RxCpp
+
+
+// !! CSP (Communicating Sequential Processes)
+
+
+1. CSP 是一种描述并发系统交互的编程模型, 线程理论上是分开的, 没有共享数据, 每个线程可以完全独立地思考, 消息通过 communication channel 在不同线程间传递, 
+   线程行为取决于收到的消息, 因此每个线程实际上是一个状态机, 收到一条消息时就以某种方式更新状态, 并且还可能发送消息给其他线程。
+
+2. Erlang 采用了这种编程模型, 并用于 MPI 做 C 和 C++ 的高性能计算。真正的 CSP 没有共享数据, 所有通信通过消息队列传递, 但由于 C++ 线程共享地址空间,无法强制
+   实现这个要求，所以需要应用或者库的作者来确保线程间不会共享数据
 
 

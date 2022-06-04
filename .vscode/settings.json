@@ -89,12 +89,14 @@
         "custset",
         "datademo",
         "demangling",
+        "downdemo",
         "Exupéry",
         "fibl",
         "fopow",
         "inorder",
         "iofile",
         "jthread",
+        "libfoo",
         "Lippman",
         "ltpi",
         "ltps",
@@ -111,6 +113,7 @@
         "Schwarz",
         "setaffinity",
         "Shopiro",
+        "Stallman",
         "subobject",
         "subobjects",
         "sval",
@@ -120,6 +123,7 @@
         "unsynchronized",
         "Usenix",
         "vbtl",
+        "vdso",
         "xforg"
     ]
 }
