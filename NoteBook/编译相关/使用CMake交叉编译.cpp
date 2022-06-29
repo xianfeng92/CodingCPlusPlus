@@ -42,5 +42,4 @@ tools 是本人使用的交叉工具链路径, 可以根据自己的实际文件
 // 注意，工具链文件的指定一定要紧跟cmake命令之后，不能放到 .. 后面
 cmake -DCMAKE_TOOLCHAIN_FILE=../arm_linux_setup.cmake ..
 
-
 ok 后再执行 make 就可以生成 main 的 elf 文件。使用 file 命令去查看这个文件, 可以看到其运行平台是 32 位 ARM 处理器上的 Linux 系统。
