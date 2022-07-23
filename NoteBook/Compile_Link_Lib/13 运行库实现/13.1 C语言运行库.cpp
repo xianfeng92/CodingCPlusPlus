@@ -351,3 +351,385 @@ int mini_crt_heap_init(){
 
 Mini CRT 的 IO 部分实现源代码如清单 13-3 所示。
 
+#include "minicrt.h"
+
+int mini_crt_io_init() {
+    return 1;
+}
+
+#ifdef WIN32
+#include <windows.h>
+
+FILE* fopen(const char* filename, const char* mode) {
+    HANDLE hFIle = 0;
+    int access = 0;
+    int creation = 0;
+
+    if(strcmp(mode, "w") == 0) {
+        access |= GENERIC_WRITE;
+        creation |= CREATE_ALWAYS;
+    }
+    if(strcmp(mode, "w+") == 0) {
+        access |= GENERIC_WRITE | GENERIC_READ;
+        creation |= CREATE_ALWAYS;
+    }
+    if(strcmp(mode, "r") == 0) {
+        access |= GENERIC_READ;
+        creation |= OPEN_EXISTING;
+    }
+    if(strcmp(mode, "r+") == 0) {
+        access |= GENERIC_READ | GENERIC_WRITE;
+        creation |= TRUNCATE_EXISTING;
+    }
+    hFIle = CreateFile(filename, access, 0, 0, creation, 0, 0);
+    if(hFIle == INVALID_HANDLE_VALUE) {
+        return 0;
+    }
+    return (FILE*)hFIle;
+}
+
+int fread(void* buffer, int size, int count, FILE* stream) {
+    int read = 0;
+    if(!ReadFile((HANDLE)stream, buffer, size * count, &read, 0)) {
+        return 0;
+    }
+    return read;
+}
+
+int fwrite(const void *buffer, int size, int count, FILE *stream) {
+    int written = 0;
+    if(!WriteFile((HANDLE)stream, buffer, size * count, &written, 0)) {
+        return 0;
+    }
+    return written;
+}
+
+int fclose(FILE *fp) {
+    return CloseHandle((HANDLE)fp);
+}
+
+int fseek(FILE *fp, int offset, int set) {
+    return SetFilePointer((HANDLE)fp, offset, 0, set);
+}
+
+#else // #ifdef WIN32
+
+static int open(const char *pathname, int flags, int mode) {
+    int fd = 0;
+    asm("movl $5,%%eax    \n\t"
+    "movl %1,%%ebx    \n\t"
+    "movl %2,%%ecx  \n\t"
+    "movl %3,%%edx    \n\t"
+    "int $0x80        \n\t"
+    "movl %%eax,%0    \n\t": "=m"(fd):"m"(pathname),"m"(flags),"m"(mode));
+}
+
+static int read( int fd, void* buffer, unsigned size){
+    int ret = 0;
+    asm("movl $3,%%eax    \n\t"
+    "movl %1,%%ebx    \n\t"
+    "movl %2,%%ecx  \n\t"
+    "movl %3,%%edx    \n\t"
+    "int $0x80        \n\t"
+    "movl %%eax,%0    \n\t": "=m"(ret):"m"(fd),"m"(buffer),"m"(size));
+    return ret;
+}
+
+static int write( int fd, const void* buffer, unsigned size){
+    int ret = 0;
+    asm("movl $4,%%eax    \n\t"
+    "movl %1,%%ebx    \n\t"
+    "movl %2,%%ecx  \n\t"
+    "movl %3,%%edx    \n\t"
+    "int $0x80        \n\t"
+    "movl %%eax,%0    \n\t": "=m"(ret):"m"(fd),"m"(buffer),"m"(size));
+    return ret;
+}
+
+static int close(int fd){
+    int ret = 0;
+    asm("movl $6,%%eax    \n\t"
+    "movl %1,%%ebx    \n\t"
+    "int $0x80        \n\t"
+    "movl %%eax,%0    \n\t":"=m"(ret):"m"(fd));
+    return ret;
+}
+
+FILE * fopen(const char *filename, const char *mode) {
+    int fd = -1;
+    int flags = 0;
+    int access = 00700; // 创建文件的权限
+
+    // 来自于/usr/include/bits/fcntl.h
+    // 注意: 以0开始的数字是八进制的
+    #define O_RDONLY             00
+    #define O_WRONLY             01
+    #define O_RDWR               02
+    #define O_CREAT            0100
+    #define O_TRUNC           01000
+    #define O_APPEND          02000
+
+    if(strcmp(mode, "w") == 0) {
+        flags |= O_WRONLY | O_CREAT | O_TRUNC;
+    }
+
+    if(strcmp(mode, "w+") == 0) {
+        flags |=  O_RDWR | O_CREAT | O_TRUNC;
+    }
+
+    if(strcmp(mode, "r") == 0) {
+         flags |=  O_RDONLY;
+    }
+
+    if(strcmp(mode, "r+") == 0) {
+        flags |=  O_RDWR | O_CREAT;
+    }
+
+    fd = open(filename, flags, access);
+    return (FILE *)fd;
+}
+
+int fread(void* buffer, int size, int count, FILE *stream) {
+    return read((int)stream, buffer, size * count);
+}
+
+int fwrite(const void* buffer, int size, int count, FILE *stream) {
+    return write((int)stream, buffer, size * count);
+}
+
+int fclose(FILE *fp) {
+    return close((int)fp);
+}
+
+int fseek(FILE *fp, int offset, int set) {
+    return lseek((int)fp, offset, set);
+}
+
+#endif
+
+另外还有一段与文件操作相关的声明须放在 minicrt.h 里面:
+
+typedef int FILE;
+#define EOF (-1)
+#ifdef WIN32
+#define stdin   ((FILE*)(GetStdHandle(STD_INPUT_HANDLE)))
+#define stdout  ((FILE*)(GetStdHandle(STD_OUTPUT_HANDLE)))
+#define stderr  ((FILE*)(GetStdHandle(STD_ERROR_HANDLE)))
+
+#else
+#define stdin   ((FILE*)0)
+#define stdout  ((FILE*)1)
+#define stderr  ((FILE*)2)
+#endif
+
+
+// !! 13.1.4　字符串相关操作
+
+'字符串相关的操作也是 CRT 的一部分, 包括计算字符串长度、比较两个字符串、整数与字符串之间的转换等'。由于这部分功能无须涉及任何与内核交互, 是纯粹的用户态的计算, 所以它们
+的实现相对比较简单。
+
+我们在 Mini CRT 中将实现与如清单 13-4 几个字符串相关的操作。
+
+char* itoa(int n, char* str, int radix) {
+    char digit[] = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ";
+    char* p = str;
+    char* head = str;
+    if(!p || radix < 2 || radix > 36){
+        return p;
+    }
+    if(radix != 10 && n < 0) {
+        return p;
+    }
+    if(n == 0){
+        *p++ = '0';
+        *p = 0;
+        return p;
+    }
+    if(radix == 10 && n < 0){
+        *p++ = '-';
+        n = -n;
+    }
+    while(n) {
+        *p++ digit[n % radix];
+        n /= radix;
+    }
+    *p =n;
+    for(--p; head < p; head++, --p ) {
+        char temp = *head;
+        *head = *p;
+        *p = temp;
+    }
+    return str;
+}
+
+int strcmp(const char* src, const char* dst) {
+    int ret = 0;
+    unsigned char* p1 = (unsigned char*)src;
+    unsigned char* p2 = (unsigned char*)dst;
+    while(!(*p1 - *p2) && *p2) {
+        ++p1;
+        ++p2;
+    }
+    if(ret < 0) {
+        return -1;
+    }else if (ret > 0) {
+        return 1;
+    }else {
+        return ret;
+    }
+}
+
+
+char* strcpy(char* dst, const char* src) {
+    char* ret = dst;
+    while(*src) {
+        *dst++ = *src++;
+    }
+    *dst = '\0';
+    return ret;
+}
+
+unsigned strlen(const char* src) {
+    int cnt = 0;
+    if(!src) {
+        return 0;
+    }
+    for(; *src != '\0'; ++src) {
+        ++cnt;
+    }
+    return cnt;
+}
+
+
+// !! 13.1.5　格式化字符串
+
+现在的 Mini CRT 已经初具雏形了, 它拥有了堆管理、文件操作、基本字符串操作。
+
+接下来将要实现的是 CRT 中一个如雷贯耳的函数, 那就是 printf。
+
+1. printf 实现仅支持 %d、%s, 且不支持格式控制(比如 %08d)
+
+2. 实现 fprintf 和 vfprintf, 实际上 printf 是 fprintf 的特殊形式, 即目标文件为标准输出的 fprintf
+
+3. 实现与文件字符串操作相关的几个函数, fputc 和 fputs
+
+printf 相关的实现代码如清单 13-5 所示。
+
+#include "minicrt.h"
+
+int fputc(int c, FILE *stream) {
+    if(fwrite(c, 1, 1, stream) != 1){
+        return EOF;
+    }
+    return c;
+}
+
+int fputs(const char *str, FILE *stream) {
+    int len = strlen(str);
+    if(fwrite(str, 1, len, stream) != len){
+        return EOF;
+    }
+    return len;
+}
+
+#ifndef WIN32
+#define va_list char*
+#define va_start(ap,arg) (ap=(va_list)&arg+sizeof(arg))
+#define va_arg(ap,t) (*(t*)((ap+=sizeof(t))-sizeof(t)))
+#define va_end(ap) (ap=(va_list)0)
+#else
+#include <Windows.h>
+#endif
+
+int vprintf(FILE* stream, const char* format, va_list arglist) {
+    int translating = 0;
+    int ret = 0;
+    const char* p = 0;
+    for(p = format, *p != '\0'; ++p) {
+        switch(*p) {
+            case '%':
+             if(!translation){
+                translating = 1;
+             }else{
+                if(fputc('%', stream) < 0){
+                    return EOF;
+                }
+                ++ret;
+                translating = 0;
+             }
+            break;
+            case 'd':
+            if(translation){
+                char buf[16];
+                translating = 0;
+                itoa(va_arg(arglist, int), buf, 10);
+                if(fputs(buf, stream) < 0){
+                    return EOF;
+                }
+                ret = strlen(buf);
+            }else if(fputc('d', stream) < 0){
+                return EOF;
+            }else {
+                ++ret;
+            }
+            break;
+            case 's':
+            if(translation){
+                const char* str = va_arg(arglist, const char*);
+                translating = 0;
+                if (fputs(str, stream) < 0){
+                    return EOF;
+                }else {
+                    ++ret;
+                }
+            } else if (fputc('s', stream) < 0){
+                return EOF;
+            }else {
+                ++ret;
+            }
+            break;
+            default:
+            if(translation){
+                translating = 0;
+            }
+            if(fputc(*p, stream) < 0){
+                return EOF;
+            }else {
+                ++ret;
+            }
+            break;
+        }
+    }
+}
+
+int printf(const char *format, ...) {
+    va_list(arglist);
+    va_start(arglist, format);
+    return vprintf(stdout, format, arglist);
+}
+
+
+int fprintf(FILE *stream, const char *format, ...) {
+    va_list(arglist);
+    va_start(arglist, format);
+    return vfprintf(stream, format, arglist);
+}
+
+
+可以看到 vfprintf 是这些函数中真正实现字符串格式化的函数, 实现它的主要复杂性来源于对格式化字符串的分析。
+
+在这里使用了一种简单的算法:
+
+1. 定义模式: 翻译模式/普通模式
+
+2. 循环整个格式字符串
+
+   a. 如果遇到 %
+      i. 普通模式: 进入翻译模式
+      ii. 翻译模式: 输出%, 退出翻译模式
+      
+   b. 如果遇到 % 后面允许出现的特殊字符 (如 d 和 s)
+      i. 翻译模式: 从不定参数中取出一个参数输出, 退出翻译模式
+      ii.普通模式: 直接输出该字符
+
+   c. 如果遇到其他字符: 无条件退出翻译模式并输出字符

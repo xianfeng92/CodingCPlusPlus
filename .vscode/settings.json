@@ -82,6 +82,7 @@
         "aggr",
         "anybuf",
         "aranges",
+        "arglist",
         "ARRAYSZ",
         "auxbase",
         "auxv",
@@ -130,6 +131,7 @@
         "FPIPE",
         "fresolution",
         "getconf",
+        "ggdb",
         "gnueabihf",
         "GOTPCRELX",
         "helloworld",
@@ -158,6 +160,7 @@
         "liba",
         "libfoo",
         "liblto",
+        "libminicrt",
         "linkonce",
         "Lippman",
         "loadarchive",
@@ -257,6 +260,7 @@
         "vvar",
         "xforg",
         "Xlinker",
-        "xorl"
+        "xorl",
+        "Znwm"
     ]
 }
