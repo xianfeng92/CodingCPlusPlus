@@ -1,0 +1,82 @@
+#IncludeRegexLine: ^[ 	]*[#%][ 	]*(include|import)[ 	]*[<"]([^">]+)([">])
+
+#IncludeRegexScan: ^.*$
+
+#IncludeRegexComplain: ^$
+
+#IncludeRegexTransform: 
+
+../src/include/minicrt.h
+stdint.h
+../src/include/stdint.h
+
+../src/include/port.h
+
+../src/include/stdarg.h
+Windows.h
+-
+
+../src/include/stddef.h
+
+../src/include/stdint.h
+
+../src/include/stdio.h
+stdint.h
+../src/include/stdint.h
+
+../src/include/string.h
+stdint.h
+../src/include/stdint.h
+
+../src/include/unistd.h
+
+/home/parallels/Stan/CodingCPlusPlus/NoteBook/Compile_Link_Lib/13 运行库实现/MiniCRTV4/src/entry.c
+minicrt.h
+/home/parallels/Stan/CodingCPlusPlus/NoteBook/Compile_Link_Lib/13 运行库实现/MiniCRTV4/src/minicrt.h
+stddef.h
+/home/parallels/Stan/CodingCPlusPlus/NoteBook/Compile_Link_Lib/13 运行库实现/MiniCRTV4/src/stddef.h
+unistd.h
+/home/parallels/Stan/CodingCPlusPlus/NoteBook/Compile_Link_Lib/13 运行库实现/MiniCRTV4/src/unistd.h
+stdio.h
+/home/parallels/Stan/CodingCPlusPlus/NoteBook/Compile_Link_Lib/13 运行库实现/MiniCRTV4/src/stdio.h
+Windows.h
+-
+
+/home/parallels/Stan/CodingCPlusPlus/NoteBook/Compile_Link_Lib/13 运行库实现/MiniCRTV4/src/format.c
+stdarg.h
+/home/parallels/Stan/CodingCPlusPlus/NoteBook/Compile_Link_Lib/13 运行库实现/MiniCRTV4/src/stdarg.h
+stdint.h
+/home/parallels/Stan/CodingCPlusPlus/NoteBook/Compile_Link_Lib/13 运行库实现/MiniCRTV4/src/stdint.h
+stdio.h
+/home/parallels/Stan/CodingCPlusPlus/NoteBook/Compile_Link_Lib/13 运行库实现/MiniCRTV4/src/stdio.h
+string.h
+/home/parallels/Stan/CodingCPlusPlus/NoteBook/Compile_Link_Lib/13 运行库实现/MiniCRTV4/src/string.h
+port.h
+/home/parallels/Stan/CodingCPlusPlus/NoteBook/Compile_Link_Lib/13 运行库实现/MiniCRTV4/src/port.h
+
+/home/parallels/Stan/CodingCPlusPlus/NoteBook/Compile_Link_Lib/13 运行库实现/MiniCRTV4/src/malloc.c
+minicrt.h
+/home/parallels/Stan/CodingCPlusPlus/NoteBook/Compile_Link_Lib/13 运行库实现/MiniCRTV4/src/minicrt.h
+stddef.h
+/home/parallels/Stan/CodingCPlusPlus/NoteBook/Compile_Link_Lib/13 运行库实现/MiniCRTV4/src/stddef.h
+unistd.h
+/home/parallels/Stan/CodingCPlusPlus/NoteBook/Compile_Link_Lib/13 运行库实现/MiniCRTV4/src/unistd.h
+Windows.h
+-
+
+/home/parallels/Stan/CodingCPlusPlus/NoteBook/Compile_Link_Lib/13 运行库实现/MiniCRTV4/src/stdio.c
+stdio.h
+/home/parallels/Stan/CodingCPlusPlus/NoteBook/Compile_Link_Lib/13 运行库实现/MiniCRTV4/src/stdio.h
+unistd.h
+/home/parallels/Stan/CodingCPlusPlus/NoteBook/Compile_Link_Lib/13 运行库实现/MiniCRTV4/src/unistd.h
+string.h
+/home/parallels/Stan/CodingCPlusPlus/NoteBook/Compile_Link_Lib/13 运行库实现/MiniCRTV4/src/string.h
+Windows.h
+-
+
+/home/parallels/Stan/CodingCPlusPlus/NoteBook/Compile_Link_Lib/13 运行库实现/MiniCRTV4/src/string.c
+string.h
+/home/parallels/Stan/CodingCPlusPlus/NoteBook/Compile_Link_Lib/13 运行库实现/MiniCRTV4/src/string.h
+stddef.h
+/home/parallels/Stan/CodingCPlusPlus/NoteBook/Compile_Link_Lib/13 运行库实现/MiniCRTV4/src/stddef.h
+

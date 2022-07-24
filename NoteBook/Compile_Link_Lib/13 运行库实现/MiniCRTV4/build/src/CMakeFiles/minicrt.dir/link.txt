@@ -1,0 +1,2 @@
+/usr/bin/ar qc ../lib/libminicrt.a  CMakeFiles/minicrt.dir/entry.c.o CMakeFiles/minicrt.dir/format.c.o CMakeFiles/minicrt.dir/malloc.c.o CMakeFiles/minicrt.dir/stdio.c.o CMakeFiles/minicrt.dir/string.c.o CMakeFiles/minicrt.dir/cxxabi.cpp.o CMakeFiles/minicrt.dir/new_delete.cpp.o CMakeFiles/minicrt.dir/string.cpp.o CMakeFiles/minicrt.dir/iostream.cpp.o
+/usr/bin/ranlib ../lib/libminicrt.a

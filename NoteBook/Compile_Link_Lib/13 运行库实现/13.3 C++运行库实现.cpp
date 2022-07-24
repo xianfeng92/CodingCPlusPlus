@@ -305,6 +305,214 @@ void mini_crt_call_exit_routine() {
 函数是按照先注册后调用的顺序, 这符合析构函数的规则, 因为先构造的全局对象应该后析构。
 
 
-
 // !! 13.3.4　入口函数修改
+
+由于增加了全局构造和析构的支持, 那么需要对 Mini CRT 的入口函数和 exit() 函数进行修改, 把对 do_global_ctors() 和 mini_crt_call_exit_routine() 的调用加入到
+entry() 和 exit() 函数中去。
+
+
+
+// !! 13.3.5　stream 与 string
+
+C++ 的 Hello World 里面一般都会用到 cout 和 string, 以展示 C++ 的特性。流和字符串是 C++ STL 的最基本的两个部分, 在这一节中为 Mini CRT 增加 string 和 stream 
+的实现, 在有了流和字符串之后, Mini CRT 将最终宣告完成, 可以考虑将它重命名为 Mini CRT++。
+
+当然, 在真正的 STL 实现中, string 和 stream 的实现十分复杂, 不仅有强大的模板定制功能、缓冲，庞大的继承体系及一系列辅助类。我们在实现时还是以展示和剖析为最基本的目的, 
+简化一切能够简化的内容。string 和 stream 的实现将遵循下列原则:
+
+1. 不支持模板定制, 即这两个类仅支持 char 字符串类型, 不支持自定义分配器等, 没有 basic_string 模板类
+
+2. 流对象仅实现 ofstream, 且没有继承体系, 即没有 ios_base、stream、ostream、fstream 等类似的相关类
+
+3. cout 作为 ofstream 的一个实例, 它的输出文件是标准输出
+
+
+stream 和 string 类的实现用到了不少 C++ 语言的特性, 已经一定程度上偏离了本书所要描述的主题, 因此在此仅将它们的实现源代码列出, 而不做更多的详细分析。
+
+string 和 iostream 的实现如清单 13-13、清单 13-14、清单 13-15 所示。
+
+namespace std {
+    class string {
+        unsigned len;
+        char* buf;
+        public:
+          explicit string(const char* str);
+          string(const string&);
+          ~string();
+          string& operator=(const string&);
+          string& operator=(const char* str);
+          const char& operator[](unsigned idx) const;
+          char& operator[](unsigned idx);
+          const char* c_str() const;
+          unsigned length() const;
+          unsigned size() const;
+    };
+
+
+    string::string(const char* str) : len(0), pbuf(0){
+        *this = str;
+    }
+
+    string::~string() {
+        if(pbuf != 0) {
+            delete[] pbuf;
+            pbuf = 0;
+        }
+    }
+
+    string& string::operator=(const string&s) {
+        if(&s == this){
+            return *this;
+        }
+        this->~string();
+        len = s.len;
+        pbuf = strcpy(new char[len + 1], s.pbuf);
+        return *this;
+    }
+
+    string& string::operator=(const char* str) {
+        this->~string();
+        len = strlen(str);
+        pbuf = strcpy(new char[len + 1], str);
+        return *this;
+    }
+
+    const char& string::operator[](unsigned idx) const {
+        return pbuf[idx];
+    }
+
+    char& string::operator[](unsigned idx) {
+        return pbuf[idx];
+    }
+
+    unsigned string::length() const {
+        return len;
+    }
+
+    unsigned string::size() const {
+        return len;
+    }
+
+    ofstream& operator<<(ofstream& o, const string& s) {
+        return o << s.c_str();
+    }
+}
+
+
+#include "minicrt.h"
+
+namespace std {
+
+    class ofstream {
+        protected:
+          FILE* fp;
+          ofstream(const ofstream&);
+        public:
+          enum openmode {in = 1, out = 2, binary = 4, trunc = 8};
+          ofstream();
+          explicit ofstream(const char* filename, ofstream::openmode md = ofstream::out);
+          ~ofstream();
+          ofstream& operator<<(char c);
+          ofstream& operator<<(int n);
+          ofstream& operator<<(const char* str);
+          ofstream& operator<<(ofstream&(*)(ofstream&));
+          void open(const char* str, ofstream::openmode md = ofstream::out);
+          void close();
+          ofstream& write(const char* buf, unsigned size);
+
+    };
+
+    inline ofstream& endl(ofstream& o){
+        return o << '\n';
+    }
+
+    class stdout_stream : public ofstream {
+        public:
+          stdout_stream();
+        extern stdout_stream cout;
+    };
+}
+
+
+#include "minicrt.h"
+#include "iostream"
+
+#ifdef WIN32
+#include <windows.h>
+#endif
+
+namespace std {
+    stdout_stream::stdout_stream(): ofstream() {
+        fp = stdout;
+    }
+
+    stdout_stream cout;
+
+    ofstream::ofstream() : fp(0) {
+
+    }
+
+    ofstream::ofstream(const char* filename, ofstream::openmode md) : fp(0) {
+        open(filename, md);
+    }
+
+    ofstream::~ofstream() {
+        close();
+    }
+
+    ofstream& ofstream::operator<<(char c) {
+        fputs(c, fp);
+        return *this;
+    }
+
+    ofstream& ofstream::operator<<(int n) {
+        fprintf(fp, "%d", n);
+        return *this;
+    }
+
+
+    ofstream& ofstream::operator<<(const char* str) {
+         fprintf(fp, "%s", str);
+         return *this;
+    }
+
+    ofstream& ofstream::operator<<(ofstream& (*manip)(ofstream&)){
+        return manip(*this);
+    }
+
+    void ofstream::open(const char* filename, ofstream::openmode md) {
+        char mode[4];
+        close();
+        switch(mode) {
+            case out | trunc:
+            strcpy(mode, "w");
+            break;
+            case out | in |trunc:
+            strcpy(mode, "w+");
+            break;
+            case out | trunc | binary:
+            strcpy(mode, "wb");
+            break;
+            case out | binary| trunc | in:
+            strcpy(mode, "wb+");
+            break;
+        }
+        fp = fopen(filename, mode);
+    }
+
+
+    void ofstream::close() {
+        if(fp) {
+            fclose(fp);
+            return *this;
+        }
+    }
+
+
+    ofstream& ofstream::write(const char* buf, unsigned size) {
+        fwrite(buf, 1, size, fp);
+        return *this;
+    }
+
+}
 
