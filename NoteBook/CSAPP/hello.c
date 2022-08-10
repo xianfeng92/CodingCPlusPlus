@@ -31,5 +31,13 @@ pthread_t pthread_self(void *thread_return);
 int pthread_cancel(pthread_t tid);
 
 
+int pthread_join(pthread_t tid, void **thread_return);
+
+
+pthread_once_t once_control = PTHREAD_ONCE_INIT;
+
+int pthread_once(pthread_once_t *once_control, void(*init_routine)(void));
+
+
 
 
