@@ -44,3 +44,16 @@ sudo systemctl disable apport.service
 
 ### Ubuntu core_pattern config
 sudo bash -c 'echo /home/xforg/Desktop/CodingCPlusPlus/NoteBook/CoreDump/core.%e.%p > /proc/sys/kernel/core_pattern'
+
+
+
+
+#define SIG_KERNEL_COREDUMP_MASK (\
+        rt_sigmask(SIGQUIT)   |  rt_sigmask(SIGILL)    | \
+>   rt_sigmask(SIGTRAP)   |  rt_sigmask(SIGABRT)   | \
+        rt_sigmask(SIGFPE)    |  rt_sigmask(SIGSEGV)   | \
+>   rt_sigmask(SIGBUS)    |  rt_sigmask(SIGSYS)    | \
+        rt_sigmask(SIGXCPU)   |  rt_sigmask(SIGXFSZ)   | \
+>   SIGEMT_MASK>>   >   >          )
+ 
+#define sig_kernel_coredump(sig)>   siginmask(sig, SIG_KERNEL_COREDUMP_MASK)
