@@ -1,0 +1,23 @@
+        -:    0:Source:gcov_test.cpp
+        -:    0:Graph:gcov_test.gcno
+        -:    0:Data:gcov_test.gcda
+        -:    0:Runs:1
+        -:    0:Source is newer than graph
+        -:    1:#include <stdio.h>
+        -:    2:
+        -:    3:// gcc -fprofile-arcs -ftest-coverage -o gcov_test gcov_test.cpp 
+        -:    4:// ./gcov_test
+        1:    5:// gcov gcov_test.cpp 
+        -:    6:int main(int argc, char **argv) {
+        1:    7:    int i, total;
+       11:    8:    total = 0;
+       10:    9:    for(i = 0; i < 10; i++) {
+        -:   10:        total += i;
+        1:   11:    }
+    #####:   12:    if(total != 45) {
+        -:   13:        printf("fail!\n");
+        1:   14:    } else {
+        -:   15:        printf("success!\n");
+        1:   16:    }
+        -:   17:    return 0;
+        -:   18:}
